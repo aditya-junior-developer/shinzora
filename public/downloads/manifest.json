@@ -1,0 +1,11 @@
+{
+  "$comment": [
+    "Shinzora build registry — the only source of download links in the UI.",
+    "A platform gets a Download button ONLY when an entry exists here AND the",
+    "file answers a HEAD request at the listed url. Anything not listed is shown",
+    "as 'no standalone build published', with the browser-install route instead.",
+    "See public/downloads/README.md for how to publish a build."
+  ],
+  "updated": "2026-11-06",
+  "builds": {}
+}

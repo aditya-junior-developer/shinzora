@@ -1,0 +1,2115 @@
+/* ==========================================================================
+   Shinzora — Component library
+   Buttons, fields, cards, badges, tables, tabs, modals, toasts, empty states,
+   skeletons, menus, switches, progress, tooltips, avatars, pagination.
+   Consumed by marketing, auth, onboarding, dashboard and admin surfaces.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+.btn {
+  --btn-h: 42px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  height: var(--btn-h);
+  padding-inline: var(--s-5);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition:
+    transform var(--t-fast) var(--ease),
+    background var(--t-base) var(--ease),
+    border-color var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease),
+    color var(--t-base) var(--ease),
+    opacity var(--t-base) var(--ease);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active {
+  transform: translateY(1px) scale(0.995);
+}
+.btn[disabled],
+.btn[aria-busy="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.btn .ico {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-primary {
+  background: var(--grad-brand);
+  color: #fff;
+  box-shadow:
+    var(--shadow-inset-top),
+    0 10px 26px -12px rgba(124, 58, 237, 0.85);
+}
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 55%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.btn-primary:hover {
+  box-shadow:
+    var(--shadow-inset-top),
+    0 16px 34px -14px rgba(147, 87, 255, 0.95);
+  filter: brightness(1.06);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--line-strong);
+  color: var(--white);
+  backdrop-filter: blur(10px);
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(168, 85, 247, 0.38);
+}
+
+.btn-ghost {
+  color: var(--text-2);
+}
+.btn-ghost:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.btn-violet-outline {
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--lavender);
+}
+.btn-violet-outline:hover {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(168, 85, 247, 0.55);
+  color: #fff;
+}
+
+.btn-danger {
+  background: rgba(251, 113, 133, 0.14);
+  border-color: rgba(251, 113, 133, 0.34);
+  color: #ffc2cb;
+}
+.btn-danger:hover {
+  background: rgba(251, 113, 133, 0.22);
+  color: #fff;
+}
+
+.btn-success {
+  background: rgba(52, 211, 153, 0.14);
+  border-color: rgba(52, 211, 153, 0.32);
+  color: #a7f3d0;
+}
+.btn-success:hover {
+  background: rgba(52, 211, 153, 0.22);
+  color: #fff;
+}
+
+.btn-sm {
+  --btn-h: 34px;
+  padding-inline: var(--s-3);
+  font-size: var(--fs-xs);
+  border-radius: var(--r-sm);
+}
+.btn-sm .ico {
+  width: 14px;
+  height: 14px;
+}
+.btn-lg {
+  --btn-h: 50px;
+  padding-inline: var(--s-7);
+  font-size: var(--fs-body);
+  border-radius: var(--r-lg);
+}
+.btn-xl {
+  --btn-h: 56px;
+  padding-inline: var(--s-8);
+  font-size: 1rem;
+  border-radius: var(--r-lg);
+}
+.btn-block {
+  width: 100%;
+}
+.btn-icon {
+  --btn-h: 38px;
+  width: var(--btn-h);
+  padding: 0;
+  border-radius: var(--r-md);
+}
+.btn-icon.btn-sm {
+  --btn-h: 30px;
+  width: var(--btn-h);
+}
+
+/* Loading spinner inside buttons */
+.spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 0.7s linear infinite;
+  opacity: 0.9;
+}
+.spinner-lg {
+  width: 26px;
+  height: 26px;
+  border-width: 2.5px;
+}
+
+/* --------------------------------------------------------------------------
+   Form fields
+   -------------------------------------------------------------------------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  color: var(--text);
+}
+.field-label .optional {
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.field-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.field-error {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--danger);
+}
+.field.invalid .field-error {
+  display: flex;
+}
+.field.invalid .input,
+.field.invalid .select,
+.field.invalid .textarea {
+  border-color: rgba(251, 113, 133, 0.55);
+  background: rgba(251, 113, 133, 0.05);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px var(--s-4);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line-strong);
+  color: var(--white);
+  font-size: var(--fs-body);
+  transition:
+    border-color var(--t-base) var(--ease),
+    background var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-4);
+}
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: rgba(168, 85, 247, 0.7);
+  background: rgba(124, 58, 237, 0.07);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+}
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.6;
+  padding-block: var(--s-3);
+}
+.select {
+  cursor: pointer;
+  padding-right: var(--s-8);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8a1bd' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--s-4) center;
+}
+.select option {
+  background: var(--panel-2);
+  color: var(--text);
+}
+/* --------------------------------------------------------------------------
+   Inputs with a leading icon and an optional trailing action
+   --------------------------------------------------------------------------
+   Geometry is explicit rather than inherited from the flex baseline. An
+   absolutely positioned icon inside a flex row is placed at the container's
+   *static position*, which moves whenever the field grows (validation text,
+   a taller control, a different font metric). That is what put the mail, lock
+   and eye glyphs off-centre and, on some rows, on top of the value. Both
+   glyphs are now pinned with top: 50% / translateY(-50%), the input reserves
+   space for them with padding, and the action button is a 34px target that
+   never overlaps the text.
+   ------------------------------------------------------------------------- */
+.input-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+/* The icon is either the raw <svg class="ico"> (inserted directly) or an <i>
+   placeholder that hydrateIcons() fills with an svg — the wrapper stays, so
+   both shapes have to be positioned. Matching only `.ico` left the <i> as a
+   flex item: the glyph sat outside the field border and the input's 44px
+   padding-left became a dead gap. Both selectors below are required. */
+.input-icon > .ico,
+.input-icon > i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  font-style: normal;
+  line-height: 0;
+  color: var(--text-3);
+  pointer-events: none;
+  z-index: 1;
+  transition: color var(--t-fast) var(--ease);
+}
+.input-icon > i > .ico {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+/* The glyph is centred on the field's own box, so a taller input (a textarea, a
+   field with error text under it) can never drag the icon off-centre. */
+.input-icon .input:focus + .ico,
+.input-icon .input:focus ~ i {
+  color: var(--lavender);
+}
+.input-icon .input {
+  width: 100%;
+  /* 14px inset + 18px glyph + 12px gap. Text can never reach the icon. */
+  padding-left: 44px;
+  padding-right: 14px;
+  line-height: 1.4;
+}
+/* Reserve room for the reveal button only when one exists. */
+.input-icon:has(.input-action) .input {
+  padding-right: 48px;
+}
+.input-icon .input-action {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  z-index: 2;
+}
+.input-icon .input-action .ico {
+  position: static;
+  transform: none;
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+}
+.input-icon .input-action:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.07);
+}
+.input-icon .input-action:focus-visible {
+  outline: 2px solid var(--violet-400, #a78bfa);
+  outline-offset: 2px;
+}
+/* Recipient rows, password fields and anything with a leading icon share the
+   same rhythm on small screens. */
+@media (max-width: 480px) {
+  /* Same geometry as desktop, one pixel tighter: 13px inset + 17px glyph +
+     12px gap = 42px, so the text can never touch the icon on a small screen
+     either. */
+  .input-icon > .ico,
+  .input-icon > i { left: 13px; width: 17px; height: 17px; }
+  .input-icon > i > .ico { width: 17px; height: 17px; }
+  .input-icon .input { padding-left: 42px; }
+  .input-icon:has(.input-action) .input { padding-right: 46px; }
+}
+.input-lg {
+  min-height: 50px;
+  font-size: var(--fs-body-lg);
+  border-radius: var(--r-lg);
+}
+
+/* Checkbox / radio */
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.check .box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 5px;
+  border: 1.5px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  transition: all var(--t-base) var(--ease);
+}
+.check .box svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all var(--t-fast) var(--ease-spring);
+  color: #fff;
+}
+.check input:checked + .box {
+  background: var(--grad-brand);
+  border-color: transparent;
+}
+.check input:checked + .box svg {
+  opacity: 1;
+  transform: none;
+}
+.check input:focus-visible + .box {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+}
+.check a {
+  color: var(--lavender);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.check:hover .box {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+/* Switch */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+}
+.switch .track {
+  position: relative;
+  width: 40px;
+  height: 23px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line-strong);
+  transition: all var(--t-base) var(--ease);
+  flex: none;
+}
+.switch .track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition: all var(--t-base) var(--ease-spring);
+}
+.switch input:checked + .track {
+  background: var(--grad-brand);
+  border-color: transparent;
+}
+.switch input:checked + .track::after {
+  transform: translateX(17px);
+  background: #fff;
+}
+.switch input:focus-visible + .track {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+}
+
+/* Choice cards (onboarding / pricing radios) */
+.choice {
+  position: relative;
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.022);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--t-base) var(--ease);
+  width: 100%;
+}
+.choice:hover {
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.07);
+}
+.choice input {
+  position: absolute;
+  opacity: 0;
+}
+.choice .choice-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: var(--lavender);
+}
+.choice .choice-mark .ico {
+  width: 17px;
+  height: 17px;
+}
+.choice-title {
+  display: block; /* was inline: the description ran on with no gap */
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--white);
+}
+.choice-desc {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.choice[aria-checked="true"],
+.choice:has(input:checked) {
+  border-color: rgba(168, 85, 247, 0.6);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(124, 58, 237, 0.06));
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.22), 0 14px 32px -22px rgba(124, 58, 237, 0.9);
+}
+.choice:has(input:checked) .choice-mark {
+  background: var(--grad-brand);
+  border-color: transparent;
+  color: #fff;
+}
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Cards & panels
+   -------------------------------------------------------------------------- */
+.card {
+  position: relative;
+  border-radius: var(--r-lg);
+  background: var(--grad-panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-md), var(--shadow-inset-top);
+}
+.card-pad {
+  padding: var(--s-5);
+}
+.card-pad-lg {
+  padding: var(--s-6);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.card-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: -0.008em;
+}
+.card-sub {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.card-body {
+  padding: var(--s-5);
+}
+.card-foot {
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+/* Glass panel — used sparingly, only over imagery/atmosphere */
+.glass {
+  background: var(--ink-glass);
+  backdrop-filter: blur(22px) saturate(130%);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-lg), var(--shadow-inset-top);
+}
+
+/* Gradient hairline border */
+.hairline {
+  position: relative;
+}
+.hairline::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(168, 85, 247, 0.42), rgba(255, 255, 255, 0.04) 38%, transparent 64%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Badges, pills, chips
+   -------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding-inline: var(--s-2);
+  border-radius: var(--r-xs);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.badge .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badge-ok {
+  color: #6ee7b7;
+  background: var(--ok-dim);
+  border-color: rgba(52, 211, 153, 0.26);
+}
+.badge-warn {
+  color: #fcd34d;
+  background: var(--warn-dim);
+  border-color: rgba(251, 191, 36, 0.26);
+}
+.badge-danger {
+  color: #fda4af;
+  background: var(--danger-dim);
+  border-color: rgba(251, 113, 133, 0.26);
+}
+.badge-info {
+  color: #93c5fd;
+  background: var(--info-dim);
+  border-color: rgba(96, 165, 250, 0.26);
+}
+.badge-violet {
+  color: var(--lavender);
+  background: rgba(124, 58, 237, 0.16);
+  border-color: var(--line-violet);
+}
+.badge-neutral {
+  color: var(--text-3);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding-inline: var(--s-3);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all var(--t-base) var(--ease);
+  white-space: nowrap;
+}
+.chip:hover {
+  color: var(--white);
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.12);
+}
+.chip[aria-pressed="true"],
+.chip.is-active {
+  color: #fff;
+  background: rgba(124, 58, 237, 0.26);
+  border-color: rgba(168, 85, 247, 0.55);
+}
+.chip .ico {
+  width: 13px;
+  height: 13px;
+}
+
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 5px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Avatars
+   -------------------------------------------------------------------------- */
+.avatar {
+  --av: 34px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--av);
+  height: var(--av);
+  border-radius: 50%;
+  flex: none;
+  overflow: hidden;
+  background: var(--grad-brand);
+  color: #fff;
+  font-size: calc(var(--av) * 0.36);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  text-transform: uppercase;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-sm {
+  --av: 26px;
+}
+.avatar-lg {
+  --av: 48px;
+}
+.avatar-xl {
+  --av: 68px;
+}
+.avatar-stack {
+  display: flex;
+}
+.avatar-stack .avatar + .avatar {
+  margin-left: -9px;
+}
+.avatar-stack .avatar {
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table {
+  width: 100%;
+  font-size: var(--fs-sm);
+  min-width: 620px;
+}
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 10px var(--s-4);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: rgba(12, 10, 20, 0.94);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.table tbody td {
+  padding: 13px var(--s-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  vertical-align: middle;
+}
+.table tbody tr {
+  transition: background var(--t-fast) var(--ease);
+}
+.table tbody tr:hover {
+  background: rgba(124, 58, 237, 0.06);
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table .cell-strong {
+  font-weight: 550;
+  color: var(--white);
+}
+.table .cell-sub {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.table .cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.table-compact tbody td {
+  padding-block: 9px;
+}
+
+/* --------------------------------------------------------------------------
+   Tabs / segmented control
+   -------------------------------------------------------------------------- */
+.tabs {
+  display: flex;
+  gap: var(--s-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1px;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  position: relative;
+  padding: var(--s-3) var(--s-4);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+  transition: color var(--t-base) var(--ease);
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab[aria-selected="true"] {
+  color: var(--white);
+}
+.tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--grad-brand);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.8);
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--line);
+}
+.segmented button {
+  padding: 5px var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  font-weight: 550;
+  color: var(--text-3);
+  transition: all var(--t-base) var(--ease);
+}
+.segmented button[aria-pressed="true"] {
+  background: rgba(124, 58, 237, 0.3);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+.segmented button:hover {
+  color: var(--white);
+}
+
+/* --------------------------------------------------------------------------
+   Menus (dropdown)
+   -------------------------------------------------------------------------- */
+.menu {
+  position: absolute;
+  min-width: 216px;
+  padding: 6px;
+  border-radius: var(--r-md);
+  background: var(--ink-glass-strong);
+  backdrop-filter: blur(26px) saturate(140%);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-overlay);
+  animation: fade-up 0.16s var(--ease-out);
+}
+.menu[hidden] {
+  display: none;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 9px var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  text-align: left;
+  transition: all var(--t-fast) var(--ease);
+}
+.menu-item .ico {
+  width: 15px;
+  height: 15px;
+  color: var(--text-3);
+}
+.menu-item:hover {
+  background: rgba(124, 58, 237, 0.16);
+  color: var(--white);
+}
+.menu-item:hover .ico {
+  color: var(--lavender);
+}
+.menu-item-danger {
+  color: #fda4af;
+}
+.menu-item-danger .ico {
+  color: #fda4af;
+}
+.menu-item-danger:hover {
+  background: rgba(251, 113, 133, 0.14);
+  color: #fff;
+}
+.menu-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--line);
+}
+.menu-label {
+  padding: 8px var(--s-3) 4px;
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+/* --------------------------------------------------------------------------
+   Modal / dialog
+   -------------------------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--s-4);
+  background: rgba(4, 3, 8, 0.72);
+  backdrop-filter: blur(8px);
+  animation: fade-in 0.18s var(--ease);
+  overflow-y: auto;
+}
+.modal {
+  position: relative;
+  width: min(100%, 560px);
+  max-height: calc(100dvh - 2 * var(--s-4));
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-xl);
+  background: linear-gradient(168deg, #191527, #0d0b15 70%);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(168, 85, 247, 0.1);
+  animation: fade-up 0.22s var(--ease-out);
+  overflow: hidden;
+}
+.modal-sm {
+  width: min(100%, 430px);
+}
+.modal-lg {
+  width: min(100%, 780px);
+}
+.modal-xl {
+  width: min(100%, 1040px);
+}
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+.modal-title {
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.modal-desc {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+.modal-body {
+  padding: var(--s-5);
+  overflow-y: auto;
+}
+.modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.22);
+  flex-wrap: wrap;
+}
+.modal-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: -4px -4px 0 0;
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+  transition: all var(--t-fast) var(--ease);
+}
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Toasts
+   -------------------------------------------------------------------------- */
+.toast-region {
+  position: fixed;
+  right: var(--s-4);
+  bottom: var(--s-4);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: min(calc(100vw - 2 * var(--s-4)), 380px);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--ink-glass-strong);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  pointer-events: auto;
+  animation: fade-up 0.24s var(--ease-out);
+  line-height: 1.45;
+}
+.toast.leaving {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all var(--t-base) var(--ease);
+}
+.toast .ico {
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  flex: none;
+}
+.toast-ok .ico { color: var(--ok); }
+.toast-error .ico { color: var(--danger); }
+.toast-info .ico { color: var(--info); }
+.toast-warn .ico { color: var(--warn); }
+.toast-body { flex: 1; min-width: 0; }
+.toast-title { font-weight: 600; color: var(--white); }
+.toast-close {
+  color: var(--text-3);
+  padding: 2px;
+  border-radius: 4px;
+}
+.toast-close:hover { color: #fff; }
+
+/* --------------------------------------------------------------------------
+   Alerts / inline notices
+   -------------------------------------------------------------------------- */
+.alert {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+}
+.alert .ico {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: none;
+}
+.alert strong {
+  color: var(--white);
+  font-weight: 600;
+}
+.alert-title {
+  font-weight: 600;
+  color: var(--white);
+  display: block;
+  margin-bottom: 2px;
+}
+.alert-info {
+  border-color: rgba(96, 165, 250, 0.3);
+  background: rgba(96, 165, 250, 0.08);
+  color: #cfe4ff;
+}
+.alert-info .ico { color: var(--info); }
+.alert-warn {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.07);
+  color: #fde9b8;
+}
+.alert-warn .ico { color: var(--warn); }
+.alert-danger {
+  border-color: rgba(251, 113, 133, 0.32);
+  background: rgba(251, 113, 133, 0.08);
+  color: #ffd6dc;
+}
+.alert-danger .ico { color: var(--danger); }
+.alert-ok {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(52, 211, 153, 0.07);
+  color: #c8f7e4;
+}
+.alert-ok .ico { color: var(--ok); }
+.alert-violet {
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.1);
+  color: #ddd0ff;
+}
+.alert-violet .ico { color: var(--violet-soft); }
+
+/* --------------------------------------------------------------------------
+   Empty state / loading
+   -------------------------------------------------------------------------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  padding: var(--s-9) var(--s-5);
+}
+.empty-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-lg);
+  background: rgba(124, 58, 237, 0.12);
+  border: 1px solid var(--line-violet);
+  color: var(--violet-soft);
+  margin-bottom: var(--s-1);
+}
+.empty-mark .ico {
+  width: 22px;
+  height: 22px;
+}
+.empty-title {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--white);
+}
+.empty-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  max-width: 44ch;
+  line-height: 1.6;
+}
+
+.skeleton {
+  border-radius: var(--r-sm);
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.045) 20%, rgba(255, 255, 255, 0.09) 42%, rgba(255, 255, 255, 0.045) 64%);
+  background-size: 220% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+.skeleton-line {
+  height: 11px;
+  border-radius: var(--r-pill);
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) 0;
+}
+
+/* --------------------------------------------------------------------------
+   Progress
+   -------------------------------------------------------------------------- */
+.progress {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--grad-brand);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+  transition: width 0.5s var(--ease-out);
+}
+.progress-thin {
+  height: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Tooltip
+   -------------------------------------------------------------------------- */
+[data-tip] {
+  position: relative;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 9px;
+  border-radius: var(--r-xs);
+  background: #1d1930;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  animation: fade-in 0.12s var(--ease);
+}
+
+/* --------------------------------------------------------------------------
+   Pagination
+   -------------------------------------------------------------------------- */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.page-btn {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding-inline: 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  transition: all var(--t-fast) var(--ease);
+}
+.page-btn:hover:not([disabled]) {
+  border-color: var(--line-violet);
+  color: #fff;
+  background: rgba(124, 58, 237, 0.12);
+}
+.page-btn[aria-current="page"] {
+  background: rgba(124, 58, 237, 0.28);
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #fff;
+}
+.page-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   Divider with label
+   -------------------------------------------------------------------------- */
+.divider-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 500;
+}
+.divider-label::before,
+.divider-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* --------------------------------------------------------------------------
+   Scroll-triggered counter & marquee (marketing)
+   -------------------------------------------------------------------------- */
+.marquee {
+  position: relative;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  gap: var(--s-8);
+  width: max-content;
+  animation: marquee 42s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+/* --------------------------------------------------------------------------
+   Brand lockup (mark + text wordmark)
+   -------------------------------------------------------------------------- */
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  white-space: nowrap;
+}
+.nav-brand .brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.5));
+}
+/* The official mark ships as a PNG tile (and an .ico for the desktop app), so
+   anything using it keeps the same square, slightly rounded silhouette. */
+.brand-mark img,
+img.brand-mark,
+.nav-brand > img {
+  display: block;
+  border-radius: 22%;
+  filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.45));
+}
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+}
+.nav-brand .brand-word {
+  font-size: 0.94rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--white);
+  text-indent: 0.06em;
+}
+.nav-brand:hover .brand-word {
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Boot overlay (shown while route guards resolve)
+   -------------------------------------------------------------------------- */
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  background: radial-gradient(60% 50% at 50% 40%, rgba(124, 58, 237, 0.18), transparent 70%), #06050b;
+  animation: fade-in 0.2s var(--ease);
+}
+.boot-mark {
+  animation: float-y 3.2s ease-in-out infinite;
+  filter: drop-shadow(0 10px 28px rgba(124, 58, 237, 0.55));
+}
+.boot-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.boot-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.boot-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--violet-soft);
+  animation: pulse-soft 1.2s ease-in-out infinite;
+}
+.boot-dots i:nth-child(2) { animation-delay: 0.18s; }
+.boot-dots i:nth-child(3) { animation-delay: 0.36s; }
+
+/* ---------------------------------------------------------------------------
+   Icon button — square, quiet, used in every shell chrome (topbar, sidebar
+   collapse, modal close, install prompt). Relies on hydrated <svg> icons.
+   --------------------------------------------------------------------------- */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--line-strong);
+  color: var(--white);
+}
+
+.icon-btn:active {
+  transform: translateY(1px);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+}
+
+.icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ---------------------------------------------------------------------------
+   Switch — used by notification preferences. A real checkbox with a styled
+   track so it stays keyboard- and screen-reader-friendly.
+   --------------------------------------------------------------------------- */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.switch-track {
+  position: relative;
+  display: block;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--line-strong);
+  transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition: transform var(--t-base) var(--ease-spring), background var(--t-base) var(--ease);
+}
+
+.switch input:checked + .switch-track {
+  background: rgba(124, 58, 237, 0.55);
+  border-color: var(--line-violet);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(16px);
+  background: var(--white);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Get app — install panel
+   --------------------------------------------------------------------------
+   Frosted glass over an animated violet field. Kept in components.css because
+   it is injected into any page that can host the header trigger.
+   ========================================================================== */
+.ip-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: max(var(--s-4), env(safe-area-inset-top)) var(--s-4) max(var(--s-4), env(safe-area-inset-bottom));
+  background: rgba(5, 3, 10, 0.62);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+  overflow-y: auto;
+}
+.ip-backdrop.is-open {
+  opacity: 1;
+}
+body.ip-open {
+  overflow: hidden;
+}
+
+.ip-panel {
+  position: relative;
+  width: min(520px, 100%);
+  padding: var(--s-6);
+  border-radius: var(--r-2xl);
+  border: 1px solid rgba(168, 85, 247, 0.26);
+  background:
+    linear-gradient(168deg, rgba(28, 22, 44, 0.9), rgba(12, 9, 20, 0.94)),
+    radial-gradient(120% 90% at 12% 0%, rgba(124, 58, 237, 0.22), transparent 62%);
+  box-shadow: 0 40px 120px rgba(3, 1, 8, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(26px) saturate(150%);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  transform: translateY(14px) scale(0.985);
+  opacity: 0;
+  transition: transform 0.42s var(--ease-spring), opacity 0.32s var(--ease);
+  overflow: hidden;
+  isolation: isolate;
+}
+.ip-backdrop.is-open .ip-panel {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+/* Slow violet light behind the glass; opacity-only so it never reflows. */
+.ip-glow {
+  position: absolute;
+  inset: -40% -20% auto -20%;
+  height: 320px;
+  z-index: -1;
+  background: radial-gradient(50% 60% at 30% 20%, rgba(168, 85, 247, 0.42), transparent 70%),
+    radial-gradient(45% 55% at 80% 10%, rgba(196, 181, 253, 0.24), transparent 72%);
+  animation: ip-glow-drift 14s var(--ease) infinite alternate;
+  pointer-events: none;
+}
+@keyframes ip-glow-drift {
+  from { transform: translate3d(-3%, 0, 0); opacity: 0.7; }
+  to   { transform: translate3d(6%, 4%, 0); opacity: 1; }
+}
+
+.ip-close {
+  position: absolute;
+  top: var(--s-4);
+  right: var(--s-4);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.ip-close:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--white);
+  border-color: var(--line-strong);
+}
+
+.ip-head {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding-right: 34px;
+}
+.ip-mark {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(168, 85, 247, 0.32);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.26), rgba(12, 9, 20, 0.4));
+  box-shadow: 0 10px 30px rgba(76, 29, 149, 0.42);
+}
+.ip-title {
+  font-family: var(--font-sans);
+  font-size: var(--fs-h4);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 4px;
+  color: var(--white);
+}
+.ip-sub {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
+/* --------------------------------------------------------------------------
+   Aurora canvas sizing
+   --------------------------------------------------------------------------
+   The renderer measures the canvas with getBoundingClientRect(). Only the hero
+   had sizing rules (fx.css `.fx-aurora-canvas`); everywhere else the canvas kept
+   its intrinsic box and painted nothing. This is the shared floor: the wrapper
+   decides the size, the canvas fills it and never intercepts a pointer.
+   -------------------------------------------------------------------------- */
+.af-aurora-canvas,
+.fx-aurora-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Download centre — three screens in one modal
+   --------------------------------------------------------------------------
+   device → family → platform. Each screen cross-fades and slides instead of
+   being replaced, the viewport keeps a stable height so the modal does not jump
+   between steps, and every state below exists because the JavaScript can
+   actually produce it (a build is offered only when the file answers).
+   -------------------------------------------------------------------------- */
+
+.ip-view {
+  margin-top: var(--s-5);
+  min-height: 216px;
+  transition: opacity 0.17s var(--ease), transform 0.17s var(--ease), height 0.22s var(--ease);
+  will-change: opacity, transform;
+}
+.ip-view.is-resizing {
+  overflow: clip;
+}
+.ip-view.is-out-left {
+  opacity: 0;
+  transform: translateX(-18px);
+}
+.ip-view.is-out-right {
+  opacity: 0;
+  transform: translateX(18px);
+}
+.ip-view.is-in-right {
+  opacity: 0;
+  transform: translateX(22px);
+}
+.ip-view.is-in-left {
+  opacity: 0;
+  transform: translateX(-22px);
+}
+
+.ip-lede {
+  margin: 0 0 var(--s-4);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+/* --- screen 1: device ---------------------------------------------------- */
+.ip-devices {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.ip-device {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  padding: 18px var(--s-5) 18px var(--s-4);
+  text-align: left;
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  background:
+    linear-gradient(150deg, rgba(30, 22, 48, 0.72), rgba(12, 9, 20, 0.82));
+  color: var(--white);
+  cursor: pointer;
+  transition: transform 0.22s var(--ease), border-color 0.22s var(--ease),
+    box-shadow 0.22s var(--ease), background 0.22s var(--ease);
+}
+.ip-device:hover,
+.ip-device:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 18px 44px -22px rgba(124, 58, 237, 0.85);
+  outline: none;
+}
+.ip-device:active {
+  transform: translateY(0) scale(0.995);
+}
+.ip-device-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.3), rgba(12, 9, 20, 0.4));
+  color: var(--lavender);
+  flex: none;
+}
+.ip-device-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ip-device-name {
+  font-size: var(--fs-body-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.ip-device-meta {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.01em;
+  color: var(--violet-soft, #c4b5fd);
+}
+.ip-device-desc {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+.ip-device-go {
+  color: var(--text-3);
+  transition: transform 0.22s var(--ease), color 0.22s var(--ease);
+}
+.ip-device:hover .ip-device-go {
+  transform: translateX(3px);
+  color: var(--lavender);
+}
+
+/* --- screen 2: platform list -------------------------------------------- */
+.ip-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.ip-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.ip-back:hover {
+  color: var(--white);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateX(-2px);
+}
+.ip-crumb {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.ip-step-title {
+  margin: 0 0 4px;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--white);
+}
+
+.ip-options {
+  display: grid;
+  gap: 10px;
+}
+.ip-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 13px var(--s-4);
+  text-align: left;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(168, 85, 247, 0.16);
+  background: rgba(255, 255, 255, 0.028);
+  color: var(--white);
+  cursor: pointer;
+  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease),
+    background 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.ip-option:hover,
+.ip-option:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(124, 58, 237, 0.1);
+  box-shadow: 0 14px 34px -24px rgba(124, 58, 237, 0.9);
+  outline: none;
+}
+.ip-option-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  flex: none;
+}
+.ip-option-body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.ip-option-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.ip-option-desc {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.ip-here {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--violet-soft, #c4b5fd);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.ip-chip {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.ip-chip.is-ready {
+  color: var(--ok);
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+}
+.ip-option-go {
+  color: var(--text-4);
+  transition: transform 0.2s var(--ease), color 0.2s var(--ease);
+}
+.ip-option:hover .ip-option-go {
+  transform: translateX(3px);
+  color: var(--lavender);
+}
+
+/* --- screen 3: platform detail ------------------------------------------ */
+.ip-platform-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.ip-platform-mark {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(168, 85, 247, 0.32);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.28), rgba(12, 9, 20, 0.4));
+  color: var(--lavender);
+  flex: none;
+}
+.ip-platform-head .ip-lede {
+  margin: 0;
+}
+
+.ip-action-card {
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.12), rgba(12, 9, 20, 0.5));
+  margin-bottom: var(--s-4);
+}
+.ip-action-card.is-soft {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ip-action-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: 10px;
+  font-size: var(--fs-xs);
+}
+.ip-action-file {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ip-action-size {
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.ip-action-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.ip-action-note {
+  margin: 8px 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.ip-prompt-hint {
+  margin: 8px 0 0;
+  font-size: var(--fs-2xs);
+  color: var(--text-4);
+  text-align: center;
+}
+
+.ip-download,
+.ip-prompt {
+  position: relative;
+}
+
+/* Real progress, driven by streamed bytes. */
+.ip-progress {
+  margin-top: 10px;
+}
+.ip-progress-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.ip-progress-fill {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6d28d9, #a855f7 55%, #c4b5fd);
+  transition: transform 0.18s linear;
+}
+.ip-progress-text {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ip-steps {
+  margin: 0;
+  padding-left: 1.25em;
+  list-style: decimal;
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.ip-steps li::marker {
+  color: var(--violet-soft, #c4b5fd);
+}
+.ip-steps strong {
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* --- the guide line, exactly under the options --------------------------- */
+.ip-guide {
+  margin: var(--s-4) 0 0;
+  padding-top: var(--s-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  text-align: center;
+}
+.ip-guide a {
+  color: var(--lavender);
+  font-weight: 550;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.45);
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.ip-guide a:hover {
+  color: var(--white);
+  border-bottom-color: var(--white);
+}
+
+.ip-installed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: var(--s-4) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--ok);
+}
+
+/* --- live status --------------------------------------------------------- */
+.ip-status {
+  margin: 10px 0 0;
+  min-height: 18px;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-3);
+}
+.ip-status.is-ok {
+  color: var(--ok);
+}
+.ip-status.is-warn {
+  color: var(--warn, #fbbf24);
+}
+.ip-status.is-error {
+  color: var(--danger, #f87171);
+}
+
+@media (max-width: 520px) {
+  .ip-panel {
+    padding: var(--s-5) var(--s-4) var(--s-5);
+    border-radius: var(--r-xl);
+  }
+  .ip-mark { width: 44px; height: 44px; }
+  .ip-title { font-size: var(--fs-h4); }
+  .ip-view { min-height: 0; }
+  .ip-device { gap: var(--s-3); padding: 12px; }
+  .ip-device-icon { width: 40px; height: 40px; }
+  .ip-option { grid-template-columns: auto 1fr auto; }
+  .ip-chip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ip-backdrop,
+  .ip-panel,
+  .ip-glow,
+  .ip-view,
+  .ip-device,
+  .ip-option,
+  .ip-progress-fill {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}

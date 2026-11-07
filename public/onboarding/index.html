@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Set up your workspace — Shinzora</title>
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#08070e" />
+<link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+<link rel="stylesheet" href="/css/components.css?v=20261107g" />
+<link rel="stylesheet" href="/css/app.css?v=20261107g" />
+<link rel="stylesheet" href="/css/onboarding.css?v=20261107g" />
+<script src="/js/config/runtime.js"></script>
+</head>
+<body>
+<div class="atmosphere" aria-hidden="true"></div>
+<a class="skip-link" href="#ob-panel">Skip to form</a>
+
+<div class="ob-shell">
+  <!-- ================================ RAIL ================================ -->
+  <aside class="ob-rail">
+    <div class="ob-rail-head">
+      <a class="nav-brand" href="/" aria-label="Shinzora home">
+        <img src="/assets/icons/mark.svg" alt="" width="28" height="28" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <div>
+        <div class="ob-rail-title">Set up your workspace</div>
+        <div class="ob-rail-sub">Five short steps. Everything can be edited later from Settings.</div>
+      </div>
+    </div>
+
+    <nav class="ob-steps" aria-label="Onboarding steps">
+      <button class="ob-step is-active" data-step-link="1" aria-current="step">
+        <span class="obs-marker">1</span>
+        <span><span class="obs-label">Your profile</span><span class="obs-desc">Name, phone, photo</span></span>
+      </button>
+      <button class="ob-step" data-step-link="2">
+        <span class="obs-marker">2</span>
+        <span><span class="obs-label">The business</span><span class="obs-desc">Name, category, stage</span></span>
+      </button>
+      <button class="ob-step" data-step-link="3">
+        <span class="obs-marker">3</span>
+        <span><span class="obs-label">Goals</span><span class="obs-desc">What you want Shinzora to do</span></span>
+      </button>
+      <button class="ob-step" data-step-link="4">
+        <span class="obs-marker">4</span>
+        <span><span class="obs-label">Brand direction</span><span class="obs-desc">Colours, style, audience</span></span>
+      </button>
+      <button class="ob-step" data-step-link="5">
+        <span class="obs-marker">5</span>
+        <span><span class="obs-label">Plan</span><span class="obs-desc">Start free, upgrade later</span></span>
+      </button>
+    </nav>
+
+    <div class="ob-rail-foot">
+      <div>
+        <div class="ob-progress-label"><span>Progress</span><span data-progress-label>1 of 5</span></div>
+        <div class="progress progress-thin" style="margin-top:7px"><span data-progress-bar style="width:20%"></span></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="button" id="ob-signout">
+        <i data-icon="log-out" data-size="14"></i>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ================================ MAIN ================================ -->
+  <main class="ob-main">
+    <div class="ob-topbar">
+      <a class="nav-brand" href="/" aria-label="Shinzora" style="display:none" id="ob-mobile-brand">
+        <img src="/assets/icons/mark.svg" alt="" width="26" height="26" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <div class="ob-save">
+        <span class="ob-save-status" id="ob-save-status"><i data-icon="cloud-upload" data-size="13"></i> Progress saves automatically</span>
+        <button class="btn btn-secondary btn-sm" type="button" id="ob-save-exit">
+          <i data-icon="clock" data-size="13"></i>
+          Save &amp; exit
+        </button>
+      </div>
+    </div>
+
+    <div class="ob-panel" id="ob-panel">
+      <div id="ob-alert" role="status" aria-live="polite"></div>
+
+      <!-- ------------------------------ STEP 1 ------------------------------ -->
+      <section data-step="1">
+        <div class="ob-head">
+          <span class="ob-kicker">Step 1 of 5</span>
+          <h1>Let's start with you</h1>
+          <p>This is how your name appears on invoices, notifications and anything Shinzora sends on your behalf.</p>
+        </div>
+        <div class="ob-card" style="margin-top:var(--s-5)">
+          <div class="uploader">
+            <div class="uploader-preview round" id="avatar-preview"><i data-icon="user-round" data-size="22"></i></div>
+            <div class="uploader-body">
+              <span class="up-title">Profile picture</span>
+              <span class="up-hint">PNG or JPG, up to 2 MB. Optional.</span>
+              <div class="uploader-actions">
+                <button class="btn btn-secondary btn-sm" type="button" id="avatar-pick">Upload</button>
+                <button class="btn btn-ghost btn-sm hidden" type="button" id="avatar-clear">Remove</button>
+              </div>
+              <input type="file" id="avatar-input" accept="image/png,image/jpeg,image/webp" class="hidden" />
+            </div>
+          </div>
+          <div class="ob-grid-2">
+            <div class="field" data-field="fullName">
+              <label class="field-label" for="ob-name">Full name</label>
+              <input class="input" id="ob-name" name="fullName" autocomplete="name" placeholder="Riya Sharma" />
+              <div class="field-error"></div>
+            </div>
+            <div class="field" data-field="phone">
+              <label class="field-label" for="ob-phone">Phone number <span class="optional">optional</span></label>
+              <input class="input" id="ob-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+91 98765 43210" />
+              <div class="field-hint">Used for payment verification and urgent account notices.</div>
+              <div class="field-error"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="ob-email">Email address</label>
+            <input class="input" id="ob-email" name="email" type="email" readonly disabled />
+            <div class="field-hint">Verified addresses cannot be changed here. Contact support to move an account.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ STEP 2 ------------------------------ -->
+      <section data-step="2" hidden>
+        <div class="ob-head">
+          <span class="ob-kicker">Step 2 of 5</span>
+          <h1>Tell us about the business</h1>
+          <p>Everything the AI generates — copy, structure, categories, even domain ideas — is derived from this.</p>
+        </div>
+        <div class="ob-card" style="margin-top:var(--s-5)">
+          <div class="uploader">
+            <div class="uploader-preview" id="logo-preview"><i data-icon="image" data-size="20"></i></div>
+            <div class="uploader-body">
+              <span class="up-title">Business logo</span>
+              <span class="up-hint">Square works best. Optional — we can generate a wordmark instead.</span>
+              <div class="uploader-actions">
+                <button class="btn btn-secondary btn-sm" type="button" id="logo-pick">Upload</button>
+                <button class="btn btn-ghost btn-sm hidden" type="button" id="logo-clear">Remove</button>
+              </div>
+              <input type="file" id="logo-input" accept="image/png,image/jpeg,image/webp" class="hidden" />
+            </div>
+          </div>
+
+          <div class="ob-grid-2">
+            <div class="field" data-field="businessName">
+              <label class="field-label" for="ob-bname">Business name</label>
+              <input class="input" id="ob-bname" name="businessName" autocomplete="organization" placeholder="Studio Aria" />
+              <div class="field-error"></div>
+            </div>
+            <div class="field" data-field="category">
+              <label class="field-label" for="ob-category">Category</label>
+              <select class="select" id="ob-category" name="category">
+                <option value="">Choose a category</option>
+                <option>Fashion &amp; apparel</option>
+                <option>Beauty &amp; personal care</option>
+                <option>Food &amp; beverage</option>
+                <option>Retail &amp; e-commerce</option>
+                <option>Professional services</option>
+                <option>Creative &amp; design</option>
+                <option>Technology &amp; SaaS</option>
+                <option>Education</option>
+                <option>Health &amp; wellness</option>
+                <option>Real estate</option>
+                <option>Travel &amp; hospitality</option>
+                <option>Manufacturing</option>
+                <option>Logistics</option>
+                <option>Finance</option>
+                <option>Media &amp; entertainment</option>
+                <option>Other</option>
+              </select>
+              <div class="field-error"></div>
+            </div>
+          </div>
+
+          <div class="field" data-field="description">
+            <label class="field-label" for="ob-desc">What does the business do?</label>
+            <textarea class="textarea" id="ob-desc" name="description" rows="4" placeholder="Two or three sentences about what you sell, who buys it, and what makes it different."></textarea>
+            <div class="field-hint"><span data-desc-count>0</span>/600 characters — the more specific, the better the generated site.</div>
+            <div class="field-error"></div>
+          </div>
+
+          <div class="ob-grid-2">
+            <div class="field" data-field="location">
+              <label class="field-label" for="ob-location">Business location</label>
+              <input class="input" id="ob-location" name="location" placeholder="Faridabad, Haryana" autocomplete="address-level2" />
+              <div class="field-error"></div>
+            </div>
+            <div class="field" data-field="website">
+              <label class="field-label" for="ob-website">Existing website <span class="optional">optional</span></label>
+              <input class="input" id="ob-website" name="website" placeholder="https://" inputmode="url" />
+              <div class="field-error"></div>
+            </div>
+          </div>
+
+          <div class="field" data-field="stage">
+            <label class="field-label">Where are you now?</label>
+            <div class="ob-grid-2" style="gap:var(--s-2)">
+              <button class="choice" type="button" data-stage="idea" aria-checked="false">
+                <span class="choice-mark"><i data-icon="compass" data-size="16"></i></span>
+                <span><span class="choice-title">Idea stage</span><span class="choice-desc">Exploring the concept.</span></span>
+              </button>
+              <button class="choice" type="button" data-stage="starting" aria-checked="false">
+                <span class="choice-mark"><i data-icon="feather" data-size="16"></i></span>
+                <span><span class="choice-title">Just starting</span><span class="choice-desc">Building the first version.</span></span>
+              </button>
+              <button class="choice" type="button" data-stage="operating" aria-checked="false">
+                <span class="choice-mark"><i data-icon="store" data-size="16"></i></span>
+                <span><span class="choice-title">Operating</span><span class="choice-desc">Selling or serving customers.</span></span>
+              </button>
+              <button class="choice" type="button" data-stage="growing" aria-checked="false">
+                <span class="choice-mark"><i data-icon="trending-up" data-size="16"></i></span>
+                <span><span class="choice-title">Growing</span><span class="choice-desc">Established, ready to scale.</span></span>
+              </button>
+            </div>
+            <div class="field-error"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ STEP 3 ------------------------------ -->
+      <section data-step="3" hidden>
+        <div class="ob-head">
+          <span class="ob-kicker">Step 3 of 5</span>
+          <h1>What should Shinzora do for you?</h1>
+          <p>Pick everything that applies. This tunes your dashboard, the AI assistant's context and what we suggest first.</p>
+        </div>
+        <div class="ob-card" style="margin-top:var(--s-5)">
+          <div class="goal-grid" id="goal-grid">
+            <button class="goal-chip" type="button" data-goal="website" aria-pressed="false"><i data-icon="panels-top-left" data-size="16"></i>Create a website<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="app" aria-pressed="false"><i data-icon="blocks" data-size="16"></i>Build an app<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="ecommerce" aria-pressed="false"><i data-icon="store" data-size="16"></i>Launch an online store<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="domain" aria-pressed="false"><i data-icon="globe" data-size="16"></i>Purchase a domain<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="inventory" aria-pressed="false"><i data-icon="boxes" data-size="16"></i>Manage inventory<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="marketing" aria-pressed="false"><i data-icon="megaphone" data-size="16"></i>Run marketing<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="support" aria-pressed="false"><i data-icon="life-buoy" data-size="16"></i>Automate support<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+            <button class="goal-chip" type="button" data-goal="operations" aria-pressed="false"><i data-icon="workflow" data-size="16"></i>Run the whole business<span class="gc-check"><i data-icon="check" data-size="10"></i></span></button>
+          </div>
+          <div class="field">
+            <label class="field-label" for="ob-goal-note">Anything specific you want first? <span class="optional">optional</span></label>
+            <textarea class="textarea" id="ob-goal-note" name="goalNote" rows="3" placeholder="Example: I need the store live before Diwali, and a WhatsApp support flow afterwards."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ STEP 4 ------------------------------ -->
+      <section data-step="4" hidden>
+        <div class="ob-head">
+          <span class="ob-kicker">Step 4 of 5</span>
+          <h1>Brand direction</h1>
+          <p>These preferences seed the design system the builder proposes. You can override everything per project.</p>
+        </div>
+        <div class="ob-card" style="margin-top:var(--s-5)">
+          <div class="field">
+            <label class="field-label">Brand colours</label>
+            <div class="swatch-row" id="swatch-row">
+              <button class="swatch" type="button" data-color="#7C3AED" style="background:#7C3AED" aria-label="Violet" aria-pressed="false"></button>
+              <button class="swatch" type="button" data-color="#0F172A" style="background:#0F172A" aria-label="Midnight" aria-pressed="false"></button>
+              <button class="swatch" type="button" data-color="#0E7490" style="background:#0E7490" aria-label="Teal" aria-pressed="false"></button>
+              <button class="swatch" type="button" data-color="#B45309" style="background:#B45309" aria-label="Amber" aria-pressed="false"></button>
+              <button class="swatch" type="button" data-color="#BE123C" style="background:#BE123C" aria-label="Rose" aria-pressed="false"></button>
+              <button class="swatch" type="button" data-color="#166534" style="background:#166534" aria-label="Forest" aria-pressed="false"></button>
+              <button class="swatch" type="button" data-color="#F5F5F4" style="background:#F5F5F4" aria-label="Bone" aria-pressed="false"></button>
+              <label class="swatch-custom">
+                <input type="color" id="ob-color" name="brandColor" value="#7c3aed" aria-label="Custom brand colour" />
+                Custom
+              </label>
+            </div>
+            <div class="field-hint">Pick up to two. The generated site uses them as the accent and surface tint.</div>
+          </div>
+
+          <div class="ob-grid-2">
+            <div class="field" data-field="style">
+              <label class="field-label" for="ob-style">Website style</label>
+              <select class="select" id="ob-style" name="style">
+                <option value="">Choose a style</option>
+                <option>Editorial &amp; minimal</option>
+                <option>Bold &amp; expressive</option>
+                <option>Warm &amp; approachable</option>
+                <option>Technical &amp; precise</option>
+                <option>Luxury &amp; restrained</option>
+                <option>Playful &amp; bright</option>
+              </select>
+            </div>
+            <div class="field" data-field="audience">
+              <label class="field-label" for="ob-audience">Target audience</label>
+              <select class="select" id="ob-audience" name="audience">
+                <option value="">Choose an audience</option>
+                <option>Consumers (B2C)</option>
+                <option>Businesses (B2B)</option>
+                <option>Both consumers and businesses</option>
+                <option>Local customers</option>
+                <option>International customers</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Preferred domain extension</label>
+            <div class="swatch-row" id="tld-row">
+              <button class="chip" type="button" data-tld=".com">.com</button>
+              <button class="chip" type="button" data-tld=".in">.in</button>
+              <button class="chip" type="button" data-tld=".co">.co</button>
+              <button class="chip" type="button" data-tld=".shop">.shop</button>
+              <button class="chip" type="button" data-tld=".store">.store</button>
+              <button class="chip" type="button" data-tld=".io">.io</button>
+              <button class="chip" type="button" data-tld=".design">.design</button>
+            </div>
+            <div class="field-hint">Used for AI domain suggestions. Shinzora always gives you a free subdomain too.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ STEP 5 ------------------------------ -->
+      <section data-step="5" hidden>
+        <div class="ob-head">
+          <span class="ob-kicker">Step 5 of 5</span>
+          <h1>Choose how you start</h1>
+          <p>Every account begins on a working workspace. Paid plans unlock the operating tools and higher AI limits.</p>
+        </div>
+
+        <div class="plan-row" style="margin-top:var(--s-5)" role="radiogroup" aria-label="Plan">
+          <button class="plan-pick" type="button" data-plan="free" role="radio" aria-checked="true">
+            <span class="pp-name">Free</span>
+            <span class="pp-price">₹0 <span>forever</span></span>
+            <span class="pp-desc">1 project, 30 AI generations per month, Shinzora subdomain.</span>
+          </button>
+          <button class="plan-pick" type="button" data-plan="pro" role="radio" aria-checked="false">
+            <span class="pp-flag">Popular</span>
+            <span class="pp-name">Pro</span>
+            <span class="pp-price">₹2,499 <span>/month</span></span>
+            <span class="pp-desc">15 projects, 800 generations, store and operations tools, custom domains.</span>
+          </button>
+          <button class="plan-pick" type="button" data-plan="enterprise" role="radio" aria-checked="false">
+            <span class="pp-name">Enterprise</span>
+            <span class="pp-price">₹9,999 <span>/month</span></span>
+            <span class="pp-desc">100 projects, 6,000 generations, priority queue, managed domain workflow.</span>
+          </button>
+        </div>
+
+        <div id="plan-note" class="alert alert-info" style="margin-top:var(--s-4)">
+          <i data-icon="info" data-size="16"></i>
+          <span>Free plan starts immediately — no payment needed. You can create your first project as soon as you finish.</span>
+        </div>
+
+        <div class="ob-card" style="margin-top:var(--s-5)">
+          <div class="section-title"><h3>Review</h3><a href="#" id="review-edit">Edit details</a></div>
+          <div class="review-list" id="review-list"></div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ NAV ------------------------------ -->
+      <div class="ob-nav">
+        <button class="btn btn-ghost" type="button" id="ob-back">
+          <i data-icon="arrow-left" data-size="15"></i>
+          Back
+        </button>
+        <div class="ob-nav-right">
+          <button class="ob-skip hidden" type="button" id="ob-skip">Skip for now</button>
+          <button class="btn btn-primary" type="button" id="ob-next">
+            Continue
+            <i data-icon="arrow-right" data-size="15"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/vendor/supabase-js.js"></script>
+<script type="module" src="/js/boot/onboarding.js?v=20261107g"></script>
+</body>
+</html>

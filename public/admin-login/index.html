@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Administrator access · Shinzora</title>
+  <meta name="description" content="Shinzora operations console. Administrator access only." />
+  <meta name="theme-color" content="#08060d" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/app.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/admin.css?v=20261107g" />
+</head>
+<body class="admin admin-gate-page">
+  <div class="admin-fx" aria-hidden="true">
+    <canvas class="af-aurora-canvas" data-aurora data-aurora-intensity="0.85"></canvas>
+    <span class="auth-grain"></span>
+  </div>
+
+  <main class="admin-login" id="admin-gate">
+    <div class="admin-login-card">
+      <a class="nav-brand" href="/" aria-label="Shinzora home">
+        <span class="brand-mark" aria-hidden="true"><img src="/assets/icons/mark.png" alt="" width="30" height="30" decoding="async" /></span>
+        <span class="brand-word">SHINZORA</span>
+        <span class="admin-brand-tag">Admin</span>
+      </a>
+
+      <h1>Administrator access</h1>
+      <p class="admin-gate-note">
+        Administrators sign in on the standard Shinzora sign-in page — there is no separate
+        administrator login. Your role is verified server-side on every request, and an account
+        without an administrator entry is refused.
+      </p>
+
+      <a class="btn btn-primary btn-block" href="/auth/login/?next=%2Fadmin%2F">
+        Go to the sign-in page
+        <i data-icon="arrow-right" data-size="16" data-stroke="2"></i>
+      </a>
+
+      <div class="admin-gate-foot">
+        <a href="/app/">Open your workspace</a>
+        <span aria-hidden="true">·</span>
+        <a href="/">Back to the website</a>
+      </div>
+
+      <p class="admin-gate-legal">
+        Authorised personnel only. Every sign-in attempt and every administrative action is recorded
+        in the audit log.
+      </p>
+    </div>
+  </main>
+
+  <script src="/js/config/runtime.js"></script>
+  <script src="/js/vendor/supabase-js.js"></script>
+  <script type="module" src="/js/boot/admin-login.js?v=20261107g"></script>
+</body>
+</html>

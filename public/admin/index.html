@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Shinzora Admin</title>
+  <meta name="description" content="Shinzora operations console. Administrator access only." />
+  <meta name="theme-color" content="#08060d" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/app.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/views.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/admin.css?v=20261107g" />
+</head>
+<body class="admin">
+  <!-- Access is decided server-side before this panel is ever shown. There is no
+       sign-in form here: administrators use the standard sign-in page. -->
+  <div class="admin-login" id="admin-gate" hidden>
+    <div class="admin-login-card">
+      <a class="nav-brand" href="/" aria-label="Shinzora home">
+        <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
+        <span class="brand-word">SHINZORA</span>
+        <span class="admin-brand-tag">Admin</span>
+      </a>
+      <h1 id="admin-gate-title">Checking access</h1>
+      <p id="admin-gate-message">
+        Verifying your administrator role with the server.
+      </p>
+      <div class="field-error" id="admin-gate-error" role="alert" aria-live="polite"></div>
+      <a class="btn btn-primary btn-block" id="admin-gate-primary" href="/auth/login/?next=/admin/" hidden>Go to sign in</a>
+      <a class="btn btn-ghost btn-sm btn-block" id="admin-gate-secondary" href="/app/" hidden>Open your workspace</a>
+    </div>
+  </div>
+
+  <div class="admin-shell" id="admin-shell" hidden>
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div class="admin-brand">
+        <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
+        <span class="brand-word">SHINZORA</span>
+        <span class="admin-brand-tag">Admin</span>
+      </div>
+      <nav id="admin-nav" aria-label="Admin sections"></nav>
+      <div class="admin-sidebar-foot">
+        <div id="admin-identity">—</div>
+        <div style="margin-top:8px;display:flex;gap:10px">
+          <a href="/app/">Dashboard</a>
+          <a href="/">Website</a>
+          <button class="btn btn-ghost btn-sm" id="admin-signout" style="padding:0;font-size:inherit;color:inherit">Sign out</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <button class="icon-btn admin-menu-toggle" id="admin-menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
+          <i data-icon="menu"></i>
+        </button>
+        <div class="admin-search">
+          <i data-icon="search"></i>
+          <input id="admin-search" type="search" placeholder="Search customers, payments, tickets" aria-label="Search" />
+        </div>
+        <div class="admin-who">
+          <span class="badge badge-brand" id="admin-role">admin</span>
+          <span id="admin-email-label">—</span>
+        </div>
+      </header>
+
+      <main class="admin-body" id="admin-root" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <script src="/js/vendor/supabase-js.js"></script>
+  <script type="module" src="/js/boot/admin.js?v=20261107g"></script>
+</body>
+</html>

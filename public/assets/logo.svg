@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" width="240" height="48" role="img" aria-label="Shinzora">
+  <defs>
+    <linearGradient id="szMark" x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#d9c9ff"/>
+      <stop offset="0.45" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="szFacetA" x1="16" y1="12" x2="30" y2="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#b98cff" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="szFacetB" x1="30" y1="26" x2="18" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8b5cf6" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#3b0f73" stop-opacity="0.75"/>
+    </linearGradient>
+    <linearGradient id="szWord" x1="60" y1="30" x2="240" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="0.72" stop-color="#efe9fb"/>
+      <stop offset="1" stop-color="#cdbdf0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Prism mark: a hexagonal outline containing a faceted, ascending core -->
+  <path d="M24 3.2 42.2 13.6v20.8L24 44.8 5.8 34.4V13.6L24 3.2Z" fill="#0b0912" stroke="url(#szMark)" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M24 10.4 35.9 17.2v13.6L24 37.6 12.1 30.8V17.2L24 10.4Z" fill="url(#szFacetB)" opacity="0.55"/>
+  <path d="M24 10.4 35.9 17.2 24 24 12.1 17.2 24 10.4Z" fill="url(#szFacetA)"/>
+  <path d="M24 24v13.6L12.1 30.8V17.2L24 24Z" fill="#2b1055" opacity="0.72"/>
+  <path d="M24 24 35.9 30.8 24 37.6v-13.6Z" fill="#a855f7" opacity="0.5"/>
+  <circle cx="24" cy="24" r="1.7" fill="#f5efff"/>
+
+  <!-- Wordmark: outlined text keeps the logo dependency-free and crisp at any size -->
+  <text x="58" y="33" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="23.5" font-weight="600" letter-spacing="4.6" fill="url(#szWord)">SHINZORA</text>
+</svg>

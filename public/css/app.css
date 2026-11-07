@@ -1,0 +1,882 @@
+/* ==========================================================================
+   Shinzora — application shell
+   Shared by onboarding, the customer dashboard and the admin panel:
+   sidebar, topbar, page header, content grid and mobile navigation.
+   ========================================================================== */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100dvh;
+  background: var(--void);
+}
+@media (min-width: 1024px) {
+  .app-shell {
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  }
+  body.sidebar-collapsed .app-shell {
+    grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
+.app-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--z-sidebar);
+  width: min(84vw, 300px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(186deg, #0d0a15 0%, #09070f 62%, #07060c 100%);
+  border-right: 1px solid var(--line);
+  transform: translateX(-101%);
+  transition: transform 0.3s var(--ease);
+  overflow: hidden;
+}
+.app-sidebar.is-open {
+  transform: none;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.7);
+}
+@media (min-width: 1024px) {
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    width: auto;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--nav-h);
+  padding-inline: var(--s-4);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.sidebar-head .nav-brand {
+  gap: 9px;
+}
+.sidebar-head .brand-word {
+  font-size: 0.8rem;
+  letter-spacing: 0.19em;
+}
+.sidebar-close {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+}
+.sidebar-close:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+@media (min-width: 1024px) {
+  .sidebar-close {
+    display: none;
+  }
+}
+
+.sidebar-workspace {
+  padding: var(--s-3) var(--s-3) var(--s-2);
+  flex: none;
+}
+.workspace-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.028);
+  text-align: left;
+  transition: all var(--t-base) var(--ease);
+}
+.workspace-switch:hover {
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.1);
+}
+.workspace-switch .ws-name {
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  color: var(--white);
+  line-height: 1.2;
+}
+.workspace-switch .ws-plan {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+.workspace-switch .ico {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+  flex: none;
+}
+
+/* `min-height: 0` is load-bearing. A flex item defaults to `min-height:auto`,
+   so without it this column refuses to shrink below its content, the sidebar
+   overflows its own `overflow:hidden` box, and the last links (Billing,
+   Settings) are clipped with no way to scroll to them. */
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--s-2) var(--s-3) var(--s-5);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 139, 250, 0.32) transparent;
+  /* Soften the cut edge because the list is taller than most viewports. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(167, 139, 250, 0.28);
+  border-radius: 99px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 139, 250, 0.45);
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-group {
+  margin-bottom: var(--s-4);
+}
+.sidebar-group-label {
+  padding: 8px 10px 5px;
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.sidebar-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 1px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: 450;
+  color: var(--text-2);
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.sidebar-link .ico {
+  width: 16px;
+  height: 16px;
+  color: var(--text-3);
+  transition: color var(--t-fast) var(--ease);
+}
+.sidebar-link:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.05);
+}
+.sidebar-link:hover .ico {
+  color: var(--lavender);
+}
+.sidebar-link.is-active {
+  color: #fff;
+  background: linear-gradient(92deg, rgba(124, 58, 237, 0.28), rgba(124, 58, 237, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.18);
+}
+.sidebar-link.is-active .ico {
+  color: #e2d5ff;
+}
+.sidebar-link.is-active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--violet);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.9);
+}
+.sidebar-link .link-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 5px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: rgba(168, 85, 247, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+}
+.sidebar-link .link-badge.warn {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+}
+
+/* Collapsed sidebar (desktop toggle) */
+@media (min-width: 1024px) {
+  body.sidebar-collapsed .sidebar-head .brand-word,
+  body.sidebar-collapsed .workspace-switch .ws-meta,
+  body.sidebar-collapsed .workspace-switch .ico,
+  body.sidebar-collapsed .sidebar-group-label,
+  body.sidebar-collapsed .sidebar-link span,
+  body.sidebar-collapsed .sidebar-link .link-badge,
+  body.sidebar-collapsed .sidebar-foot-info {
+    display: none;
+  }
+  body.sidebar-collapsed .sidebar-link {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  body.sidebar-collapsed .workspace-switch {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  body.sidebar-collapsed .sidebar-head {
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+
+.sidebar-foot {
+  flex: none;
+  padding: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.sidebar-foot-info {
+  padding: 10px;
+  margin-bottom: var(--s-2);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.022);
+}
+.sidebar-foot-info .sfi-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-4);
+  margin-bottom: 6px;
+}
+.sidebar-foot-info .sfi-value {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* --------------------------------------------------------------------------
+   Main column + topbar
+   -------------------------------------------------------------------------- */
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100dvh;
+}
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: var(--nav-h);
+  padding-inline: clamp(0.9rem, 0.4rem + 1.6vw, 1.75rem);
+  background: rgba(8, 7, 14, 0.82);
+  backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  flex: none;
+}
+.topbar-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+@media (min-width: 1024px) {
+  .topbar-toggle[data-sidebar-open] {
+    display: none;
+  }
+}
+
+.topbar-search {
+  position: relative;
+  flex: 1;
+  max-width: 420px;
+}
+.topbar-search .ico {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--text-4);
+  pointer-events: none;
+}
+.topbar-search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 46px 0 34px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  transition: all var(--t-base) var(--ease);
+}
+.topbar-search input::placeholder {
+  color: var(--text-4);
+}
+.topbar-search input:focus {
+  outline: none;
+  border-color: rgba(168, 85, 247, 0.55);
+  background: rgba(124, 58, 237, 0.08);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.14);
+}
+.topbar-search .kbd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+.topbar-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  color: var(--text-2);
+  transition: all var(--t-fast) var(--ease);
+}
+.topbar-icon:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-color: var(--line);
+}
+.topbar-icon .dot-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 15px;
+  height: 15px;
+  padding-inline: 3px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--violet);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  border: 2px solid #0a0812;
+}
+.topbar-avatar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 3px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  transition: all var(--t-fast) var(--ease);
+}
+.topbar-avatar:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line-strong);
+}
+.topbar-avatar .ta-name {
+  font-size: var(--fs-xs);
+  font-weight: 550;
+  color: var(--text);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .topbar-avatar .ta-name {
+    display: none;
+  }
+}
+
+/* Search results popover */
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--r-md);
+  background: var(--ink-glass-strong);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-overlay);
+}
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  text-align: left;
+}
+.search-result:hover,
+.search-result.is-active {
+  background: rgba(124, 58, 237, 0.16);
+  color: #fff;
+}
+.search-result .sr-type {
+  margin-left: auto;
+  font-size: var(--fs-2xs);
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.search-empty {
+  padding: var(--s-4);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* --------------------------------------------------------------------------
+   Page content
+   -------------------------------------------------------------------------- */
+.app-content {
+  flex: 1;
+  padding: clamp(1.1rem, 0.6rem + 1.4vw, 2rem) clamp(0.9rem, 0.4rem + 1.6vw, 1.75rem) var(--s-10);
+  min-width: 0;
+}
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
+}
+.page-head-left {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.page-title {
+  font-size: clamp(1.25rem, 1.05rem + 0.7vw, 1.6rem);
+  letter-spacing: -0.028em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.page-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  max-width: 76ch;
+  line-height: 1.55;
+}
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* Grid helpers used by views */
+.grid-2 {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.grid-3 {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+.grid-4 {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+.grid-main-side {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 1120px) {
+  .grid-main-side {
+    grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/* Stat cards */
+.stat {
+  position: relative;
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+  overflow: hidden;
+  min-width: 0;
+}
+.stat::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  right: -20%;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.14), transparent 70%);
+  pointer-events: none;
+}
+.stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.stat-label {
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-3);
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-label .ico {
+  width: 13px;
+  height: 13px;
+  color: var(--text-4);
+}
+.stat-value {
+  font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.8rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value small {
+  font-size: 0.62em;
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.stat-foot {
+  margin-top: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-foot .ico {
+  width: 12px;
+  height: 12px;
+}
+.trend-up { color: var(--ok); }
+.trend-down { color: var(--danger); }
+.trend-flat { color: var(--text-3); }
+
+/* Section heading inside a view */
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.section-title h3 {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.section-title a {
+  font-size: var(--fs-xs);
+  color: var(--lavender-dim);
+}
+.section-title a:hover {
+  color: #fff;
+}
+
+/* Toolbar (filters, search, bulk actions) */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+}
+.toolbar .input,
+.toolbar .select {
+  height: 36px;
+  min-height: 36px;
+  font-size: var(--fs-sm);
+}
+.toolbar-search {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+}
+.toolbar-search .ico {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-4);
+}
+.toolbar-search .input {
+  padding-left: 32px;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Mobile scrim for the sidebar */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-sidebar) - 1);
+  background: rgba(4, 3, 8, 0.62);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--t-base) var(--ease), visibility var(--t-base);
+}
+.sidebar-scrim.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+@media (min-width: 1024px) {
+  .sidebar-scrim {
+    display: none;
+  }
+}
+
+/* Setup banner: shown whenever a dependency is not configured */
+.setup-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  margin-bottom: var(--s-5);
+  border-radius: var(--r-md);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  background: rgba(251, 191, 36, 0.07);
+  font-size: var(--fs-sm);
+  color: #fbe7b4;
+  line-height: 1.55;
+}
+.setup-banner .ico {
+  color: var(--warn);
+  margin-top: 1px;
+  flex: none;
+}
+.setup-banner strong {
+  color: #fff;
+}
+.setup-banner a {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.setup-banner code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* ==========================================================================
+   Dashboard surface polish
+   --------------------------------------------------------------------------
+   Restrained on purpose: this is where people work all day. Glass is used for
+   the chrome (sidebar, header) and never for data tables or form fields.
+   ========================================================================== */
+
+.app-sidebar {
+  border-right-color: rgba(168, 85, 247, 0.14);
+  background:
+    linear-gradient(180deg, rgba(22, 17, 34, 0.92), rgba(9, 7, 15, 0.96)),
+    radial-gradient(90% 40% at 0% 0%, rgba(124, 58, 237, 0.12), transparent 70%);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.sidebar-link {
+  position: relative;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.sidebar-link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--lavender), var(--violet));
+  transform: translateY(-50%);
+  transition: height var(--t-base) var(--ease-spring);
+}
+.sidebar-link:hover::before {
+  height: 40%;
+}
+.sidebar-link.is-active::before {
+  height: 62%;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+}
+
+.app-topbar {
+  border-bottom-color: rgba(168, 85, 247, 0.12);
+  background: rgba(9, 7, 15, 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Cards lift a little on hover; no movement on touch, no shadow on tables. */
+.card {
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
+}
+@media (hover: hover) {
+  .card:hover {
+    border-color: rgba(168, 85, 247, 0.2);
+    box-shadow: var(--shadow-md);
+  }
+  .kpi-card:hover,
+  .metric-card:hover {
+    border-color: rgba(168, 85, 247, 0.24);
+  }
+}
+
+/* View content settles in rather than snapping when switching sections.
+   #view-root is the single mount point the router renders into. */
+#view-root > * {
+  animation: view-in 0.34s var(--ease-out) both;
+}
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view-root > * { animation: none !important; }
+  .card, .kpi-card, .metric-card { transition: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Topbar search on phones
+   --------------------------------------------------------------------------
+   Between the toggle and five action icons a 390px topbar leaves the field
+   about 90px — enough for one clipped character. Below 640px it collapses to
+   an icon-sized pill that expands across the bar as soon as it is tapped, so
+   the placeholder and the typed term are always fully readable.
+   -------------------------------------------------------------------------- */
+@media (max-width: 639px) {
+  .app-topbar {
+    position: sticky;
+  }
+  .topbar-search {
+    flex: 0 1 auto;
+    width: 38px;
+    min-width: 0;
+    max-width: none;
+    transition: width var(--t-base) var(--ease);
+  }
+  .topbar-search .kbd {
+    display: none;
+  }
+  .topbar-search input {
+    padding: 0 0 0 30px;
+    text-overflow: ellipsis;
+  }
+  .topbar-search input::placeholder {
+    color: transparent;
+  }
+  .topbar-search:focus-within {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    z-index: 45;
+  }
+  .topbar-search:focus-within input {
+    padding: 0 14px 0 32px;
+    background: #0d0a15;
+    border-color: rgba(168, 85, 247, 0.55);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  }
+  .topbar-search:focus-within input::placeholder {
+    color: var(--text-4);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Search popover must be opaque
+   --------------------------------------------------------------------------
+   The topbar already applies `backdrop-filter`. A descendant that also asks
+   for `backdrop-filter` cannot blur its backdrop (the ancestor's filtered
+   snapshot becomes the backdrop root), so the translucent fill let page
+   headings ghost through the results. Solid surface instead.
+   -------------------------------------------------------------------------- */
+.search-results {
+  background: linear-gradient(180deg, #131020 0%, #0b0912 100%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(168, 85, 247, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.4);
+}

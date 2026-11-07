@@ -1,0 +1,651 @@
+/* ==========================================================================
+   Shinzora — Admin console
+   Loaded after tokens + components + app. A denser, more operational variant
+   of the dashboard shell: same tokens, less atmosphere, more data.
+   ========================================================================== */
+
+body.admin {
+  background: var(--base);
+}
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------ sidebar */
+.admin-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-5) var(--s-3);
+  background: linear-gradient(180deg, rgba(18, 12, 28, 0.96), rgba(10, 8, 16, 0.98));
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--s-2) var(--s-4);
+}
+
+.admin-brand .brand-word {
+  font-size: 1.02rem;
+  letter-spacing: 0.22em;
+}
+
+.admin-brand-tag {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--violet-soft);
+  border: 1px solid rgba(167, 139, 250, 0.32);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.admin-nav-group {
+  padding: var(--s-3) var(--s-3) 6px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.admin-nav-item:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+}
+
+.admin-nav-item.is-active {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.24), rgba(124, 58, 237, 0.05));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.28);
+}
+
+.admin-nav-item .count {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
+}
+
+.admin-sidebar-foot {
+  margin-top: auto;
+  padding: var(--s-4) var(--s-2) 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  line-height: 1.6;
+}
+
+.admin-sidebar-foot a {
+  color: var(--violet-soft);
+}
+
+/* --------------------------------------------------------------------- main */
+.admin-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-5);
+  background: rgba(10, 8, 16, 0.86);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-search {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+}
+
+.admin-search svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-4);
+}
+
+.admin-search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-xs);
+}
+
+.admin-search input:focus {
+  outline: none;
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.16);
+}
+
+.admin-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.admin-body {
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.admin-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+
+.admin-head h1 {
+  font-size: var(--fs-h3);
+  color: #fff;
+  margin: 0 0 4px;
+}
+
+.admin-head p {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  max-width: 70ch;
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------- components */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--s-3);
+}
+
+.admin-stat {
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+}
+
+.admin-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.admin-stat-value {
+  margin-top: 8px;
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.admin-stat-foot {
+  margin-top: 4px;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+
+.admin-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.admin-card {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.admin-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.admin-card-title {
+  font-size: var(--fs-sm);
+  color: #fff;
+  font-weight: 500;
+}
+
+.admin-card-sub {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.admin-card-body {
+  padding: var(--s-4);
+}
+
+.admin-empty {
+  padding: var(--s-7) var(--s-4);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+.admin-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-tabs {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-tabs button {
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: var(--fs-2xs);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.admin-tabs button.is-active {
+  background: rgba(124, 58, 237, 0.3);
+  color: #fff;
+}
+
+/* monitoring: the list of files that changed since the previous check */
+.monitor-changes {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+.monitor-changes li {
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.monitor-changes .mono {
+  color: var(--accent-300, #c4b5fd);
+  margin-right: 4px;
+}
+
+/* tables are denser in the console */
+.admin-card table.table th,
+.admin-card table.table td {
+  padding: 10px 14px;
+  font-size: var(--fs-xs);
+}
+
+.admin-card table.table th {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.admin-card table.table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.customer-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.customer-cell .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 10px;
+}
+
+.customer-cell strong {
+  display: block;
+  color: var(--text);
+  font-weight: 500;
+  font-size: var(--fs-xs);
+}
+
+.customer-cell span {
+  display: block;
+  color: var(--text-4);
+  font-size: var(--fs-2xs);
+}
+
+.admin-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.admin-note {
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: rgba(124, 58, 237, 0.08);
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+  line-height: 1.6;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.admin-kv {
+  display: grid;
+  grid-template-columns: minmax(90px, 130px) 1fr;
+  gap: 6px 14px;
+  font-size: var(--fs-xs);
+}
+
+.admin-kv dt {
+  color: var(--text-4);
+}
+
+.admin-kv dd {
+  color: var(--text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timeline-item {
+  position: relative;
+  padding: 0 0 var(--s-4) 22px;
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  margin-left: 5px;
+}
+
+.timeline-item:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -4.5px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--violet);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+}
+
+.timeline-title {
+  font-size: var(--fs-xs);
+  color: var(--text);
+}
+
+.timeline-meta {
+  font-size: var(--fs-2xs);
+  color: var(--text-4);
+  margin-top: 2px;
+}
+
+.announcement-preview {
+  border-left: 2px solid rgba(167, 139, 250, 0.5);
+  padding-left: 12px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.admin-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--s-5);
+}
+
+/* `display:grid` above outranks the default [hidden] rule, which kept the old
+   gate painted on top of the console. Any element that carries `hidden` here
+   must genuinely be gone. */
+.admin-login[hidden],
+.admin-shell[hidden],
+.admin-login [hidden] {
+  display: none !important;
+}
+
+.admin-login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--s-6);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  background: linear-gradient(170deg, rgba(28, 18, 42, 0.94), rgba(12, 9, 20, 0.98));
+  box-shadow: var(--shadow-lg);
+}
+
+.admin-login-card h1 {
+  font-size: var(--fs-h4);
+  color: #fff;
+  margin: var(--s-4) 0 6px;
+}
+
+.admin-login-card p {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.65;
+  margin: 0 0 var(--s-5);
+}
+
+/* --------------------------------------------------------------------------
+   /admin-login — the standalone administrator gate
+   --------------------------------------------------------------------------
+   Its own page, its own atmosphere, and the same server-side role check as the
+   console. Kept visually quieter than the customer sign-in: this is a door,
+   not a shopfront.
+   -------------------------------------------------------------------------- */
+.admin-gate-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.admin-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(96% 70% at 22% -10%, rgba(76, 29, 149, 0.42), transparent 64%),
+    radial-gradient(80% 60% at 82% 12%, rgba(124, 58, 237, 0.24), transparent 68%),
+    #08060d;
+}
+
+.admin-gate-page .admin-login {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-gate-page .admin-login-card {
+  border-color: rgba(167, 139, 250, 0.26);
+  background:
+    linear-gradient(170deg, rgba(30, 20, 46, 0.86), rgba(11, 8, 19, 0.94)),
+    radial-gradient(120% 80% at 12% 0%, rgba(124, 58, 237, 0.16), transparent 62%);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  box-shadow:
+    0 34px 90px rgba(3, 1, 8, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.admin-gate-page .admin-login-card .field-error {
+  min-height: 18px;
+  color: var(--danger, #f87171);
+  font-size: var(--fs-xs);
+}
+
+.admin-gate-note {
+  color: var(--text-2);
+}
+
+.admin-gate-note code {
+  color: var(--lavender);
+  font-size: 0.92em;
+}
+
+.admin-gate-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--s-4);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.admin-gate-foot a {
+  color: var(--text-2);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.admin-gate-foot a:hover {
+  color: var(--white);
+  border-bottom-color: rgba(167, 139, 250, 0.5);
+}
+
+.admin-gate-legal {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid rgba(167, 139, 250, 0.12);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-4);
+}
+
+
+/* ------------------------------------------------------------------ mobile */
+.admin-menu-toggle {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 268px;
+    z-index: 60;
+    transform: translateX(-102%);
+    transition: transform var(--t-base);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+  }
+
+  .admin-sidebar.is-open {
+    transform: none;
+  }
+
+  .admin-menu-toggle {
+    display: inline-flex;
+  }
+
+  .admin-split {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-body {
+    padding: var(--s-4);
+  }
+
+  .admin-topbar {
+    padding: var(--s-3) var(--s-4);
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-head h1 {
+    font-size: var(--fs-h4);
+  }
+
+  .admin-search {
+    display: none;
+  }
+
+  .admin-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .admin-stat-value {
+    font-size: 1.3rem;
+  }
+}

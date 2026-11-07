@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Install Shinzora</title>
+  <meta name="description" content="Install Shinzora on your phone or desktop. A real progressive web app — no app store, no download button that does nothing." />
+  <meta name="theme-color" content="#08060d" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <style>
+    .install-wrap { max-width: 880px; margin: 0 auto; padding: 88px 24px 96px; }
+    .install-head { text-align: center; margin-bottom: 44px; }
+    .install-head .brand-word { font-size: 1rem; }
+    .install-head h1 { font-size: clamp(1.8rem, 1.3rem + 2vw, 2.6rem); letter-spacing: -.03em; margin: 22px 0 14px; color: #fff; }
+    .install-head p { color: var(--text-3); font-size: .95rem; line-height: 1.7; max-width: 58ch; margin: 0 auto; }
+    .badge-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
+    .platform-tabs { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 34px 0 22px; }
+    .platform-tabs button {
+      font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+      border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--text-2);
+      transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+    }
+    .platform-tabs button[aria-selected="true"] { background: rgba(124,58,237,.24); border-color: rgba(167,139,250,.42); color: #fff; }
+    .steps { display: flex; flex-direction: column; gap: 12px; }
+    .step {
+      display: flex; gap: 16px; align-items: flex-start;
+      padding: 20px; border-radius: var(--r-md);
+      border: 1px solid var(--line);
+      background: linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    }
+    .step-num {
+      flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 12px; font-weight: 600;
+      background: rgba(124,58,237,.2); color: var(--violet-2); border: 1px solid rgba(167,139,250,.3);
+    }
+    .step h3 { margin: 2px 0 6px; font-size: .95rem; color: #fff; font-weight: 500; }
+    .step p { margin: 0; font-size: .84rem; color: var(--text-3); line-height: 1.65; }
+    .install-cta { margin-top: 36px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .install-note { margin-top: 30px; padding: 18px 20px; border-radius: var(--r-md); border: 1px solid rgba(167,139,250,.22); background: rgba(124,58,237,.07); font-size: .82rem; color: var(--text-2); line-height: 1.7; }
+    .installed-banner { display: none; margin-top: 26px; padding: 16px 18px; border-radius: var(--r-md); border: 1px solid rgba(52,211,153,.3); background: rgba(52,211,153,.08); color: #a7f3d0; font-size: .84rem; }
+    .installed-banner.is-visible { display: block; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="install-wrap">
+    <header class="install-head">
+      <a class="nav-brand" href="/" aria-label="Shinzora home" style="justify-content:center">
+        <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <h1>Install Shinzora</h1>
+      <p>
+        Shinzora is a progressive web app. Installing puts it on your home screen or dock with its own icon, a
+        full-screen window and offline handling — without an app store and without a download that does nothing.
+      </p>
+      <p style="margin-top:14px;font-size:.84rem">
+        Want the full walkthrough, with a section for every platform? Read the
+        <a href="/docs/" style="color:var(--lavender,#c4b5fd)">documentation</a> and the <a href="/install-guide/" style="color:var(--lavender,#c4b5fd)">setup guide</a>.
+      </p>
+      <div class="badge-row">
+        <span class="badge badge-brand">Works offline</span>
+        <span class="badge badge-neutral">Under 1 MB shell</span>
+        <span class="badge badge-neutral">No app store</span>
+      </div>
+      <div class="installed-banner" id="installed-banner">
+        Shinzora is already running as an installed app. You can close this tab and open it from your home screen.
+      </div>
+    </header>
+
+    <div class="platform-tabs" role="tablist" aria-label="Choose your device">
+      <button role="tab" aria-selected="true" data-platform="chrome">Chrome / Edge</button>
+      <button role="tab" aria-selected="false" data-platform="android">Android</button>
+      <button role="tab" aria-selected="false" data-platform="ios">iPhone / iPad</button>
+      <button role="tab" aria-selected="false" data-platform="desktop">macOS</button>
+    </div>
+
+    <section class="steps" id="steps" aria-live="polite"></section>
+
+    <div class="install-cta">
+      <button class="btn btn-primary" id="native-install" hidden>Install now</button>
+      <a class="btn btn-secondary" href="/auth/signup/">Create an account</a>
+      <a class="btn btn-ghost" href="/app/">Open dashboard</a>
+    </div>
+
+    <p class="install-note">
+      No APK, no IPA, no fake "Download" button. If your browser supports the install prompt, the button above appears and
+      triggers the real browser prompt. Otherwise follow the steps for your device — they are the honest manual route.
+    </p>
+  </main>
+
+  <script type="module" src="/js/boot/install.js?v=20261107g"></script>
+</body>
+</html>

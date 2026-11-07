@@ -1,0 +1,213 @@
+/* ==========================================================================
+   Shinzora — legal documents
+   Long-form reading surface: single column, generous measure, no decoration
+   that competes with the text.
+   ========================================================================== */
+
+.legal-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.legal-top {
+  border-bottom: 1px solid var(--line);
+  background: rgba(8, 6, 13, 0.7);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.legal-top-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: 14px 24px;
+}
+
+.legal-top nav {
+  margin-left: auto;
+  display: flex;
+  gap: 18px;
+  font-size: var(--fs-xs);
+  flex-wrap: wrap;
+}
+
+.legal-top nav a {
+  color: var(--text-3);
+}
+
+.legal-top nav a[aria-current="page"] {
+  color: var(--text);
+}
+
+.legal-main {
+  flex: 1;
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 60px 24px 96px;
+}
+
+.legal-main header {
+  margin-bottom: 40px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+}
+
+.legal-main h1 {
+  font-size: clamp(1.7rem, 1.3rem + 1.6vw, 2.3rem);
+  letter-spacing: -0.028em;
+  color: #fff;
+  margin: 0 0 12px;
+}
+
+.legal-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.legal-main h2 {
+  font-size: 1.1rem;
+  color: #fff;
+  margin: 40px 0 12px;
+  letter-spacing: -0.01em;
+}
+
+.legal-main h3 {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin: 24px 0 8px;
+  font-weight: 600;
+}
+
+.legal-main p,
+.legal-main li {
+  color: var(--text-2);
+  font-size: 0.92rem;
+  line-height: 1.78;
+}
+
+.legal-main p {
+  margin: 0 0 14px;
+}
+
+.legal-main ul,
+.legal-main ol {
+  margin: 0 0 16px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.legal-main a {
+  color: var(--violet-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal-main strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.legal-main code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.legal-callout {
+  margin: 24px 0;
+  padding: 18px 20px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(167, 139, 250, 0.24);
+  background: rgba(124, 58, 237, 0.08);
+  font-size: 0.88rem;
+  line-height: 1.72;
+  color: var(--text-2);
+}
+
+.legal-callout strong {
+  display: block;
+  color: var(--violet-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.legal-toc {
+  margin: 0 0 34px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.legal-toc span {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 10px;
+}
+
+.legal-toc ol {
+  margin: 0;
+  padding-left: 18px;
+  gap: 4px;
+}
+
+.legal-toc a {
+  color: var(--text-2);
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
+.legal-toc a:hover {
+  color: var(--violet-soft);
+}
+
+.legal-foot {
+  border-top: 1px solid var(--line);
+  padding: 26px 24px 40px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.legal-foot-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.legal-foot-inner nav {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .legal-main {
+    padding: 38px 18px 70px;
+  }
+
+  .legal-top nav {
+    display: none;
+  }
+}

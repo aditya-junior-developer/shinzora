@@ -1,0 +1,56 @@
+{
+  "name": "shinzora",
+  "productName": "Shinzora",
+  "version": "1.0.0",
+  "description": "Shinzora — Build beyond. Your business, built, powered and managed with intelligence.",
+  "author": {
+    "name": "Shinzora",
+    "email": "official.shinzora@proton.me"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "in.shinzora.desktop",
+    "productName": "Shinzora",
+    "copyright": "Copyright © Shinzora",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "assets/icon.ico",
+      "assets/icon.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "Shinzora-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Shinzora",
+      "uninstallDisplayName": "Shinzora",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

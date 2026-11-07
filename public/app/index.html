@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Dashboard — Shinzora</title>
+<meta name="description" content="Run your business on Shinzora: websites, store, orders, customers, marketing and analytics." />
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#08070e" />
+<link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+<link rel="stylesheet" href="/css/components.css?v=20261107g" />
+<link rel="stylesheet" href="/css/app.css?v=20261107g" />
+<link rel="stylesheet" href="/css/views.css?v=20261107g" />
+<script src="/js/config/runtime.js"></script>
+</head>
+<body>
+<div class="atmosphere" aria-hidden="true"></div>
+<a class="skip-link" href="#app-content">Skip to content</a>
+
+<div class="app-shell">
+  <!-- =============================== SIDEBAR =============================== -->
+  <aside class="app-sidebar" id="app-sidebar" aria-label="Workspace navigation">
+    <div class="sidebar-head">
+      <a class="nav-brand" href="/app/" aria-label="Shinzora dashboard">
+        <img src="/assets/icons/mark.svg" alt="" width="26" height="26" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <button class="sidebar-close" data-sidebar-close aria-label="Close navigation">
+        <i data-icon="x" data-size="16"></i>
+      </button>
+    </div>
+
+    <div class="sidebar-workspace">
+      <button class="workspace-switch" id="workspace-switch" aria-haspopup="menu" aria-expanded="false">
+        <span class="avatar avatar-sm" id="workspace-avatar">SZ</span>
+        <span class="ws-meta" style="min-width:0">
+          <span class="ws-name truncate" id="workspace-name">Your business</span>
+          <span class="ws-plan" id="workspace-plan">Free plan</span>
+        </span>
+        <i data-icon="chevrons-up-down" data-size="14"></i>
+      </button>
+      <div class="menu" id="workspace-menu" hidden style="position:relative;margin-top:6px;left:0">
+        <a class="menu-item" href="/app/?view=settings"><i data-icon="settings" data-size="15"></i>Workspace settings</a>
+        <a class="menu-item" href="/app/?view=billing"><i data-icon="credit-card" data-size="15"></i>Plan &amp; billing</a>
+        <div class="menu-sep"></div>
+        <a class="menu-item" id="view-public-site" href="#" role="menuitem"><i data-icon="external-link" data-size="15"></i>View public site</a>
+      </div>
+    </div>
+
+    <div class="sidebar-scroll">
+      <nav id="sidebar-nav"><!-- rendered by shell.js --></nav>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-foot-info" id="ai-usage-card">
+        <div class="sfi-label"><span>AI usage</span><span id="ai-usage-count">—</span></div>
+        <div class="progress progress-thin"><span id="ai-usage-bar" style="width:0%"></span></div>
+        <div class="sfi-value"><span>Resets monthly</span><a href="/app/?view=billing" style="color:var(--lavender)">Upgrade</a></div>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-block" id="sidebar-signout" style="justify-content:flex-start">
+        <i data-icon="log-out" data-size="14"></i>
+        Sign out
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+
+  <!-- ================================ MAIN ================================ -->
+  <div class="app-main">
+    <header class="app-topbar">
+      <button class="topbar-toggle" data-sidebar-open aria-label="Open navigation">
+        <i data-icon="menu" data-size="17"></i>
+      </button>
+      <button class="topbar-toggle" id="sidebar-collapse" aria-label="Collapse navigation">
+        <i data-icon="panel-left" data-size="17"></i>
+      </button>
+
+      <div class="topbar-search" id="global-search-wrap">
+        <i data-icon="search" data-size="15"></i>
+        <input type="search" id="global-search" placeholder="Search projects, orders, customers…" autocomplete="off" aria-label="Search workspace" />
+        <span class="kbd">⌘K</span>
+        <div class="search-results" id="search-results" hidden></div>
+      </div>
+
+      <div class="topbar-actions">
+        <a class="topbar-icon" href="/app/?view=assistant" data-tip="AI assistant" aria-label="AI assistant">
+          <i data-icon="sparkles" data-size="17"></i>
+        </a>
+        <button class="topbar-icon" id="notifications-toggle" data-tip="Notifications" aria-label="Notifications" aria-haspopup="dialog">
+          <i data-icon="bell" data-size="17"></i>
+          <span class="dot-badge hidden" id="notif-badge">0</span>
+        </button>
+        <button class="topbar-avatar" id="account-toggle" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar avatar-sm" id="account-avatar">SZ</span>
+          <span class="ta-name" id="account-name">Account</span>
+          <i data-icon="chevron-down" data-size="14" style="color:var(--text-3)"></i>
+        </button>
+        <div class="menu" id="account-menu" hidden style="position:absolute;top:calc(var(--nav-h) - 8px);right:var(--s-4)">
+          <div class="menu-label" id="account-email">signed in</div>
+          <a class="menu-item" href="/app/?view=settings"><i data-icon="user-round" data-size="15"></i>Profile &amp; settings</a>
+          <a class="menu-item" href="/app/?view=notifications"><i data-icon="bell" data-size="15"></i>Notifications</a>
+          <a class="menu-item" href="/app/?view=billing"><i data-icon="credit-card" data-size="15"></i>Billing</a>
+          <a class="menu-item" id="account-view-site" href="#" role="menuitem"><i data-icon="external-link" data-size="15"></i>View public site</a>
+          <a class="menu-item" id="admin-link" href="/admin/" hidden><i data-icon="shield-check" data-size="15"></i>Admin panel</a>
+          <div class="menu-sep"></div>
+          <a class="menu-item" href="/install/"><i data-icon="smartphone" data-size="15"></i>Install app</a>
+          <a class="menu-item" href="/system-check/"><i data-icon="activity" data-size="15"></i>System status</a>
+          <div class="menu-sep"></div>
+          <button class="menu-item menu-item-danger" id="account-signout"><i data-icon="log-out" data-size="15"></i>Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-content" id="app-content" tabindex="-1">
+      <div id="view-root" aria-live="polite"><!-- views render here --></div>
+    </main>
+  </div>
+</div>
+
+<!-- Notification drawer -->
+<div class="drawer" id="notification-drawer" role="dialog" aria-modal="true" aria-label="Notifications" hidden>
+  <div class="drawer-head">
+    <div>
+      <div class="drawer-title">Notifications</div>
+      <div class="drawer-sub" id="notif-sub">Recent activity in your workspace</div>
+    </div>
+    <button class="modal-close" data-drawer-close aria-label="Close notifications"><i data-icon="x" data-size="16"></i></button>
+  </div>
+  <div class="drawer-body" id="notif-list"></div>
+  <div class="drawer-foot">
+    <button class="btn btn-ghost btn-sm" id="notif-mark-all"><i data-icon="check-check" data-size="14"></i>Mark all as read</button>
+    <a class="btn btn-secondary btn-sm" href="/app/?view=notifications">View all</a>
+  </div>
+</div>
+<div class="drawer-scrim" id="drawer-scrim"></div>
+
+<div class="install-prompt" id="install-prompt" hidden>
+  <img src="/assets/icons/icon-192.png" alt="" width="38" height="38" />
+  <div>
+    <div class="ip-title">Install Shinzora</div>
+    <div class="ip-desc">Add the dashboard to your device for one-tap access.</div>
+  </div>
+  <div class="ip-actions">
+    <button class="btn btn-primary btn-sm" id="install-accept">Install</button>
+    <button class="btn btn-ghost btn-icon btn-sm" id="install-dismiss" aria-label="Dismiss install prompt"><i data-icon="x" data-size="14"></i></button>
+  </div>
+</div>
+
+<script src="/js/vendor/supabase-js.js"></script>
+<script type="module" src="/js/boot/dashboard.js?v=20261107g"></script>
+</body>
+</html>

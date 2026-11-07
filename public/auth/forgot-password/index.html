@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Reset password — Shinzora</title>
+<meta name="description" content="Request a Shinzora password reset link." />
+<meta name="robots" content="noindex, follow" />
+<meta name="theme-color" content="#08070e" />
+<link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+<link rel="stylesheet" href="/css/components.css?v=20261107g" />
+<link rel="stylesheet" href="/css/auth.css?v=20261107g" />
+<script src="/js/config/runtime.js"></script>
+</head>
+<body data-auth-page="forgot-password">
+<div class="atmosphere" aria-hidden="true"></div>
+<div class="auth-fx" aria-hidden="true">
+  <canvas class="af-aurora-canvas" data-aurora data-aurora-intensity="0.9"></canvas>
+  <span class="af-grid"></span>
+  <span class="auth-grain"></span>
+</div>
+<a class="skip-link" href="#auth-panel">Skip to form</a>
+
+<div class="auth-shell">
+  <!-- ===================== Brand / atmosphere panel ===================== -->
+  <aside class="auth-aside" aria-hidden="false">
+    <a class="nav-brand" href="/" aria-label="Shinzora home">
+      <span class="brand-mark" aria-hidden="true"><img src="/assets/icons/mark.png" alt="" width="30" height="30" decoding="async" /></span>
+      <span class="brand-word">SHINZORA</span>
+    </a>
+
+    <div class="auth-aside-copy">
+      <h1>Your business. Built, powered and managed with <em>intelligence.</em></h1>
+      <p>One workspace for the website, the storefront, the application and the operations behind them.</p>
+      <div class="auth-points">
+        <div class="auth-point">
+          <span class="ap-ico"><i data-icon="sparkles" data-size="14"></i></span>
+          <span><strong>AI that builds, not chats</strong><span>Structure, pages, copy and metadata generated server-side.</span></span>
+        </div>
+        <div class="auth-point">
+          <span class="ap-ico"><i data-icon="shield-check" data-size="14"></i></span>
+          <span><strong>Private by construction</strong><span>Row-level security scopes every record to your account.</span></span>
+        </div>
+        <div class="auth-point">
+          <span class="ap-ico"><i data-icon="rocket" data-size="14"></i></span>
+          <span><strong>Publish for real</strong><span>Shinzora subdomain, custom domain, or GitHub and Vercel.</span></span>
+        </div>
+      </div>
+
+      <div class="auth-preview">
+        <div class="auth-preview-head"><span class="dot-sample"></span> workspace activity · example</div>
+        <div class="auth-preview-rows">
+          <div class="auth-preview-row"><i data-icon="sparkles" data-size="13"></i> Homepage generated <span class="apr-tag">v3</span></div>
+          <div class="auth-preview-row"><i data-icon="package" data-size="13"></i> Order marked shipped <span class="apr-tag">#1042</span></div>
+          <div class="auth-preview-row"><i data-icon="globe" data-size="13"></i> Domain connected <span class="apr-tag">live</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-aside-foot">
+      <span>© <span data-year>2026</span> Shinzora</span>
+      <span><a href="/legal/terms/">Terms</a> · <a href="/legal/privacy/">Privacy</a></span>
+    </div>
+  </aside>
+
+  <!-- ============================ Form panel =========================== -->
+  <main class="auth-main">
+    <div class="auth-topbar">
+      <a class="auth-mobile-brand nav-brand" href="/" aria-label="Shinzora home">
+        <img src="/assets/icons/mark.svg" alt="" width="28" height="28" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <span class="auth-help">Remembered it? <a href="/auth/login/">Sign in</a></span>
+    </div>
+    <section class="auth-panel" id="auth-panel">
+      <div class="auth-head">
+        <h2>Reset your password</h2>
+        <p>Enter the email address on your account and we will send a secure reset link.</p>
+      </div>
+      <div id="auth-alert" role="status" aria-live="polite"></div>
+      <form class="auth-form" id="forgot-form" novalidate>
+        <div class="field" data-field="email">
+          <label class="field-label" for="fp-email">Email address</label>
+          <div class="input-icon">
+            <i data-icon="mail" data-size="16"></i>
+            <input class="input" id="fp-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@business.com" required />
+          </div>
+          <div class="field-error"></div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="forgot-submit">
+          Send reset link
+          <i data-icon="send" data-size="15"></i>
+        </button>
+      </form>
+      <div id="forgot-success" class="hidden"></div>
+      <p class="auth-footer-note">No account yet? <a href="/auth/signup/">Create one</a></p>
+    </section>
+    <p class="auth-legal">
+      Protected by Supabase Auth. By continuing you agree to the
+      <a href="/legal/terms/">terms of service</a> and <a href="/legal/privacy/">privacy policy</a>.
+    </p>
+  </main>
+</div>
+
+<script src="/js/vendor/supabase-js.js"></script>
+<script type="module" src="/js/boot/auth-forgot.js?v=20261107g"></script>
+</body>
+</html>

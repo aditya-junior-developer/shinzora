@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shinzora documentation</title>
+  <meta name="description" content="How Shinzora works: accounts, the dashboard, builders, store, payments, domains, service requests, the admin console and deployment." />
+  <meta name="theme-color" content="#08060d" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <style>
+    .doc-wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 96px; }
+    .doc-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+    .doc-top .brand-word { font-size: .95rem; }
+    .doc-layout { display: grid; gap: 34px; margin-top: 30px; }
+    @media (min-width: 900px) { .doc-layout { grid-template-columns: 232px minmax(0, 1fr); gap: 44px; } }
+    .doc-nav { font-size: .84rem; }
+    .doc-nav h2 { font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); margin: 0 0 10px; font-weight: 600; }
+    .doc-nav ol { list-style: none; margin: 0 0 24px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+    .doc-nav a { display: block; padding: 7px 10px; border-radius: 8px; color: var(--text-2); text-decoration: none; line-height: 1.4; }
+    .doc-nav a:hover { background: rgba(255,255,255,.04); color: #fff; }
+    @media (max-width: 899px) {
+      .doc-nav { position: sticky; top: 0; z-index: 5; background: rgba(8,6,13,.92); backdrop-filter: blur(12px); padding: 10px 0; margin: 0 -24px; padding-left: 24px; padding-right: 24px; overflow-x: auto; }
+      .doc-nav h2 { display: none; }
+      .doc-nav ol { flex-direction: row; gap: 8px; margin: 0; }
+      .doc-nav a { white-space: nowrap; border: 1px solid var(--line); }
+    }
+    .doc-body { min-width: 0; }
+    .doc-body h1 { font-size: clamp(1.7rem, 1.2rem + 2vw, 2.35rem); letter-spacing: -.03em; color: #fff; margin: 0 0 12px; }
+    .doc-body h2 { font-size: 1.24rem; color: #fff; margin: 46px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); letter-spacing: -.01em; }
+    .doc-body h2:first-of-type { border-top: 0; padding-top: 0; margin-top: 30px; }
+    .doc-body h3 { font-size: .98rem; color: #fff; margin: 24px 0 8px; font-weight: 550; }
+    .doc-body p, .doc-body li { font-size: .89rem; line-height: 1.78; color: var(--text-2); }
+    .doc-body p { margin: 0 0 12px; }
+    .doc-body ul, .doc-body ol { margin: 0 0 14px; padding-left: 20px; }
+    .doc-body li { margin-bottom: 6px; }
+    .doc-body a { color: var(--lavender, #c4b5fd); }
+    .doc-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82em; padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.06); color: #d8ccff; }
+    .doc-body pre { margin: 0 0 16px; padding: 14px 16px; border-radius: 10px; background: #06040c; border: 1px solid var(--line); overflow-x: auto; }
+    .doc-body pre code { background: none; padding: 0; font-size: 12px; line-height: 1.75; color: #cbb8ff; }
+    .doc-callout { margin: 16px 0; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(167,139,250,.26); background: rgba(124,58,237,.08); font-size: .85rem; line-height: 1.7; color: var(--text-2); }
+    .doc-callout strong { color: #fff; }
+    .doc-table { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: .84rem; }
+    .doc-table th, .doc-table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .doc-table th { color: var(--text-3); font-weight: 600; font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; }
+    .doc-table td { color: var(--text-2); line-height: 1.6; }
+    .doc-foot { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; gap: 14px; flex-wrap: wrap; justify-content: space-between; font-size: .82rem; color: var(--text-3); }
+  </style>
+</head>
+<body>
+  <main class="doc-wrap">
+    <div class="doc-top">
+      <a class="nav-brand" href="/" aria-label="Shinzora home">
+        <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <div class="row gap-2 wrap">
+        <a class="btn btn-ghost btn-sm" href="/download/">Applications</a>
+        <a class="btn btn-primary btn-sm" href="/app/">Open dashboard</a>
+      </div>
+    </div>
+
+    <div class="doc-layout">
+      <nav class="doc-nav" aria-label="Documentation sections">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#start">Getting started</a></li>
+          <li><a href="#accounts">Accounts and security</a></li>
+          <li><a href="#dashboard">The dashboard</a></li>
+          <li><a href="#builders">Website and app builders</a></li>
+          <li><a href="#store">Online store</a></li>
+          <li><a href="#payments">Payments</a></li>
+          <li><a href="#domains">Domains and subdomains</a></li>
+          <li><a href="#services">Service requests</a></li>
+          <li><a href="#admin">Admin console</a></li>
+          <li><a href="#monitoring">Monitoring</a></li>
+          <li><a href="#prelaunch">Pre-launch testing</a></li>
+          <li><a href="#deploy">Deployment</a></li>
+          <li><a href="#security">Security model</a></li>
+          <li><a href="#faq">Questions</a></li>
+        </ol>
+      </nav>
+
+      <article class="doc-body">
+        <h1>Documentation</h1>
+        <p>
+          Everything below describes what the platform actually does. Where a feature depends on an external
+          provider — a registrar, a payment gateway, an AI key — the page says so instead of pretending.
+        </p>
+
+        <h2 id="start">Getting started</h2>
+        <ol>
+          <li>Create an account at <a href="/auth/signup/">/auth/signup</a>. Email confirmation is required before the dashboard opens.</li>
+          <li>Answer the three onboarding questions: business name, what you are building, and how you sell.</li>
+          <li>You land on the dashboard. The first useful step is usually <em>Website Builder → New project</em>.</li>
+        </ol>
+        <div class="doc-callout">
+          <strong>No credit card to start.</strong> The free plan includes a working website project, the store, support
+          and the assistant. Nothing is charged until you choose a paid plan or request a paid service.
+        </div>
+
+        <h2 id="accounts">Accounts and security</h2>
+        <h3>Signing in</h3>
+        <p>
+          Sign in at <a href="/auth/login/">/auth/login</a> with your email and password. Administrators use the same
+          page — there is no separate admin login form, because a second login screen is a second thing to keep
+          secure. The console lives at <a href="/admin/">/admin</a> and refuses non-administrators on the server.
+        </p>
+        <h3>Changing your password</h3>
+        <p>
+          Dashboard → Account settings → Security. The change is completed through the account provider, and the
+          success message only appears after the provider confirms it.
+        </p>
+        <h3>Forgot your password</h3>
+        <ol>
+          <li>Open <a href="/auth/forgot-password/">/auth/forgot-password</a> and enter your email.</li>
+          <li>The reset email contains a single-use link that expires; the link returns you to the reset screen.</li>
+          <li>Choose a new password. Used, expired or tampered links are refused rather than silently accepted.</li>
+        </ol>
+        <div class="doc-callout">
+          <strong>Email delivery is part of the deployment.</strong> If reset mail does not arrive, the mail provider in
+          the Supabase project is the thing to check — the platform will not claim a message was sent if the provider
+          rejected it.
+        </div>
+
+        <h2 id="dashboard">The dashboard</h2>
+        <p>Every section reads and writes real records; there are no placeholder screens.</p>
+        <table class="doc-table">
+          <tr><th>Section</th><th>What it does</th></tr>
+          <tr><td>Overview</td><td>Revenue, customers, products, open support, recent projects, orders, activity, notifications and any payment awaiting verification.</td></tr>
+          <tr><td>AI Assistant</td><td>Chat backed by the <code>ai</code> function. If no AI key is configured, it says so instead of inventing an answer.</td></tr>
+          <tr><td>Website Builder</td><td>Describe a business, get a generated site, edit sections, preview, publish or rollback to a previous version.</td></tr>
+          <tr><td>App Builder</td><td>Same pipeline for web applications: pages, data model and a published preview.</td></tr>
+          <tr><td>Projects</td><td>Every site and app with status, version and the published URL.</td></tr>
+          <tr><td>Domains</td><td>Free subdomains, plus availability checks and a request path for custom domains.</td></tr>
+          <tr><td>Online Store / Inventory / Orders / Customers</td><td>Products, stock levels, orders and buyer records for the storefront.</td></tr>
+          <tr><td>Marketing</td><td>Campaign drafts; sending depends on a configured email provider.</td></tr>
+          <tr><td>Customer Support</td><td>Tickets and replies, including drafted replies from the assistant.</td></tr>
+          <tr><td>Analytics</td><td>Traffic and conversion summaries from your own records.</td></tr>
+          <tr><td>Billing</td><td>Plan, AI usage, payment records, and the UPI checkout described below.</td></tr>
+          <tr><td>Settings</td><td>Profile, logo, business details, security and notification preferences.</td></tr>
+        </table>
+
+        <h2 id="builders">Website and app builders</h2>
+        <p>
+          A project has versions. Generating a site creates a new version with sections you can edit, reorder or
+          delete. Publishing marks one version live and serves it at <code>/site/?p=slug</code> or on your own domain.
+          Rolling back publishes an earlier version — nothing is destroyed.
+        </p>
+        <p>
+          Generation needs the <code>ai</code> function with a model key configured. Without it the builder returns a
+          clear "AI is not configured" message and no half-generated content.
+        </p>
+
+        <h2 id="store">Online store</h2>
+        <p>
+          Add products with price, stock and description; orders arrive with the buyer's details and move through
+          <em>new → paid → shipped → delivered</em>. Stock decrements when an order is recorded, and low stock is
+          flagged on the overview.
+        </p>
+
+        <h2 id="payments">Payments</h2>
+        <h3>UPI (the default)</h3>
+        <ol>
+          <li>Choose a plan or a service. The amount comes from the server-side catalogue — a tampered browser cannot change it.</li>
+          <li>Enter the UPI ID you will pay from. This is how the payment is matched in the bank statement.</li>
+          <li>The amount and the Shinzora payment QR are shown. Pay the exact amount in any UPI app.</li>
+          <li>Submit the UPI transaction ID. The record moves to <em>awaiting verification</em> and you may close the page.</li>
+        </ol>
+        <div class="doc-callout">
+          <strong>Nothing is marked paid by the customer's browser.</strong> Only an administrator approving the payment
+          — or a signature-verified gateway callback — can move a payment to <em>verified</em>, and that is the moment a
+          plan or subscription changes.
+        </div>
+        <h3>Gateway (optional)</h3>
+        <p>
+          With Razorpay keys configured, orders are created server-side and confirmed by a signed webhook. Duplicate
+          webhooks are ignored by reference, so a retried callback cannot double-credit an account.
+        </p>
+        <h3>Payment history</h3>
+        <p>
+          Your billing page lists your payments. Removing an entry from the customer's view hides it; the financial
+          record itself stays in the database for accounting and audit, and remains visible to administrators.
+        </p>
+
+        <h2 id="domains">Domains and subdomains</h2>
+        <ul>
+          <li><strong>Free subdomain</strong> — every project can be published at <code>your-slug.shinzora.in</code> immediately.</li>
+          <li><strong>Availability</strong> — checked against public registry data (RDAP), so "taken or free" is real and needs no account.</li>
+          <li><strong>Price and registration</strong> — need a registrar connected to the deployment. Until then the row shows <em>price on request</em> and files a request rather than inventing a number.</li>
+          <li><strong>Your own domain</strong> — add it here, create the DNS records shown, and the status stays <em>pending</em> until DNS actually resolves.</li>
+        </ul>
+
+        <h2 id="services">Service requests</h2>
+        <p>
+          Paid and managed services are requested from the dashboard and tracked with a status you can follow. Each
+          request is linked to your account and, where relevant, to a business and a project.
+        </p>
+        <p>
+          Every request gets a reference such as <code>SR-4F2A9C10</code> and moves through four stages: requested,
+          approved, in progress and completed. A request can also end as rejected or cancelled, and the reason is shown
+          on the card. You can follow all of this under <strong>Service requests</strong> in the dashboard, where each
+          card shows its stage rail, the target date if one has been set, and any note Shinzora has written for you.
+        </p>
+        <p>
+          Shinzora contacts you about your request; you are never told to wait for a third-party call. Deadlines shown
+          for a service are Shinzora's own targets, not a guarantee from any external provider.
+        </p>
+
+        <h2 id="admin">Admin console</h2>
+        <p>
+          <a href="/admin/">/admin</a> is available to accounts with an administrator role, granted in the database —
+          never from the browser. The console covers overview metrics, customers, payments (with approve and reject),
+          service requests, subscriptions, projects, deployments, domains, orders, support, announcements, contact
+          messages, activity and monitoring.
+        </p>
+        <p>
+          Payment approval is the only path that upgrades a plan. Every approval records who did it and when.
+        </p>
+
+        <h2 id="monitoring">Monitoring</h2>
+        <p>
+          Incidents and events are recorded as they happen: sign-ins, server starts, browser errors, data changes,
+          abandoned and failed payments, and admin actions. The monitoring view separates pre-launch test activity from
+          customer activity so the two never mix. Logs never contain passwords, tokens or keys.
+        </p>
+
+        <h2 id="prelaunch">Pre-launch testing</h2>
+        <p>
+          The repository can run a local, self-contained environment with its own accounts and data so the product can
+          be exercised without touching production records. It is a development surface: it is not deployed with the
+          public site and it holds no customer data.
+        </p>
+
+        <h2 id="deploy">Deployment</h2>
+        <p>The full walkthrough is in <code>docs/DEPLOYMENT.md</code>. In short:</p>
+        <pre><code># 1. database
+supabase db push                      # migrations 0001–0005
+
+# 2. edge functions (8 of them)
+export SUPABASE_ACCESS_TOKEN=sbp_…
+node scripts/deploy-functions.mjs
+node scripts/smoke-functions.mjs --remote
+
+# 3. secrets (server-side only)
+supabase secrets set SHINZORA_AI_API_KEY=… SHINZORA_AI_MODEL=gemini-3.8-flash
+supabase secrets set UPI_ID=… UPI_PAYEE_NAME="…"</code></pre>
+        <p>
+          The web app is a static build plus one serverless API entry point, so it deploys to any static host with
+          function support. Configure the Supabase URL and publishable key in the environment; the
+          <code>service_role</code> key is never part of the frontend.
+        </p>
+
+        <h2 id="security">Security model</h2>
+        <ul>
+          <li>Authentication is handled by the account provider; passwords never touch Shinzora's own storage.</li>
+          <li>Every server function verifies the caller's token before doing anything on their behalf.</li>
+          <li>Administrator rights are checked on the server for every admin action, not by hiding buttons.</li>
+          <li>Row-level security scopes reads and writes to the signed-in owner.</li>
+          <li>Secrets — AI keys, gateway secrets, service keys — live only in the server environment.</li>
+          <li>A payment is never inferred from interface state: closing a window, reloading or navigating changes nothing.</li>
+        </ul>
+
+        <h2 id="faq">Questions</h2>
+        <h3>The assistant says AI is not configured</h3>
+        <p>No model key is set for the deployment. Until one is, the assistant refuses rather than inventing an answer.</p>
+        <h3>Domain search shows "price on request"</h3>
+        <p>Availability is live from the public registry, but pricing needs a registrar account connected to the deployment.</p>
+        <h3>I paid and nothing changed</h3>
+        <p>Payments move to <em>verified</em> after review, normally within 24 hours. Check Billing for the status of the reference you submitted.</p>
+        <h3>Something else</h3>
+        <p>Write to <a href="mailto:official.shinzora@proton.me">official.shinzora@proton.me</a>.</p>
+
+        <footer class="doc-foot">
+          <span><a href="/">Home</a> · <a href="/download/">Applications</a> · <a href="/install-guide/">Setup guide</a></span>
+          <span>Contact: <a href="mailto:official.shinzora@proton.me">official.shinzora@proton.me</a></span>
+        </footer>
+      </article>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /site/
+Disallow: /auth/callback/
+
+Sitemap: https://shinzora.in/sitemap.xml

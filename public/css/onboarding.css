@@ -1,0 +1,626 @@
+/* ==========================================================================
+   Shinzora — onboarding wizard
+   ========================================================================== */
+
+.ob-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background:
+    radial-gradient(60% 40% at 15% -5%, rgba(124, 58, 237, 0.26), transparent 62%),
+    radial-gradient(50% 40% at 95% 10%, rgba(75, 29, 146, 0.22), transparent 68%),
+    var(--void);
+}
+@media (min-width: 1024px) {
+  .ob-shell {
+    grid-template-columns: 316px minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------------ rail -- */
+.ob-rail {
+  display: none;
+  flex-direction: column;
+  gap: var(--s-6);
+  padding: var(--s-6) var(--s-5);
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 40%);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+}
+@media (min-width: 1024px) {
+  .ob-rail {
+    display: flex;
+  }
+}
+.ob-rail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.ob-rail-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--white);
+}
+.ob-rail-sub {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.5;
+  margin-top: 3px;
+}
+.ob-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ob-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: 10px;
+  border-radius: var(--r-md);
+  text-align: left;
+  width: 100%;
+  transition: background var(--t-base) var(--ease);
+}
+.ob-step:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+.ob-step .obs-marker {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  transition: all var(--t-base) var(--ease);
+}
+.ob-step .obs-marker .ico {
+  width: 12px;
+  height: 12px;
+}
+/* Both were inline, so `margin-top` on the description did nothing and the
+   two lines collapsed into "Your profileName, phone, photo". */
+.ob-step .obs-label {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  line-height: 1.3;
+}
+.ob-step .obs-desc {
+  display: block;
+  font-size: var(--fs-2xs);
+  color: var(--text-4);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.ob-step.is-active .obs-marker {
+  background: var(--grad-brand);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.16);
+}
+.ob-step.is-active .obs-label {
+  color: #fff;
+}
+.ob-step.is-done .obs-marker {
+  background: rgba(52, 211, 153, 0.18);
+  border-color: rgba(52, 211, 153, 0.42);
+  color: var(--ok);
+}
+.ob-step.is-done .obs-label {
+  color: var(--text-2);
+}
+.ob-step:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.ob-rail-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.ob-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-4);
+}
+
+/* ------------------------------------------------------------------- main -- */
+.ob-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: var(--s-5) var(--gutter) var(--s-9);
+  max-width: 100%;
+}
+.ob-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+}
+.ob-topbar .ob-save {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.ob-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ob-save-status .ico {
+  width: 13px;
+  height: 13px;
+}
+.ob-save-status.saved .ico { color: var(--ok); }
+.ob-save-status.saving .ico { color: var(--warn); animation: spin 1.4s linear infinite; }
+
+.ob-panel {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  animation: fade-up 0.35s var(--ease-out);
+}
+.ob-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.ob-head .ob-kicker {
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--lavender-dim);
+  font-weight: 600;
+}
+.ob-head h1 {
+  font-size: clamp(1.45rem, 1.15rem + 1vw, 1.95rem);
+  letter-spacing: -0.03em;
+  line-height: 1.18;
+}
+.ob-head p {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+.ob-card {
+  padding: var(--s-5);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.ob-grid-2 {
+  display: grid;
+  gap: var(--s-4);
+}
+@media (min-width: 640px) {
+  .ob-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Avatar / logo uploader */
+.uploader {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.uploader-preview {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--text-3);
+}
+.uploader-preview.round {
+  border-radius: 50%;
+}
+.uploader-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.uploader-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.uploader-body .up-title {
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  color: var(--text);
+}
+.uploader-body .up-hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-4);
+}
+.uploader-actions {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: 3px;
+}
+
+/* Choice grid */
+.choice-grid {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}
+
+/* Goal chips (multi-select) */
+.goal-grid {
+  display: grid;
+  gap: var(--s-2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+.goal-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.022);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  text-align: left;
+  transition: all var(--t-base) var(--ease);
+}
+.goal-chip:hover {
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.08);
+  color: #fff;
+}
+.goal-chip .ico {
+  width: 16px;
+  height: 16px;
+  color: var(--text-3);
+}
+.goal-chip .gc-check {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1.5px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: transparent;
+  flex: none;
+}
+.goal-chip .gc-check .ico {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3;
+}
+.goal-chip[aria-pressed="true"] {
+  border-color: rgba(168, 85, 247, 0.55);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.06));
+  color: #fff;
+}
+.goal-chip[aria-pressed="true"] .ico {
+  color: var(--violet-soft);
+}
+.goal-chip[aria-pressed="true"] .gc-check {
+  background: var(--grad-brand);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* Colour picker row */
+.swatch-row {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+  transition: transform var(--t-fast) var(--ease), box-shadow var(--t-base) var(--ease);
+  position: relative;
+}
+.swatch:hover {
+  transform: scale(1.08);
+}
+.swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px #0a0812, 0 0 0 4px rgba(168, 85, 247, 0.85);
+}
+.swatch-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+.swatch-custom input[type="color"] {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Plan cards in onboarding */
+.plan-row {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 700px) {
+  .plan-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.plan-pick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.022);
+  text-align: left;
+  transition: all var(--t-base) var(--ease);
+}
+.plan-pick:hover {
+  border-color: var(--line-violet);
+}
+.plan-pick[aria-checked="true"] {
+  border-color: rgba(168, 85, 247, 0.6);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.05));
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.2);
+}
+.plan-pick .pp-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plan-pick .pp-price {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+.plan-pick .pp-price span {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  font-weight: 500;
+}
+.plan-pick .pp-desc {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.plan-pick .pp-flag {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--grad-brand);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* Footer navigation */
+.ob-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding-top: var(--s-3);
+  flex-wrap: wrap;
+}
+.ob-nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+.ob-skip {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ob-skip:hover {
+  color: var(--text);
+}
+
+/* Review summary */
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.review-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.review-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.review-row .rr-label {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  flex: none;
+  width: 132px;
+}
+.review-row .rr-value {
+  color: var(--text);
+  text-align: right;
+  flex: 1;
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   Glass layer — onboarding
+   --------------------------------------------------------------------------
+   The wizard already owns its layout and step logic; this only re-skins the
+   surfaces so the same markup reads as a frosted panel. Appended last so it
+   refines rather than replaces.
+   ========================================================================== */
+
+.ob-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Ambient violet field behind the wizard. */
+.ob-shell::before {
+  content: "";
+  position: fixed;
+  inset: -20% -10% auto -10%;
+  height: 620px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 52% at 26% 12%, rgba(124, 58, 237, 0.3), transparent 68%),
+    radial-gradient(40% 46% at 78% 6%, rgba(196, 181, 253, 0.16), transparent 70%);
+  animation: ob-ambient 24s var(--ease) infinite alternate;
+}
+@keyframes ob-ambient {
+  from { transform: translate3d(-2%, 0, 0) scale(1); opacity: 0.8; }
+  to   { transform: translate3d(3%, 3%, 0) scale(1.08); opacity: 1; }
+}
+
+/* The card itself: frosted, lit at the top edge. */
+.ob-card {
+  position: relative;
+  border-radius: var(--r-xl);
+  border: 1px solid rgba(168, 85, 247, 0.18);
+  background:
+    linear-gradient(168deg, rgba(30, 24, 47, 0.7), rgba(11, 9, 19, 0.84)),
+    radial-gradient(120% 80% at 12% 0%, rgba(124, 58, 237, 0.14), transparent 60%);
+  box-shadow: 0 26px 70px rgba(3, 1, 8, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+
+/* Step transition: the visible section fades up when it becomes active. */
+.ob-card > section:not([hidden]) {
+  animation: ob-step-in 0.42s var(--ease-out) both;
+}
+@keyframes ob-step-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Progress: a lit fill with a travelling highlight. */
+.progress-thin > span {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--purple-600), var(--violet), var(--lavender));
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.55);
+  transition: width 0.5s var(--ease-spring);
+}
+.progress-thin > span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: ob-progress-sheen 2.6s ease-in-out infinite;
+}
+@keyframes ob-progress-sheen {
+  0%, 40% { transform: translateX(-100%); }
+  75%, 100% { transform: translateX(100%); }
+}
+
+/* Stepper: completed steps glow, the active one lifts. */
+.ob-step {
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.ob-step:hover {
+  transform: translateY(-1px);
+}
+.ob-step.is-active {
+  border-color: rgba(196, 181, 253, 0.55);
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.22), 0 8px 24px rgba(76, 29, 149, 0.34);
+}
+
+/* Choice tiles and goal chips get the same hover language as the dashboard. */
+.choice,
+.goal-chip {
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+.choice:hover,
+.goal-chip:hover {
+  border-color: rgba(168, 85, 247, 0.42);
+  transform: translateY(-1px);
+}
+.choice.is-selected,
+.goal-chip.is-selected,
+.goal-chip[aria-pressed="true"] {
+  border-color: rgba(196, 181, 253, 0.62);
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.24), 0 12px 30px rgba(76, 29, 149, 0.3);
+}
+
+@media (max-width: 640px) {
+  .ob-shell::before { height: 420px; }
+  .ob-card { border-radius: var(--r-lg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-shell::before,
+  .ob-card > section:not([hidden]),
+  .progress-thin > span::after {
+    animation: none !important;
+  }
+  .progress-thin > span::after { display: none; }
+}

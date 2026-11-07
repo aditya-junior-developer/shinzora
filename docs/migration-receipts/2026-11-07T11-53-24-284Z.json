@@ -1,0 +1,170 @@
+{
+  "at": "2026-11-07T11:53:24.284Z",
+  "project": "zmkgfmlcpzjfgxdmbtvi",
+  "mode": "apply",
+  "migrations": {
+    "appliedNow": [],
+    "files": [
+      {
+        "file": "0001_schema.sql",
+        "sha256": "26f6fba73182624b1d599119c21dd0202eaadea555a05faee97e9b8cea9fefea"
+      },
+      {
+        "file": "0002_functions_rls.sql",
+        "sha256": "c40d952f7a676ff16970ebd40dca8191259e2453996be8c64a42fcd633df7fac"
+      },
+      {
+        "file": "0003_storage_realtime.sql",
+        "sha256": "10a4d2bdb7ccdf45191b1109a32c4821021b98eee44af5734fc9abc7b16959bf"
+      },
+      {
+        "file": "0004_admin_bootstrap.sql",
+        "sha256": "94ed29aa199352ab5192256a0728d6c9954a30756195decaa39802bace1ae011"
+      },
+      {
+        "file": "0005_schema_compat.sql",
+        "sha256": "401656ac22f82f32cea1c71c54bfc1da127b0c575872d3140c0d211b39057e9d"
+      },
+      {
+        "file": "0006_service_request_tracking.sql",
+        "sha256": "c2e7397742b4093572f57a1a5e4632e960606c9513f350d05e11c1b70d2fe95d"
+      },
+      {
+        "file": "0007_customer_reference_uniqueness.sql",
+        "sha256": "673bd521381f8f95a216bd7b0c16659a93fb8f24b552d88de292f9bd420acd50"
+      },
+      {
+        "file": "0008_payment_webhook_idempotency.sql",
+        "sha256": "aef6dd44fc7fee2c1cd7565d2b691036d8a505ec1e21dbb8bfcc24eaeaa0f3bc"
+      },
+      {
+        "file": "0009_admin_authority_and_audit.sql",
+        "sha256": "f71b3bc0841f0d094442d87fa7c84b0f6bfd49259c2ef29cfda98d0d9b31a150"
+      },
+      {
+        "file": "0010_subscription_business_link.sql",
+        "sha256": "73dc6aecf0dd7dedaa7ca717a929dc81b02f58e79224b25a97fd10f8ae509b43"
+      },
+      {
+        "file": "0011_generation_conversion_marketing.sql",
+        "sha256": "a960d494d2b2507a6cdfdcde575153be116009882b2d7ba22c5adcb9479fc043"
+      },
+      {
+        "file": "0012_app_package_enforcement.sql",
+        "sha256": "4a7fc1dd4c9078b45ab701f9f7c4828132629d19f9e3f9a0c83e24c31e0a5c86"
+      },
+      {
+        "file": "0013_marketing_request_workflow.sql",
+        "sha256": "8f7d11ae5e18c717ad8fab2d024cca4a1953b0126e5323466c593430dddebe58"
+      }
+    ]
+  },
+  "before": {
+    "tables": 41,
+    "payments": 7,
+    "service_requests": 0,
+    "profiles": 2,
+    "has_0006": true,
+    "has_0007": true,
+    "has_0008": true,
+    "has_0009": true
+  },
+  "verification": [
+    {
+      "key": "0006",
+      "label": "service request tracking",
+      "ok": true,
+      "results": [
+        {
+          "kind": "column",
+          "expected": 5,
+          "actual": 5,
+          "ok": true
+        },
+        {
+          "kind": "table",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        },
+        {
+          "kind": "index",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        },
+        {
+          "kind": "rls",
+          "expected": 3,
+          "actual": 4,
+          "ok": true
+        }
+      ],
+      "invariant": null,
+      "nulls": {
+        "label": "rows left without a reference",
+        "value": 0,
+        "ok": true
+      }
+    },
+    {
+      "key": "0007",
+      "label": "one open payment reference per customer per purpose",
+      "ok": true,
+      "results": [
+        {
+          "kind": "index",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        },
+        {
+          "kind": "table",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        },
+        {
+          "kind": "function",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        }
+      ],
+      "invariant": {
+        "label": "customers holding two open payments for one purpose",
+        "value": 0,
+        "ok": true
+      },
+      "nulls": null
+    },
+    {
+      "key": "0008",
+      "label": "payment webhook idempotency",
+      "ok": true,
+      "results": [
+        {
+          "kind": "table",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        },
+        {
+          "kind": "constraint",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        },
+        {
+          "kind": "index",
+          "expected": 1,
+          "actual": 1,
+          "ok": true
+        }
+      ],
+      "invariant": null,
+      "nulls": null
+    }
+  ],
+  "result": "verified"
+}

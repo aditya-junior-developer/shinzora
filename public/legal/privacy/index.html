@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy policy · Shinzora</title>
+  <meta name="description" content="What Shinzora collects, why, how long it is kept, and how to get it back or delete it." />
+  <meta name="theme-color" content="#08060d" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/legal.css?v=20261107g" />
+</head>
+<body>
+  <div class="legal-shell">
+    <div class="legal-top">
+      <div class="legal-top-inner">
+        <a class="nav-brand" href="/" aria-label="Shinzora home">
+          <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
+          <span class="brand-word">SHINZORA</span>
+        </a>
+        <nav aria-label="Legal documents">
+          <a href="/legal/terms/" >Terms</a>
+          <a href="/legal/privacy/" aria-current="page">Privacy</a>
+          <a href="/legal/refunds/" >Refunds</a>
+          <a href="/legal/acceptable-use/" >Acceptable use</a>
+        </nav>
+      </div>
+    </div>
+
+    <main class="legal-main">
+      <header>
+        <h1>Privacy policy</h1>
+        <div class="legal-meta">
+          <span>Last updated 4 November 2026</span>
+          <span>Applies to shinzora.in and every Shinzora subdomain</span>
+        </div>
+      </header>
+
+      <nav class="legal-toc" aria-label="Contents">
+        <span>On this page</span>
+        <ol>
+          <li><a href="#data">What we collect</a></li>
+          <li><a href="#why">Why we collect it</a></li>
+          <li><a href="#ai-processing">AI processing</a></li>
+          <li><a href="#storage">Where data lives</a></li>
+          <li><a href="#sharing">Who we share it with</a></li>
+          <li><a href="#retention">How long we keep it</a></li>
+          <li><a href="#rights">Your rights</a></li>
+          <li><a href="#cookies">Cookies and local storage</a></li>
+          <li><a href="#security">Security</a></li>
+          <li><a href="#children">Children</a></li>
+          <li><a href="#changes">Changes</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="data">1. What we collect</h2>
+      <h3>Account data</h3>
+      <ul>
+        <li>name, email address and phone number;</li>
+        <li>password, stored only as a hash by our authentication provider — we never see it;</li>
+        <li>sign-in timestamps and session metadata;</li>
+        <li>if you use Google sign-in, the account identifier and email Google returns.</li>
+      </ul>
+      <h3>Business data you enter</h3>
+      <ul>
+        <li>business name, category, description, location, contact details, audience and goals;</li>
+        <li>projects, generated files, versions, prompts and design decisions;</li>
+        <li>products, prices, stock, orders and customer records you add to the store;</li>
+        <li>support tickets, service requests and campaign plans.</li>
+      </ul>
+      <h3>Payment data</h3>
+      <ul>
+        <li>the amount, purpose, reference and status of a payment;</li>
+        <li>the UPI transaction reference (UTR) you submit for verification;</li>
+        <li>records of who verified a payment and when.</li>
+      </ul>
+      <p>We do not store card numbers, UPI PINs or bank credentials. Those are handled by your bank or payment app.</p>
+      <h3>Usage data</h3>
+      <ul>
+        <li>AI generations used per billing cycle, and errors returned by the provider;</li>
+        <li>an activity log of actions in your workspace, used for support and security.</li>
+      </ul>
+
+      <h2 id="why">2. Why we collect it</h2>
+      <ul>
+        <li><strong>To operate the product</strong> — generate a site from your brief, keep versions, publish, and show your own data back to you.</li>
+        <li><strong>To bill correctly</strong> — match a payment to the right account and service.</li>
+        <li><strong>To support you</strong> — understand what you were doing when something failed.</li>
+        <li><strong>To keep the platform secure</strong> — detect abuse, credential stuffing and attempts to escalate privileges.</li>
+        <li><strong>To meet legal obligations</strong> — keep records of payments and invoices where required.</li>
+      </ul>
+      <p>We do not sell your data, and we do not use your business content to train models ourselves.</p>
+
+      <h2 id="ai-processing">3. AI processing</h2>
+      <p>
+        When you use the assistant, the builder or any AI action, the request is sent from our Edge Function to Google's
+        Gemini API. The payload contains the instruction you wrote, the business context you saved and, for revisions,
+        the current project files. Google processes it to return a response under its API terms.
+      </p>
+      <p>
+        API keys live only in server-side secrets. Conversations and generated versions are stored in your Supabase
+        database so you can resume work; you can delete a conversation from the assistant, and deleting a project removes
+        its versions.
+      </p>
+      <p>
+        Do not paste passwords, payment card details, Aadhaar numbers or other sensitive personal data of third parties
+        into AI prompts. If a task needs that information, keep it in your own systems.
+      </p>
+
+      <h2 id="storage">4. Where data lives</h2>
+      <p>
+        Account, business and commerce data is stored in a Supabase project: a Postgres database with row-level security,
+        object storage for images, and serverless functions for privileged operations. Published site files are served
+        from the same source. Payments you initiate are recorded in that database.
+      </p>
+      <p>
+        Data may be processed in regions where these providers operate. Where a provider offers region selection we use
+        the closest available region, but we cannot guarantee that data never leaves India.
+      </p>
+
+      <h2 id="sharing">5. Who we share it with</h2>
+      <ul>
+        <li><strong>Supabase</strong> — hosting, authentication, database and storage.</li>
+        <li><strong>Google (Gemini API)</strong> — AI generation, receiving only the content needed for the request.</li>
+        <li><strong>GitHub and Vercel</strong> — only when you connect them and push or deploy.</li>
+        <li><strong>A domain registrar</strong> — only when you order or connect a domain, and only the details the registration requires.</li>
+        <li><strong>A payment provider</strong> — when one is enabled and you choose that method.</li>
+        <li><strong>Authorities</strong> — where a valid legal request requires disclosure.</li>
+      </ul>
+      <p>We do not share your data with advertisers or data brokers.</p>
+
+      <h2 id="retention">6. How long we keep it</h2>
+      <p>
+        Account and business data are kept while your account is active. When you request deletion, your profile,
+        business profile, projects, versions, conversations, campaigns and store records are deleted, and payment records
+        are retained in a minimal form where tax or accounting rules require it.
+      </p>
+      <p>Support tickets are kept for two years so that repeated problems can be recognised. Activity logs are kept for one year.</p>
+
+      <h2 id="rights">7. Your rights</h2>
+      <p>You can, from Settings:</p>
+      <ul>
+        <li><strong>export</strong> your profile, business profile, projects, products and orders as a JSON file;</li>
+        <li><strong>correct</strong> your name, phone and business details at any time;</li>
+        <li><strong>delete</strong> individual projects, products, customers and conversations;</li>
+        <li><strong>request account deletion</strong>, which is logged for review and confirmed before anything is removed.</li>
+      </ul>
+      <p>
+        If you believe data is wrong or held without basis, write to <a href="mailto:official.shinzora@proton.me">official.shinzora@proton.me</a>
+        and we will respond in writing.
+      </p>
+
+      <h2 id="cookies">8. Cookies and local storage</h2>
+      <p>
+        We use the minimum needed to keep you signed in: a Supabase session token in browser storage, plus a small
+        preference entry for notification choices and the install prompt dismissal. We do not use advertising cookies or
+        third-party tracking pixels. Clearing browser storage signs you out.
+      </p>
+
+      <h2 id="security">9. Security</h2>
+      <p>
+        Row-level security restricts every table to its owner, with administrator access enforced server-side. Privileged
+        operations run in serverless functions that verify your session on each call. Payment confirmation requires an
+        administrator or a signed provider webhook; the browser has no write path to a verified payment. Provider tokens
+        are stored in a table no browser role can read.
+      </p>
+      <p>
+        No system is perfect. If you find a vulnerability, tell us at <a href="mailto:official.shinzora@proton.me">official.shinzora@proton.me</a>
+        and give us a reasonable chance to fix it before disclosing it publicly.
+      </p>
+
+      <h2 id="children">10. Children</h2>
+      <p>Shinzora is a business tool and is not intended for anyone under 18.</p>
+
+      <h2 id="changes">11. Changes</h2>
+      <p>
+        If this policy changes materially, we announce it in the dashboard before the change takes effect and update the
+        date at the top of this page.
+      </p>
+
+      <div class="legal-callout">
+        <strong>Contact</strong>
+        Questions about this document: <a href="mailto:official.shinzora@proton.me">official.shinzora@proton.me</a>. We answer in the order
+        received, and every message gets a human reply.
+      </div>
+    </main>
+
+    <footer class="legal-foot">
+      <div class="legal-foot-inner">
+        <span>Shinzora — your business, built and managed with intelligence.</span>
+        <nav aria-label="Footer">
+          <a href="/">Home</a>
+          <a href="/install/">Install</a>
+          <a href="/system-check/">System check</a>
+          <a href="mailto:official.shinzora@proton.me">Contact</a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

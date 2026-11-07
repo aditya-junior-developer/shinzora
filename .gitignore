@@ -1,0 +1,67 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# environment — never commit secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.production
+supabase/.env
+supabase/.env.*
+supabase/.temp/
+supabase/.branches/
+
+# Runtime config IS committed on purpose.
+#
+# It holds only public values (the project URL and the publishable key, which is
+# designed to be shipped to the browser and is protected by RLS). Keeping it in
+# the repository means connecting this repo to Vercel produces a working site
+# with no environment variables at all; `node scripts/generate-config.mjs` still
+# runs at build time and lets any variable you do set win over these values.
+# Do not add secrets here — the generator refuses to write them.
+
+# build output and packaging
+dist/
+build/
+*.zip
+release/
+
+# logs
+*.log
+npm-debug.log*
+logs/
+
+# editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# pre-launch sandbox data (accounts, seeded rows, uploads, monitor log)
+.prelaunch/
+
+# test artifacts
+coverage/
+.tmp/
+tmp/
+playwright-report/
+test-results/
+
+# supabase CLI local state
+supabase/.migrations-applied
+
+# Local database backups: personal data and provider credentials. Never commit.
+.backups/
+
+# private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*

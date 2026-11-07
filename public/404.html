@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Page not found — Shinzora</title>
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#08070e" />
+<link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+<link rel="stylesheet" href="/css/components.css?v=20261107g" />
+<link rel="stylesheet" href="/css/marketing.css?v=20261107g" />
+<style>
+  .nf-shell { min-height: 100dvh; display: grid; place-items: center; padding: var(--s-8) var(--gutter); position: relative; }
+  .nf-card { max-width: 560px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--s-4); }
+  .nf-code { font-family: var(--font-serif); font-style: italic; font-size: clamp(4rem, 3rem + 8vw, 8rem); line-height: 1; background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .nf-links { display: flex; gap: var(--s-3); flex-wrap: wrap; justify-content: center; margin-top: var(--s-3); }
+</style>
+</head>
+<body>
+<div class="atmosphere" aria-hidden="true"></div>
+<main class="nf-shell">
+  <div class="nf-card">
+    <a class="nav-brand" href="/" aria-label="Shinzora home" style="align-items:center;display:inline-flex;gap:10px">
+      <img src="/assets/icons/mark.svg" alt="" width="30" height="30" />
+      <span class="brand-word">SHINZORA</span>
+    </a>
+    <div class="nf-code">404</div>
+    <h1 style="font-size:var(--fs-h3)">This page has not been built yet</h1>
+    <p class="lead" style="font-size:var(--fs-body)">
+      The address you followed does not exist. If you were looking for your workspace, sign in — everything you
+      created is still there.
+    </p>
+    <div class="nf-links">
+      <a class="btn btn-primary" href="/">Back to home</a>
+      <a class="btn btn-secondary" href="/auth/login/">Sign in</a>
+      <a class="btn btn-ghost" href="/auth/signup/">Create account</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

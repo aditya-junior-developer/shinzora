@@ -1,0 +1,71 @@
+# ============================================================================
+# SHINZORA · Supabase project configuration
+# ----------------------------------------------------------------------------
+# Used by the Supabase CLI for local development and deploys.
+# `verify_jwt` is false only where the caller cannot present a user token:
+#   • config            — public provider flags
+#   • site              — public read of a published site
+#   • payments-webhook  — signature-verified Razorpay callback
+# Everything else requires a verified user JWT.
+# ============================================================================
+
+project_id = "shinzora"
+
+[api]
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:4173"
+additional_redirect_urls = [
+  "http://localhost:4173/auth/callback/",
+  "http://localhost:4173/auth/reset/",
+  "https://shinzora.in/auth/callback/",
+  "https://shinzora.in/auth/reset/"
+]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+[functions.config]
+verify_jwt = false
+
+[functions.site]
+verify_jwt = false
+
+[functions.payments-webhook]
+verify_jwt = false
+
+[functions.ai]
+verify_jwt = true
+# Site generation streams nothing but produces large JSON payloads.
+[functions.ai.resources]
+[functions.integrations]
+verify_jwt = true
+
+[functions.admin]
+verify_jwt = true
+
+[functions.domains]
+verify_jwt = true
+
+[functions.payments]
+verify_jwt = true

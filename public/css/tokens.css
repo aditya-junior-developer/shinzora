@@ -1,0 +1,582 @@
+/* ==========================================================================
+   Shinzora — Design tokens, reset, typography primitives
+   --------------------------------------------------------------------------
+   The single source of truth for colour, type, spacing, radii, elevation and
+   motion. Every other stylesheet consumes these custom properties only.
+   ========================================================================== */
+
+@font-face {
+  font-family: "InterVar";
+  src: url("../assets/fonts/inter-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "InstrumentSerif";
+  src: url("../assets/fonts/instrument-serif-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* ---- Surfaces: glossy black → charcoal → violet ink ------------------- */
+  --void: #050409;
+  --base: #08070e;
+  --base-elev: #0b0912;
+  --panel: #100e19;
+  --panel-2: #151221;
+  --panel-3: #1a1628;
+  --ink-glass: rgba(20, 17, 32, 0.62);
+  --ink-glass-strong: rgba(14, 12, 23, 0.86);
+
+  /* ---- Brand: purple / violet / lavender --------------------------------- */
+  --purple-900: #2b1055;
+  --purple-800: #3d1473;
+  --purple-700: #4f1d91;
+  --purple-600: #6425b8;
+  --purple-500: #7c3aed;
+  --purple-400: #9061f9;
+  --violet: #a855f7;
+  --violet-soft: #b98cff;
+  --lavender: #c9b8f5;
+  --lavender-dim: #a394c9;
+
+  /* ---- Text ------------------------------------------------------------- */
+  --white: #fbfaff;
+  --text: #eae6f5;
+  --text-2: #a8a1bd;
+  --text-3: #7b7490;
+  --text-4: #57516b;
+
+  /* ---- Lines & strokes -------------------------------------------------- */
+  --line: rgba(255, 255, 255, 0.075);
+  --line-strong: rgba(255, 255, 255, 0.13);
+  --line-violet: rgba(168, 85, 247, 0.26);
+  --line-violet-soft: rgba(168, 85, 247, 0.14);
+
+  /* ---- Status ----------------------------------------------------------- */
+  --ok: #34d399;
+  --ok-dim: rgba(52, 211, 153, 0.12);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.12);
+  --danger: #fb7185;
+  --danger-dim: rgba(251, 113, 133, 0.12);
+  --info: #60a5fa;
+  --info-dim: rgba(96, 165, 250, 0.12);
+
+  /* ---- Gradients -------------------------------------------------------- */
+  --grad-brand: linear-gradient(135deg, #8a4bf2 0%, #7c3aed 34%, #5a1fa6 72%, #43187f 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(168, 117, 255, 0.22), rgba(75, 29, 146, 0.14));
+  --grad-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 62%);
+  --grad-panel: linear-gradient(168deg, rgba(28, 24, 44, 0.9) 0%, rgba(14, 12, 23, 0.92) 58%, rgba(11, 9, 18, 0.96) 100%);
+  --grad-text: linear-gradient(102deg, #ffffff 12%, #e4d6ff 46%, #b98cff 88%);
+  --grad-line: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.55), transparent);
+
+  /* ---- Atmospheric lighting -------------------------------------------- */
+  --glow-violet: radial-gradient(60% 60% at 50% 0%, rgba(124, 58, 237, 0.42), transparent 72%);
+  --glow-soft: radial-gradient(50% 50% at 50% 50%, rgba(168, 85, 247, 0.16), transparent 70%);
+
+  /* ---- Elevation -------------------------------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 28px 68px -24px rgba(0, 0, 0, 0.82);
+  --shadow-violet: 0 24px 64px -28px rgba(124, 58, 237, 0.55);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+
+  /* ---- Radii ------------------------------------------------------------ */
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* ---- Spacing scale (4px base) ---------------------------------------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+  --s-10: 64px;
+  --s-11: 80px;
+  --s-12: 104px;
+  --s-13: 136px;
+
+  /* ---- Type ------------------------------------------------------------- */
+  --font-sans: "InterVar", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "InstrumentSerif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+  --fs-display: clamp(2.3rem, 1.35rem + 3vw, 3.65rem);
+  --fs-h1: clamp(2.1rem, 1.4rem + 2.6vw, 3.4rem);
+  --fs-h2: clamp(1.65rem, 1.25rem + 1.5vw, 2.5rem);
+  --fs-h3: clamp(1.22rem, 1.06rem + 0.6vw, 1.55rem);
+  --fs-h4: 1.06rem;
+  --fs-body-lg: clamp(1.02rem, 0.98rem + 0.22vw, 1.15rem);
+  --fs-body: 0.94rem;
+  --fs-sm: 0.83rem;
+  --fs-xs: 0.75rem;
+  --fs-2xs: 0.6875rem;
+
+  --lh-tight: 1.06;
+  --lh-snug: 1.25;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.68;
+
+  --tracking-tight: -0.032em;
+  --tracking-snug: -0.018em;
+  --tracking-wide: 0.14em;
+
+  /* ---- Layout ----------------------------------------------------------- */
+  --container: 1200px;
+  --container-wide: 1360px;
+  --container-narrow: 760px;
+  --gutter: clamp(1.15rem, 0.6rem + 2.6vw, 3rem);
+  --nav-h: 68px;
+  --sidebar-w: 258px;
+  --sidebar-w-collapsed: 76px;
+
+  /* ---- Motion ----------------------------------------------------------- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --t-fast: 140ms;
+  --t-base: 220ms;
+  --t-slow: 420ms;
+
+  --z-nav: 60;
+  --z-sidebar: 50;
+  --z-overlay: 90;
+  --z-modal: 100;
+  --z-toast: 120;
+}
+
+/* ==========================================================================
+   Reset
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+img,
+picture,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+svg {
+  flex: none;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+ul,
+ol {
+  list-style: none;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.36);
+  color: #fff;
+}
+
+/* Focus: visible, branded, never removed */
+:focus-visible {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.32) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.26);
+  border-radius: var(--r-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.45);
+  background-clip: content-box;
+}
+
+/* ==========================================================================
+   Typography primitives
+   ========================================================================== */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tracking-snug);
+  color: var(--white);
+}
+
+h1 {
+  font-size: var(--fs-h1);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--lh-tight);
+}
+h2 {
+  font-size: var(--fs-h2);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.12;
+}
+h3 {
+  font-size: var(--fs-h3);
+}
+h4 {
+  font-size: var(--fs-h4);
+  letter-spacing: -0.01em;
+}
+
+.serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--lavender-dim);
+}
+
+.lead {
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-relaxed);
+  color: var(--text-2);
+}
+
+.muted {
+  color: var(--text-2);
+}
+.dim {
+  color: var(--text-3);
+}
+.text-gradient {
+  background: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ==========================================================================
+   Layout helpers
+   ========================================================================== */
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.container-wide {
+  max-width: var(--container-wide);
+}
+.container-narrow {
+  max-width: var(--container-narrow);
+}
+
+.section {
+  position: relative;
+  padding-block: clamp(4rem, 2rem + 7vw, 8.5rem);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.gap-1 { gap: var(--s-1); }
+.gap-2 { gap: var(--s-2); }
+.gap-3 { gap: var(--s-3); }
+.gap-4 { gap: var(--s-4); }
+.gap-5 { gap: var(--s-5); }
+.gap-6 { gap: var(--s-6); }
+.gap-7 { gap: var(--s-7); }
+.gap-8 { gap: var(--s-8); }
+.grow { flex: 1 1 auto; min-width: 0; }
+.center { align-items: center; justify-content: center; }
+.between { justify-content: space-between; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.mx-auto { margin-inline: auto; }
+.mt-2 { margin-top: var(--s-2); }
+.mt-4 { margin-top: var(--s-4); }
+.mt-6 { margin-top: var(--s-6); }
+.mt-8 { margin-top: var(--s-8); }
+.hidden { display: none !important; }
+.full { width: 100%; }
+.nowrap { white-space: nowrap; }
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: var(--s-4);
+  z-index: var(--z-toast);
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-md);
+  background: var(--purple-500);
+  color: #fff;
+  font-weight: 600;
+  transition: top var(--t-base) var(--ease);
+}
+.skip-link:focus {
+  top: var(--s-4);
+}
+
+/* ==========================================================================
+   Atmosphere — layered backgrounds used across marketing + app shells
+   ========================================================================== */
+.atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(78% 52% at 50% -12%, rgba(124, 58, 237, 0.34), transparent 66%),
+    radial-gradient(46% 38% at 88% 4%, rgba(168, 85, 247, 0.18), transparent 70%),
+    radial-gradient(40% 40% at 6% 22%, rgba(76, 29, 149, 0.24), transparent 72%),
+    linear-gradient(180deg, #08070e 0%, #06050b 46%, #050409 100%);
+}
+
+.atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+}
+
+.grid-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 68px 68px;
+  mask-image: radial-gradient(72% 64% at 50% 34%, #000 0%, transparent 100%);
+  -webkit-mask-image: radial-gradient(72% 64% at 50% 34%, #000 0%, transparent 100%);
+}
+
+/* ==========================================================================
+   Motion — reveal-on-scroll utility driven by IntersectionObserver
+   ========================================================================== */
+/* Reveal styles only apply once JS has taken over (html.motion-ready), so the
+   page is always readable if scripts fail to load. */
+.motion-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s var(--ease-out),
+    transform 0.7s var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.motion-ready [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes shimmer {
+  from { background-position: -180% 0; }
+  to { background-position: 180% 0; }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(2%, -3%, 0) scale(1.06); }
+}
+@keyframes caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Print — keep it readable */
+@media print {
+  .atmosphere,
+  .grid-veil,
+  .site-nav,
+  .site-footer {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
+
+/* [hidden] must win over component display rules. Without this, a .btn with
+   display:inline-flex stays visible even when the script sets hidden. */
+[hidden] { display: none !important; }

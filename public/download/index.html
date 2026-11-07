@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Get Shinzora — applications</title>
+  <meta name="description" content="Shinzora applications. The browser platform is available today. The Windows desktop application is built from source in this repository; Android, iOS, macOS and Linux are coming soon." />
+  <meta name="theme-color" content="#08060d" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <style>
+    .dl-wrap { max-width: 980px; margin: 0 auto; padding: 84px 24px 96px; }
+    .dl-head { text-align: center; margin-bottom: 40px; }
+    .dl-head .brand-word { font-size: 1rem; }
+    .dl-head h1 { font-size: clamp(1.9rem, 1.3rem + 2.4vw, 2.8rem); letter-spacing: -.03em; margin: 22px 0 14px; color: #fff; }
+    .dl-head p { color: var(--text-3); font-size: .95rem; line-height: 1.75; max-width: 62ch; margin: 0 auto; }
+    .dl-note {
+      margin: 26px auto 0; max-width: 66ch; padding: 16px 18px; border-radius: var(--r-md);
+      border: 1px solid rgba(167,139,250,.26); background: rgba(124,58,237,.08);
+      font-size: .82rem; line-height: 1.7; color: var(--text-2); text-align: left;
+    }
+    .dl-note strong { color: #fff; }
+    .dl-grid { display: grid; gap: 14px; margin-top: 36px; grid-template-columns: minmax(0, 1fr); }
+    @media (min-width: 760px) { .dl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .dl-card {
+      display: flex; flex-direction: column; gap: 10px; padding: 22px;
+      border-radius: var(--r-lg, 16px); border: 1px solid var(--line);
+      background: linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+    }
+    .dl-card.is-live { border-color: rgba(167,139,250,.4); background: linear-gradient(160deg, rgba(124,58,237,.14), rgba(124,58,237,.03)); }
+    .dl-card { min-width: 0; }
+    .dl-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .dl-card h2 { margin: 0; font-size: 1.02rem; color: #fff; font-weight: 550; display: flex; align-items: center; gap: 9px; }
+    .dl-card p { margin: 0; font-size: .83rem; line-height: 1.65; color: var(--text-3); }
+    .dl-formats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .dl-format {
+      font-size: 11px; letter-spacing: .04em; padding: 4px 9px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--text-3); background: rgba(255,255,255,.02);
+    }
+    .dl-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .dl-cmd {
+      display: block; padding: 12px 14px; border-radius: 10px; background: #06040c;
+      border: 1px solid var(--line); color: #cbb8ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px; line-height: 1.7; overflow-x: auto; white-space: pre;
+      max-width: 100%;
+    }
+    .dl-status {
+      font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600;
+      padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+    }
+    .dl-status.available { color: #a7f3d0; background: rgba(52,211,153,.12); border: 1px solid rgba(52,211,153,.32); }
+    .dl-status.soon { color: #fcd9a1; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.28); }
+    .dl-status.source { color: #ddd6fe; background: rgba(139,92,246,.16); border: 1px solid rgba(167,139,250,.34); }
+    .dl-foot { margin-top: 40px; padding-top: 26px; border-top: 1px solid var(--line); display: flex; gap: 14px; flex-wrap: wrap; justify-content: space-between; font-size: .82rem; color: var(--text-3); }
+    .dl-foot a { color: var(--lavender, #c4b5fd); }
+  </style>
+</head>
+<body>
+  <main class="dl-wrap">
+    <header class="dl-head">
+      <a class="nav-brand" href="/" aria-label="Shinzora home" style="justify-content:center">
+        <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <h1>Get Shinzora</h1>
+      <p>
+        One platform, several ways in. The browser platform is live and complete today. The Windows desktop
+        application ships from this repository as a real installer. Every other platform says exactly what it is:
+        coming soon, until the package exists.
+      </p>
+      <div class="dl-note">
+        <strong>Installing the website from your browser is not the desktop application.</strong>
+        A progressive-web-app install adds an icon and a full-screen window, but it is still the browser.
+        The Windows entry below is a separate native package with its own installer, shortcut and uninstaller.
+      </div>
+    </header>
+
+    <section class="dl-grid" aria-label="Applications by platform">
+      <article class="dl-card is-live">
+        <div class="dl-card-top">
+          <h2>Browser</h2>
+          <span class="dl-status available">Available</span>
+        </div>
+        <p>The full platform — dashboard, builders, store, payments, support and admin. Nothing to install.</p>
+        <div class="dl-formats"><span class="dl-format">Web</span><span class="dl-format">PWA install</span></div>
+        <div class="dl-actions">
+          <a class="btn btn-primary btn-sm" href="/app/">Open dashboard</a>
+          <a class="btn btn-secondary btn-sm" href="/install/">Install instructions</a>
+        </div>
+      </article>
+
+      <article class="dl-card">
+        <div class="dl-card-top">
+          <h2>Windows</h2>
+          <span class="dl-status source">Source build ready</span>
+        </div>
+        <p>
+          Electron application window with the official Shinzora icon, Start&nbsp;Menu and desktop shortcuts, and an
+          NSIS uninstaller. The installer has <strong>not</strong> been built yet — build it on Windows, where it can
+          also be installed and tested, with the commands below.
+        </p>
+        <div class="dl-formats"><span class="dl-format">.EXE (NSIS)</span><span class="dl-format">x64</span></div>
+        <code class="dl-cmd">cd desktop
+npm install
+npm run dist:win        → release/Shinzora-Setup-1.0.0.exe</code>
+        <p style="font-size:.78rem">
+          Until that file exists, there is no download button here — a button that downloads nothing would be a lie.
+        </p>
+      </article>
+
+      <article class="dl-card">
+        <div class="dl-card-top">
+          <h2>Android</h2>
+          <span class="dl-status soon">Coming soon</span>
+        </div>
+        <p>The Android build is not released. When it is, it will arrive as an installable package, not a link to a website.</p>
+        <div class="dl-formats"><span class="dl-format">.APK</span><span class="dl-format">.AAB</span></div>
+      </article>
+
+      <article class="dl-card">
+        <div class="dl-card-top">
+          <h2>iOS</h2>
+          <span class="dl-status soon">Coming soon</span>
+        </div>
+        <p>No iOS build exists. Distribution will go through the App Store once the build and review are real.</p>
+        <div class="dl-formats"><span class="dl-format">.IPA</span></div>
+      </article>
+
+      <article class="dl-card">
+        <div class="dl-card-top">
+          <h2>macOS</h2>
+          <span class="dl-status soon">Coming soon</span>
+        </div>
+        <p>The macOS package is not built. The same desktop source can be built on macOS when that build is taken on.</p>
+        <div class="dl-formats"><span class="dl-format">.PKG</span><span class="dl-format">.DMG</span></div>
+      </article>
+
+      <article class="dl-card">
+        <div class="dl-card-top">
+          <h2>Linux</h2>
+          <span class="dl-status soon">Coming soon</span>
+        </div>
+        <p>No Linux packages exist yet. The desktop source builds with electron-builder when this platform is picked up.</p>
+        <div class="dl-formats"><span class="dl-format">.DEB</span><span class="dl-format">.RPM</span><span class="dl-format">.AppImage</span></div>
+      </article>
+    </section>
+
+    <footer class="dl-foot">
+      <span>Questions about an application build? <a href="mailto:official.shinzora@proton.me">official.shinzora@proton.me</a></span>
+      <span><a href="/docs/">Documentation</a> · <a href="/install-guide/">Setup guide</a> · <a href="/">Home</a></span>
+    </footer>
+  </main>
+</body>
+</html>

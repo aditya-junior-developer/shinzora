@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Published site · Shinzora</title>
+  <meta name="robots" content="index, follow" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+  <link rel="stylesheet" href="/css/components.css?v=20261107g" />
+  <style>
+    html, body { height: 100%; margin: 0; background: #08060d; }
+    .site-bar {
+      position: fixed; inset: 0 0 auto 0; z-index: 40;
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 16px;
+      font: 500 11px/1.2 ui-sans-serif, system-ui, sans-serif;
+      color: rgba(255,255,255,.72);
+      background: rgba(10,8,16,.82);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .site-bar a { color: #c4b5fd; text-decoration: none; }
+    .site-bar a:hover { text-decoration: underline; }
+    .site-bar .spacer { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+    .site-frame {
+      position: fixed; inset: 33px 0 0 0; width: 100%; height: calc(100% - 33px);
+      border: 0; background: #fff;
+    }
+    .site-state {
+      min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      font-family: ui-sans-serif, system-ui, sans-serif; color: #fff; text-align: center;
+    }
+    .site-state-card { max-width: 520px; }
+    .site-state h1 { font-size: 1.4rem; margin: 0 0 10px; letter-spacing: -.01em; }
+    .site-state p { color: rgba(255,255,255,.62); font-size: .86rem; line-height: 1.7; margin: 0 0 18px; }
+    .site-state form { display: flex; gap: 8px; justify-content: center; }
+    .site-state input {
+      height: 40px; padding: 0 14px; border-radius: 10px; min-width: 240px;
+      border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.04); color: #fff; font: inherit;
+    }
+    .site-state button {
+      height: 40px; padding: 0 18px; border-radius: 10px; border: 0; cursor: pointer;
+      background: linear-gradient(135deg,#7c3aed,#a78bfa); color: #fff; font: inherit; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="site-root">
+    <div class="site-state">
+      <div class="site-state-card">
+        <h1>Loading published site</h1>
+        <p>Fetching the published version from Shinzora.</p>
+      </div>
+    </div>
+  </div>
+  <script src="/js/vendor/supabase-js.js"></script>
+  <script type="module" src="/js/boot/site.js?v=20261107g"></script>
+</body>
+</html>

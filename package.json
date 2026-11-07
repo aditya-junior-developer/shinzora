@@ -1,0 +1,62 @@
+{
+  "name": "shinzora",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shinzora — an AI-powered business operating platform. Vanilla ES-module frontend + Supabase backend.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs --port 4173",
+    "build": "node scripts/generate-config.mjs",
+    "check": "node scripts/check.mjs",
+    "package": "node scripts/package.mjs",
+    "test": "node scripts/check.mjs && node tests/branding.test.mjs && node tests/session-policy.test.mjs && node tests/zip.test.mjs && node tests/prelaunch-ai.test.mjs && node tests/routing.test.mjs && node tests/onboarding-writes.test.mjs && node tests/ai-errors.test.mjs && node tests/admin-authority.test.mjs && node tests/db-restore.test.mjs && node tests/migration-verify-sql.test.mjs && node tests/marketing-rls.test.mjs && node tests/single-file.test.mjs && node tests/site-validate.test.mjs && node tests/builder-stages.test.mjs && node tests/part1-verification.test.mjs && node tests/app-package.test.mjs && node tests/app-package-rls.test.mjs && node tests/marketing-workflow.test.mjs && node tests/marketing-status-labels.test.mjs && node tests/step1-backup-kit.test.mjs && node scripts/smoke.mjs",
+    "test:authority": "node tests/admin-authority.test.mjs",
+    "test:admin-ui": "node tests/browser/admin-access.mjs",
+    "test:restore": "node tests/db-restore.test.mjs",
+    "test:migrations": "node tests/migration-verify-sql.test.mjs",
+    "test:marketing": "node tests/marketing-rls.test.mjs",
+    "test:builder": "node tests/builder-stages.test.mjs && node tests/single-file.test.mjs && node tests/site-validate.test.mjs && node tests/part1-verification.test.mjs",
+    "test:app": "node tests/app-package.test.mjs && node tests/app-package-rls.test.mjs",
+    "test:ai": "node tests/ai-errors.test.mjs",
+    "brand": "node scripts/brand.mjs",
+    "brand:check": "node scripts/brand.mjs --check",
+    "brand:revert": "node scripts/brand.mjs --revert",
+    "test:unit": "node tests/branding.test.mjs && node tests/session-policy.test.mjs",
+    "test:session": "node tests/session-policy.test.mjs",
+    "test:zip": "node tests/zip.test.mjs",
+    "test:routing": "node tests/routing.test.mjs",
+    "test:onboarding": "node tests/onboarding-writes.test.mjs",
+    "test:prelaunch-ai": "node tests/prelaunch-ai.test.mjs",
+    "test:browser": "node tests/browser/flows.mjs",
+    "test:layout": "node tests/browser/sweep.mjs",
+    "test:visual": "node tests/browser/visual.mjs",
+    "test:install": "node tests/browser/install-flow.mjs",
+    "test:shell": "node tests/browser/shell.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "migrate:dry": "node scripts/migrate.mjs --dry-run",
+    "verify:deploy": "node scripts/verify-deploy.mjs",
+    "deploy:functions": "node scripts/deploy-functions.mjs",
+    "deploy:functions:dry": "node scripts/deploy-functions.mjs --dry-run",
+    "test:admin": "node tests/browser/admin.mjs",
+    "test:functions": "node scripts/smoke-functions.mjs",
+    "test:functions:remote": "node scripts/smoke-functions.mjs --remote",
+    "test:fn-unit": "deno test --allow-env supabase/functions/_shared/gemini.test.ts",
+    "gallery": "node scripts/build-gallery.mjs"
+  },
+  "keywords": [
+    "shinzora",
+    "business",
+    "supabase",
+    "gemini",
+    "pwa"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.65.0"
+  }
+}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Choose a new password — Shinzora</title>
+<meta name="description" content="Set a new password for your Shinzora account." />
+<meta name="robots" content="noindex, follow" />
+<meta name="theme-color" content="#08070e" />
+<link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
+<link rel="stylesheet" href="/css/components.css?v=20261107g" />
+<link rel="stylesheet" href="/css/auth.css?v=20261107g" />
+<script src="/js/config/runtime.js"></script>
+</head>
+<body data-auth-page="reset-password">
+<div class="atmosphere" aria-hidden="true"></div>
+<div class="auth-fx" aria-hidden="true">
+  <canvas class="af-aurora-canvas" data-aurora data-aurora-intensity="0.9"></canvas>
+  <span class="af-grid"></span>
+  <span class="auth-grain"></span>
+</div>
+<a class="skip-link" href="#auth-panel">Skip to form</a>
+
+<div class="auth-shell">
+  <!-- ===================== Brand / atmosphere panel ===================== -->
+  <aside class="auth-aside" aria-hidden="false">
+    <a class="nav-brand" href="/" aria-label="Shinzora home">
+      <span class="brand-mark" aria-hidden="true"><img src="/assets/icons/mark.png" alt="" width="30" height="30" decoding="async" /></span>
+      <span class="brand-word">SHINZORA</span>
+    </a>
+
+    <div class="auth-aside-copy">
+      <h1>Your business. Built, powered and managed with <em>intelligence.</em></h1>
+      <p>One workspace for the website, the storefront, the application and the operations behind them.</p>
+      <div class="auth-points">
+        <div class="auth-point">
+          <span class="ap-ico"><i data-icon="sparkles" data-size="14"></i></span>
+          <span><strong>AI that builds, not chats</strong><span>Structure, pages, copy and metadata generated server-side.</span></span>
+        </div>
+        <div class="auth-point">
+          <span class="ap-ico"><i data-icon="shield-check" data-size="14"></i></span>
+          <span><strong>Private by construction</strong><span>Row-level security scopes every record to your account.</span></span>
+        </div>
+        <div class="auth-point">
+          <span class="ap-ico"><i data-icon="rocket" data-size="14"></i></span>
+          <span><strong>Publish for real</strong><span>Shinzora subdomain, custom domain, or GitHub and Vercel.</span></span>
+        </div>
+      </div>
+
+      <div class="auth-preview">
+        <div class="auth-preview-head"><span class="dot-sample"></span> workspace activity · example</div>
+        <div class="auth-preview-rows">
+          <div class="auth-preview-row"><i data-icon="sparkles" data-size="13"></i> Homepage generated <span class="apr-tag">v3</span></div>
+          <div class="auth-preview-row"><i data-icon="package" data-size="13"></i> Order marked shipped <span class="apr-tag">#1042</span></div>
+          <div class="auth-preview-row"><i data-icon="globe" data-size="13"></i> Domain connected <span class="apr-tag">live</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-aside-foot">
+      <span>© <span data-year>2026</span> Shinzora</span>
+      <span><a href="/legal/terms/">Terms</a> · <a href="/legal/privacy/">Privacy</a></span>
+    </div>
+  </aside>
+
+  <!-- ============================ Form panel =========================== -->
+  <main class="auth-main">
+    <div class="auth-topbar">
+      <a class="auth-mobile-brand nav-brand" href="/" aria-label="Shinzora home">
+        <img src="/assets/icons/mark.svg" alt="" width="28" height="28" />
+        <span class="brand-word">SHINZORA</span>
+      </a>
+      <span class="auth-help"><a href="/auth/login/">Back to sign in</a></span>
+    </div>
+    <section class="auth-panel" id="auth-panel">
+      <div class="auth-head">
+        <h2>Choose a new password</h2>
+        <p>Your reset link is verified. Set a new password to regain access.</p>
+      </div>
+      <div id="auth-alert" role="status" aria-live="polite"></div>
+      <form class="auth-form" id="reset-form" novalidate>
+        <div class="field" data-field="password">
+          <label class="field-label" for="rp-password">New password</label>
+          <div class="input-icon">
+            <i data-icon="lock" data-size="16"></i>
+            <input class="input" id="rp-password" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" required />
+            <button class="input-action" type="button" data-pw-toggle="rp-password" aria-label="Show password" aria-pressed="false">
+              <i data-icon="eye" data-size="16"></i>
+            </button>
+          </div>
+          <div class="pw-meter" data-pw-meter data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="pw-hint"><span data-pw-label>Use 8+ characters with a letter and a number</span></div>
+          <div class="field-error"></div>
+        </div>
+        <div class="field" data-field="confirm">
+          <label class="field-label" for="rp-confirm">Confirm new password</label>
+          <div class="input-icon">
+            <i data-icon="lock-keyhole" data-size="16"></i>
+            <input class="input" id="rp-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Repeat your new password" required />
+          </div>
+          <div class="field-error"></div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="reset-submit" disabled>
+          Update password
+          <i data-icon="check" data-size="16" data-stroke="2.4"></i>
+        </button>
+      </form>
+      <p class="auth-footer-note">Need a new link? <a href="/auth/forgot-password/">Request another reset email</a></p>
+    </section>
+    <p class="auth-legal">
+      Protected by Supabase Auth. By continuing you agree to the
+      <a href="/legal/terms/">terms of service</a> and <a href="/legal/privacy/">privacy policy</a>.
+    </p>
+  </main>
+</div>
+
+<script src="/js/vendor/supabase-js.js"></script>
+<script type="module" src="/js/boot/auth-reset.js?v=20261107g"></script>
+</body>
+</html>

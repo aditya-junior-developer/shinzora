@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>System check · Shinzora</title>
+  <meta name="description" content="Verify your Shinzora deployment: database schema, RLS, functions, providers and assets." />
+  <style>
+    :root{
+      --bg:#08060d; --surface:#100c18; --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
+      --text:#f5f3ff; --text-2:#c9c3da; --text-3:#928ba8;
+      --violet:#7c3aed; --violet-2:#a78bfa; --ok:#34d399; --warn:#fbbf24; --danger:#f87171;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:
+        radial-gradient(1200px 600px at 12% -10%, rgba(124,58,237,.24), transparent 60%),
+        radial-gradient(900px 500px at 90% 0%, rgba(167,139,250,.12), transparent 55%),
+        var(--bg);
+      color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;min-height:100vh}
+    a{color:var(--violet-2);text-decoration:none} a:hover{text-decoration:underline}
+    .wrap{max-width:1080px;margin:0 auto;padding:40px 22px 80px}
+    header.top{display:flex;align-items:center;gap:14px;padding-bottom:26px;border-bottom:1px solid var(--line);margin-bottom:30px;flex-wrap:wrap}
+    .brand{display:flex;align-items:center;gap:10px;font-size:13px;letter-spacing:.26em;font-weight:600;color:#fff}
+    .brand svg{display:block}
+    .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--violet-2);border:1px solid rgba(167,139,250,.3);border-radius:999px;padding:3px 9px}
+    .top .spacer{margin-left:auto;display:flex;gap:16px;font-size:13px;color:var(--text-3)}
+    h1{font-size:clamp(1.6rem,1.2rem + 1.6vw,2.3rem);letter-spacing:-.025em;margin:0 0 10px}
+    .lede{color:var(--text-3);font-size:.94rem;line-height:1.7;max-width:70ch;margin:0 0 26px}
+    .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
+    .sum{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+    .sum b{display:block;font-size:1.5rem;font-weight:500;letter-spacing:-.02em}
+    .sum span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);margin-top:4px}
+    .bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;align-items:center}
+    button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line-strong);background:rgba(255,255,255,.05);color:#fff;padding:9px 16px;font-size:13px}
+    button:hover{background:rgba(255,255,255,.09)}
+    button.primary{background:linear-gradient(135deg,#7c3aed,#a78bfa);border:0;font-weight:600}
+    button.primary:disabled{opacity:.6;cursor:progress}
+    .status-note{font-size:12px;color:var(--text-3)}
+    section.group{margin-bottom:30px}
+    section.group h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-3);margin:0 0 12px;font-weight:600}
+    .checks{display:flex;flex-direction:column;gap:8px}
+    .check{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-left-width:3px;border-radius:12px;padding:14px 16px}
+    .check.pass{border-left-color:var(--ok)}
+    .check.fail{border-left-color:var(--danger)}
+    .check.warn{border-left-color:var(--warn)}
+    .check.run{border-left-color:rgba(255,255,255,.2)}
+    .check .dot{flex:0 0 18px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;margin-top:1px}
+    .check.pass .dot{background:rgba(52,211,153,.16);color:var(--ok)}
+    .check.fail .dot{background:rgba(248,113,113,.16);color:var(--danger)}
+    .check.warn .dot{background:rgba(251,191,36,.16);color:var(--warn)}
+    .check.run .dot{background:rgba(255,255,255,.08);color:var(--text-3)}
+    .check .body{min-width:0;flex:1}
+    .check .title{font-size:13.5px;color:var(--text);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .check .title code{font-family:var(--mono);font-size:11px;color:var(--violet-2);background:rgba(124,58,237,.12);padding:1px 6px;border-radius:5px}
+    .check .detail{font-size:12.5px;color:var(--text-3);line-height:1.65;margin-top:4px;word-break:break-word;overflow-wrap:anywhere}
+    .check .fix{font-size:12.5px;color:var(--text-2);line-height:1.65;margin-top:6px;padding-left:10px;border-left:2px solid rgba(167,139,250,.35);overflow-wrap:anywhere}
+    .check .fix b{color:var(--violet-2);font-weight:600}
+    pre{font-family:var(--mono);font-size:11.5px;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:320px;color:var(--text-2)}
+    footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--text-3);line-height:1.7}
+    .hidden{display:none}
+    @media (max-width:560px){ .wrap{padding:26px 16px 60px} .top .spacer{width:100%;margin-left:0} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <span class="brand">
+        <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
+          <path d="M16 2.6 28.4 9.3v13.4L16 29.4 3.6 22.7V9.3L16 2.6Z" fill="none" stroke="#a78bfa" stroke-width="1.4"/>
+          <path d="M21.6 12.3c-1.3-1.1-3.2-1.7-5.4-1.7-3.6 0-5.9 1.5-5.9 3.6 0 2 1.9 2.9 5.5 3.5 3.4.6 4.8 1.3 4.8 2.8 0 1.6-1.9 2.7-4.9 2.7-2.3 0-4.3-.7-5.7-2" fill="none" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        SHINZORA
+      </span>
+      <span class="tag">System check</span>
+      <span class="spacer">
+        <a href="/">Website</a>
+        <a href="/app/">Dashboard</a>
+        <a href="/admin/">Admin</a>
+      </span>
+    </header>
+
+    <h1>Deployment verification</h1>
+    <p class="lede">
+      This page inspects your live Supabase project and the deployed Edge Functions, then tells you exactly what is
+      missing and how to fix it. Every result comes from a real request — nothing is assumed or simulated.
+    </p>
+
+    <div class="summary">
+      <div class="sum"><b id="count-pass">—</b><span>Passed</span></div>
+      <div class="sum"><b id="count-warn">—</b><span>Warnings</span></div>
+      <div class="sum"><b id="count-fail">—</b><span>Failed</span></div>
+      <div class="sum"><b id="count-total">—</b><span>Checks run</span></div>
+    </div>
+
+    <div class="bar">
+      <button class="primary" id="rerun">Run checks again</button>
+      <button id="copy">Copy report</button>
+      <button id="toggle-json">Show raw report</button>
+      <span class="status-note" id="status-note">Starting diagnostic run…</span>
+    </div>
+
+    <div id="groups"></div>
+
+    <pre id="json" class="hidden" aria-live="polite"></pre>
+
+    <footer>
+      <p><strong>What this page does not do:</strong> it never writes data, never marks a payment as verified and never
+      changes configuration. It issues read-only requests (plus one RPC that only checks a function exists).</p>
+      <p>Missing schema? Run the migrations in order: <code>0001_schema.sql</code>, <code>0002_functions_rls.sql</code>,
+      <code>0003_storage_realtime.sql</code>, then <code>0004_admin_bootstrap.sql</code> for the first administrator.</p>
+    </footer>
+  </div>
+
+  <script src="/js/vendor/supabase-js.js"></script>
+  <script type="module" src="/js/boot/system-check.js?v=20261107g"></script>
+</body>
+</html>
