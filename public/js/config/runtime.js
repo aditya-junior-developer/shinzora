@@ -3,9 +3,10 @@
 window.__SHINZORA_ENV__ = {
   "SUPABASE_URL": "https://zmkgfmlcpzjfgxdmbtvi.supabase.co",
   "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_fXoUaZPWuEceigIlk63htA_WavvP5Al",
-  "SITE_URL": "",
+  "SITE_URL": "http://localhost:4173",
   "SUPPORT_EMAIL": "official.shinzora@proton.me",
   "APP_NAME": "Shinzora",
   "ENVIRONMENT": "production",
-  "RAZORPAY_KEY_ID": ""
+  "RAZORPAY_KEY_ID": "",
+  "PRELAUNCH_API": false
 };

@@ -17,7 +17,10 @@ const FALLBACK = {
   SITE_URL: "",
   SUPPORT_EMAIL: "official.shinzora@proton.me",
   APP_NAME: "Shinzora",
-  ENVIRONMENT: "production"
+  ENVIRONMENT: "production",
+  /* A static host has no /api/prelaunch route; only a server that mounts it
+     (scripts/dev-server.mjs) sets this true. */
+  PRELAUNCH_API: false
 };
 
 const runtime = typeof window !== "undefined" && window.__SHINZORA_ENV__ ? window.__SHINZORA_ENV__ : {};
@@ -36,6 +39,7 @@ export const env = Object.freeze({
   appName: merged.APP_NAME,
   supportEmail: merged.SUPPORT_EMAIL,
   environment: merged.ENVIRONMENT,
+  prelaunchApi: merged.PRELAUNCH_API === true,
 
   /* --- Derived ----------------------------------------------------------- */
   siteUrl: trimSlash(merged.SITE_URL) || (typeof location !== "undefined" ? location.origin : ""),

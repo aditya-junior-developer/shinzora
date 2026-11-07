@@ -1743,6 +1743,85 @@ export function brandingBadge() {
 }
 
 /**
+ * Inline a project's JavaScript into the page that shows it.
+ *
+ * Generated files are authored for a bundler and end with `export default App;`
+ * or start with `import`. Pasted into a classic `<script>` that single keyword is
+ * a parse error, and the browser discards the *whole* file — which is how a
+ * published site kept its design but lost its cart, its menu toggle and every
+ * other line of behaviour, while printing one cryptic message to the console.
+ *
+ * So: drop the module plumbing that a standalone page has no use for, and keep
+ * the code. Anything that still needs a module (a real import of another file,
+ * or JSX) is left whole and marked as one, because stripping it would change
+ * what the code does.
+ */
+function inlineScript(raw, wasModule = false) {
+  const source = String(raw == null ? "" : raw);
+  if (wasModule) return `<script type="module">\n${source}\n</script>`;
+
+  /* `export default function f(){}` / `export default class C {}` — the
+     declaration is what runs; only the two leading words have to go. */
+  let body = source.replace(
+    /^([ \t]*)export\s+default\s+(?=(?:async\s+function|function\*?|class)\b)/gm,
+    "$1"
+  );
+  /* `export default Identifier;` names something the file already defines. */
+  body = body.replace(/^[ \t]*export\s+default\s+[A-Za-z_$][\w$]*\s*;?[ \t]*$/gm, "");
+  /* Any other `export default <expression>` becomes an ordinary binding. */
+  body = body.replace(/^([ \t]*)export\s+default\s+/gm, "$1const __exportDefault = ");
+  /* `export { a, b };` and `export * from "./x.js";` */
+  body = body.replace(/^[ \t]*export\s*\{[^}]*\}\s*(?:from\s*["'][^"']+["'])?\s*;?[ \t]*$/gm, "");
+  /* `export const x`, `export function f`, `export class C` … */
+  body = body.replace(/^([ \t]*)export\s+(?=(?:const|let|var|function|async|class)\b)/gm, "$1");
+
+  /* Whatever still needs a module — an import of another file, a leftover
+     export, or JSX — is left exactly as written and marked as a module,
+     because rewriting it would change what the code does. */
+  const stillModule =
+    /(^|\n)\s*(?:import\s+[\w{*"'$]|export\s)/.test(body) || /<\/?[A-Z][\w.]*[\s/>]/.test(body);
+  if (stillModule) return `<script type="module">\n${source}\n</script>`;
+  return `<script>\n${body}\n</script>`;
+}
+
+/**
+ * Give a sandboxed page the storage API it expects.
+ *
+ * Previews and published sites render inside `sandbox="allow-scripts"`, which
+ * deliberately withholds same-origin access — so the plain `localStorage` read
+ * that every generated site performs throws a SecurityError, and with it dies
+ * the cart, the drawer state and anything else the page saved. An in-memory
+ * stand-in keeps the code working inside the sandbox without widening it: the
+ * page still cannot reach the parent's real storage, cookies or DOM.
+ *
+ * Runs only when the real API is genuinely blocked, so a page outside the
+ * sandbox keeps using the browser's own storage.
+ */
+function storageShim() {
+  return `<script>
+(function () {
+  function memory() {
+    var map = new Map();
+    return {
+      getItem: function (k) { return map.has(String(k)) ? map.get(String(k)) : null; },
+      setItem: function (k, v) { map.set(String(k), String(v)); },
+      removeItem: function (k) { map.delete(String(k)); },
+      clear: function () { map.clear(); },
+      key: function (i) { return Array.from(map.keys())[i] || null; },
+      get length() { return map.size; }
+    };
+  }
+  ["localStorage", "sessionStorage"].forEach(function (name) {
+    var blocked = false;
+    try { window[name].getItem("shinzora.probe"); } catch (error) { blocked = true; }
+    if (!blocked) return;
+    try { Object.defineProperty(window, name, { value: memory(), configurable: true }); } catch (error) {}
+  });
+})();
+</script>`;
+}
+
+/**
  * Compose the document shown in the preview and on the public site.
  *
  * A single-file project already contains everything, so it is returned as-is
@@ -1759,10 +1838,10 @@ export function buildPreviewDocument(files, entry = "index.html", options = {}) 
     return match;
   });
 
-  doc = doc.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi, (match, before, src, after) => {
+  doc = doc.replace(/<script([^>]*)src=["']([^"']+)["'][^>]*><\/script>/gi, (match, before, src) => {
     const key = src.replace(/^\.?\//, "");
-    if (files[key] && key.endsWith(".js")) return `<script>\n${files[key]}\n</script>`;
-    return match;
+    if (!files[key] || !key.endsWith(".js")) return match;
+    return inlineScript(files[key], /type\s*=\s*["']module["']/i.test(match));
   });
 
   /* Sandboxed previews must not be able to navigate the tab or post a form
@@ -1772,8 +1851,10 @@ export function buildPreviewDocument(files, entry = "index.html", options = {}) 
   const guard = options.allowForms
     ? `<meta http-equiv="Content-Security-Policy" content="base-uri 'none'">`
     : `<meta http-equiv="Content-Security-Policy" content="base-uri 'none'; form-action 'none'">`;
-  if (/<head[^>]*>/i.test(doc)) doc = doc.replace(/<head([^>]*)>/i, `<head$1>${guard}`);
-  else doc = `${guard}${doc}`;
+  /* The shim has to run before anything the page itself would execute. */
+  const prefix = `${guard}${storageShim()}`;
+  if (/<head[^>]*>/i.test(doc)) doc = doc.replace(/<head([^>]*)>/i, `<head$1>${prefix}`);
+  else doc = `${prefix}${doc}`;
 
   if (options.branding) {
     const badge = brandingBadge();

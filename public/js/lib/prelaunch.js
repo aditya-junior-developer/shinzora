@@ -45,6 +45,17 @@ function safeJson(response) {
  * makes many calls does not hammer the endpoint; `force` bypasses the cache.
  */
 export function session({ force = false } = {}) {
+  /* A static host does not mount /api/prelaunch at all, and probing it put a
+     404 (or an aborted request) in the console of every page that resolves
+     identity. Probe only where the route exists, or where this browser has
+     actually signed in to a sandbox account before. */
+  if (!env.prelaunchApi && !hasPrelaunchHint()) {
+    cache.probed = true;
+    cache.available = false;
+    cache.session = null;
+    cache.checkedAt = Date.now();
+    return Promise.resolve(null);
+  }
   if (!force && cache.probed && Date.now() - cache.checkedAt < 15000) {
     return Promise.resolve(cache.session);
   }

@@ -71,7 +71,11 @@ const config = {
   SUPPORT_EMAIL: get("SHINZORA_SUPPORT_EMAIL", "official.shinzora@proton.me"),
   APP_NAME: get("SHINZORA_APP_NAME", "Shinzora"),
   ENVIRONMENT: get("SHINZORA_ENVIRONMENT", "production"),
-  RAZORPAY_KEY_ID: get("SHINZORA_RAZORPAY_KEY_ID")
+  RAZORPAY_KEY_ID: get("SHINZORA_RAZORPAY_KEY_ID"),
+  /* True only when a deployment actually mounts the pre-launch router.
+     A static host (Vercel) does not, and probing it produced a 404 in the
+     console of every page that resolves identity. */
+  PRELAUNCH_API: get("SHINZORA_PRELAUNCH_API") === "1"
 };
 
 /* Refuse to write anything that looks like a secret. */
@@ -101,7 +105,7 @@ const resolved = { ...existing };
 /* SITE_URL always comes from the environment, even when it is empty: an empty
    value means "derive from location.origin at runtime", which is what a
    deployment wants. A stale build-machine URL must never survive. */
-const ALWAYS_FROM_ENV = new Set(["SITE_URL"]);
+const ALWAYS_FROM_ENV = new Set(["SITE_URL", "PRELAUNCH_API"]);
 for (const [key, value] of Object.entries(config)) {
   if (value !== "" && value !== null && value !== undefined) resolved[key] = value;
   else if (ALWAYS_FROM_ENV.has(key)) resolved[key] = value;
