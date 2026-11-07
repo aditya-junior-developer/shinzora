@@ -90,10 +90,16 @@ check("quota keeps 429", quota.status === 429);
 check("quota carries the real wait as data", quota.retryAfter === 5055, String(quota.retryAfter));
 check("message states the true reset window", /resets in about 1h 24m/.test(quota.message), quota.message);
 check("no developer URL leaks", !/generativelanguage|ai\.google\.dev|rate-limits/i.test(quota.message), quota.message);
+/* The provider limit belongs to the platform's own account. Telling a customer
+   "your allowance is used up" was a false statement about their plan. */
+check("the limit is not blamed on the customer's plan", !/your (plan|allowance is used)/i.test(quota.message), quota.message);
+check("the customer is told the build did not start", /did not start/i.test(quota.message), quota.message);
+check("the customer is told nothing was charged", /Nothing was taken from your allowance/i.test(quota.message), quota.message);
 
 const zero = providerError(429, ZERO_LIMIT_BODY);
-check("zero allowance is explained as a plan matter", /not included in the provider plan/i.test(zero.message), zero.message);
-check("zero allowance tells the owner what to do", /billing settings/i.test(zero.message));
+check("a zero limit is described as the provider account, not the customer's plan",
+  /not enabled on the provider account/i.test(zero.message), zero.message);
+check("a zero limit also promises no charge", /Nothing was taken from your allowance/i.test(zero.message), zero.message);
 
 const rate = providerError(429, "Too many requests. Retry in 12s.");
 check("a fast limit stays a fast limit", rate.code === "ai_rate_limited", rate.code);

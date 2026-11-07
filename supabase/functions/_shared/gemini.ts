@@ -132,20 +132,24 @@ export function providerError(status: number, detail: string): GeminiError {
   const retryAfter = extractRetrySeconds(detail);
 
   if (status === 429) {
+    /* This limit belongs to the platform's own provider account. A customer
+       reading "your allowance is used up" was reading about somebody else's
+       key, so the message now says what happened, says the build did not start,
+       and says nothing was charged. */
     if (isQuotaExhausted(detail)) {
       const window = retryAfter ? ` It resets in ${describeWait(retryAfter)}.` : "";
       const zeroLimit = /limit:\s*0\b/.test(detail);
       return new GeminiError(
         zeroLimit
-          ? "This AI feature is not included in the provider plan this project is on. The owner can enable it in the AI provider's billing settings."
-          : `The AI provider's allowance for this project is used up.${window}`,
+          ? "This AI feature is not enabled on the provider account this platform uses, so the build did not start. Nothing was taken from your allowance."
+          : `The AI service has reached its current limit, so this build did not start.${window} Nothing was taken from your allowance.`,
         "ai_quota_exhausted",
         429,
         retryAfter
       );
     }
     return new GeminiError(
-      "The AI provider is rate limiting this project. Try again in a minute.",
+      "The AI service is busy right now, so this build did not start. Nothing was taken from your allowance — try again in a minute.",
       "ai_rate_limited",
       429,
       retryAfter

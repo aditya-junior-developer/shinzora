@@ -65,7 +65,7 @@ export function stagesFor(kind) {
           { id: "screens", label: "Screens", type: "chips", required: true },
           { id: "packageId", label: "Package id", type: "package", required: true, hint: "The permanent identifier the store and the device use. It cannot change after the first release." },
           { id: "platform", label: "Which package should this app be built as?", type: "platform", required: true },
-          { id: "logo", label: "Icon", type: "asset", accept: "image/*" },
+          { id: "logo", label: "Icon", type: "asset", accept: "image/*", hint: "Required before a package can be built: 512x512 PNG works everywhere. You can attach it now or come back to it — the project can still be saved." },
           { id: "contact", label: "Support contact", type: "text", required: true, placeholder: "official.shinzora@proton.me" }
         ]
       : [

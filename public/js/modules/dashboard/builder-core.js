@@ -382,7 +382,7 @@ export function createBuilder(type) {
         return `<div class="field">${label}
           <input class="input mono" id="f-${field.id}" data-field="${field.id}" value="${esc(value)}"
                  placeholder="${esc(suggestion)}" spellcheck="false" autocapitalize="off" />
-          <div class="field-hint">${esc(field.hint || "")} ${value ? "" : `Suggestion: <span class="mono">${esc(suggestion)}</span>.`}</div>${hint}</div>`;
+          <div class="field-hint">${value ? "" : `Suggestion: <span class="mono">${esc(suggestion)}</span>.`}</div>${hint}</div>`;
       }
       if (field.type === "platform") {
         const options = packageOptions(S.platformSlots);
@@ -431,7 +431,7 @@ export function createBuilder(type) {
         <div id="stage-error"></div>`;
       wireFields();
       on(qs("#stage-next"), "click", () => {
-        const problems = validateStage(stage, S.answers.brief);
+        const problems = validateStage(stage, { ...S.answers.brief, platform: S.target || S.answers.brief.platform });
         if (problems.length) return showStageError(problems);
         S.completedStages = unique([...S.completedStages, "brief"]);
         goStage("information");
@@ -460,7 +460,7 @@ export function createBuilder(type) {
       on(qs("#stage-back"), "click", () => goStage("brief"));
       on(qs("#research-button"), "click", runResearch);
       on(qs("#stage-next"), "click", () => {
-        const problems = validateStage(stage, S.answers.information);
+        const problems = validateStage(stage, { ...S.answers.information, platform: S.target || S.answers.information.platform });
         if (problems.length) return showStageError(problems);
         if (isApp) {
           const problemsForPackage = packageReadiness({
@@ -483,6 +483,17 @@ export function createBuilder(type) {
       hostEl.innerHTML = `<div class="alert alert-warning"><span><span class="alert-title">Before continuing</span>
         <ul style="margin:6px 0 0 16px">${problems.map((p) => `<li>${esc(p.message)}</li>`).join("")}</ul></span></div>`;
       hostEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      /* Put the first unanswered control on screen instead of leaving the
+         customer to hunt for it above the fold. */
+      const first = problems.find((p) => p.field);
+      const target = first
+        ? qs(`#f-${first.field}`) || qs(`#chips-${first.field}`) || qs(`#platform-options`) || qs(`#assets-${first.field}`)
+        : null;
+      if (target) {
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+        target.classList.add("is-error");
+        setTimeout(() => target.classList.remove("is-error"), 2600);
+      }
     }
 
     /** Keep the answer object in sync with the controls as they change. */
@@ -537,6 +548,11 @@ export function createBuilder(type) {
             return;
           }
           S.target = chosen;
+          /* The validator reads the stage's answers, and it cannot know that a
+             platform is stored beside them under a different name. Without this
+             line the build refused to start with "Choose the platform this app
+             is for" while a platform was plainly selected. */
+          S.answers.information.platform = chosen;
           paintStage();
         });
       });
@@ -834,8 +850,15 @@ export function createBuilder(type) {
     function describeFailure(error) {
       const code = String(error?.code || "");
       if (code === "functions_unavailable") return "The AI function is not deployed on this deployment.";
-      if (code === "quota_exceeded" || code === "ai_quota_exhausted") return "This plan's AI allowance for the cycle is used up.";
-      if (code === "timeout") return "The AI service did not answer in time.";
+      /* Two different allowances were being reported as one. `quota_exceeded`
+         is this account's own credit for the billing cycle; `ai_quota_exhausted`
+         is the platform's provider limit, which has nothing to do with the
+         customer's plan and used to tell every customer their plan was spent. */
+      if (code === "quota_exceeded") return "You have used every AI generation in this billing cycle.";
+      if (code === "ai_quota_exhausted" || code === "ai_rate_limited" || code === "ai_unavailable" || code === "ai_bad_key") {
+        return "The AI service is at its current limit, so this build did not start. Nothing was taken from your allowance — try again later.";
+      }
+      if (code === "timeout") return "The AI service did not answer in time. Nothing was taken from your allowance.";
       return error?.message || "The build did not finish.";
     }
 

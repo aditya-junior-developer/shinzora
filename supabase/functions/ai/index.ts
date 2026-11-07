@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
   const body = await readBody<Record<string, unknown>>(req);
   const action = clean(body.action, 40);
   const mode = action || "chat";
+  let charged = false;
 
   try {
     /* Metadata, not generation: listing models must not spend a credit, so it
@@ -88,6 +89,7 @@ Deno.serve(async (req) => {
     }
 
     const quota = await ensureQuota(caller.user.id, mode);
+    if (quota && quota.ok !== false) charged = true;
     if (quota && quota.ok === false) {
       return fail(429, "quota_exceeded", "You have used every AI generation in this billing cycle.", {
         hint: `Plan ${quota.plan} allows ${quota.limit} generations per month. Upgrade in Billing or wait for the next cycle.`,
@@ -114,6 +116,10 @@ Deno.serve(async (req) => {
         return fail(400, "unknown_action", `Unknown action "${action}".`);
     }
   } catch (error) {
+    /* No output, no charge. The credit is spent before the provider is called,
+       so a provider outage, a rate limit or a bad key used to cost the customer
+       a generation they never received. */
+    if (charged) await refundCredit(caller.user.id, mode);
     return handleError(error, caller, mode);
   }
 });
@@ -145,15 +151,53 @@ function handleError(error: unknown, caller: Caller, mode: string) {
     ...extra,
     hint:
       code === "ai_quota_exhausted"
-        ? "The AI provider's allowance is spent. The owner can raise it in the provider's billing or plan settings."
-        : code === "ai_bad_json"
-          ? "The model returned an unusable payload. Running the generation again usually succeeds."
-          : code === "ai_rate_limited"
-            ? "Wait a minute and retry."
+        ? "This is the platform's own provider limit, not your plan: the credit was returned. An administrator can raise the provider limit."
+        : code === "ai_rate_limited"
+          ? "The credit was returned. Try again in a minute."
+          : code === "ai_bad_json"
+            ? "The credit was returned. Running the generation again usually succeeds."
             : code === "ai_max_tokens"
-              ? "Ask for fewer pages, or a shorter brief."
+              ? "The credit was returned. Ask for fewer pages, or a shorter brief."
               : undefined
   });
+}
+
+/**
+ * Give back a credit that produced nothing.
+ *
+ * Runs only for a request that failed after the credit was taken and before any
+ * output existed, so it can never hand out a free generation to a success. The
+ * counter lives on the subscription row; the service role may write it, and the
+ * failure itself is already recorded in ai_usage_log by handleError().
+ */
+async function refundCredit(userId: string, mode: string): Promise<void> {
+  try {
+    const db = admin();
+    const { data } = await db
+      .from("subscriptions")
+      .select("ai_credits_used")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const used = Number(data?.ai_credits_used ?? 0);
+    if (!Number.isFinite(used) || used <= 0) return;
+    const { error } = await db
+      .from("subscriptions")
+      .update({ ai_credits_used: used - 1 })
+      .eq("user_id", userId);
+    if (error) {
+      console.error("ai credit refund failed", error.message);
+      return;
+    }
+    await db.from("ai_usage_log").insert({
+      user_id: userId,
+      mode: `${mode}:refund`.slice(0, 40),
+      credits: 0,
+      ok: true,
+      error: "no output produced — credit returned"
+    });
+  } catch (error) {
+    console.error("ai credit refund threw", (error as Error)?.message || error);
+  }
 }
 
 /** Consume one credit. Returns {ok:false,...} when the plan is exhausted. */
