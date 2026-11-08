@@ -26,7 +26,7 @@ import { state, plan, canCreateProject } from "../../lib/store.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { api, runtimeConfig } from "../../lib/api.js";
 import { toast, toastError } from "../../ui/toast.js";
-import { confirmDialog, openModal } from "../../ui/modal.js";
+import { confirmDialog } from "../../ui/modal.js";
 import { pageHead, emptyState, setupNotice } from "./components.js";
 import {
   stagesFor,
@@ -36,6 +36,7 @@ import {
   researchUsable
 } from "./builder/stages.js";
 import { toSingleFile, singleFileDownload } from "../../lib/single-file.js";
+import { askNotificationPermission, notifyBuildResult } from "../../lib/notify.js";
 import { validateSiteDocument, validationSummary } from "../../lib/site-validate.js";
 import {
   packageOptions,
@@ -89,6 +90,7 @@ export function createBuilder(type) {
       versions: [],
       activeVersion: null,
       generated: null,
+      buildJob: null,
       validation: null,
       research: null,
       platformSlots: 1,
@@ -155,9 +157,11 @@ export function createBuilder(type) {
           <div class="stage-bar">
             <div class="stage-url">${icon("lock", { size: 11 })}<span id="stage-url">preview.shinzora.in</span></div>
             <div class="segmented" id="viewport-toggle">
-              <button data-viewport="desktop" aria-pressed="${isApp ? "false" : "true"}">${icon("monitor", { size: 13 })}</button>
-              <button data-viewport="tablet" aria-pressed="false">${icon("tablet", { size: 13 })}</button>
-              <button data-viewport="mobile" aria-pressed="${isApp ? "true" : "false"}">${icon("smartphone", { size: 13 })}</button>
+              <button data-viewport="tablet" data-width="768" data-height="1024" aria-label="Tablet preview 768 by 1024" aria-pressed="${isApp ? "false" : "true"}">${icon("tablet", { size: 13 })}<span>Tablet</span></button>
+              <button data-viewport="tablet" data-width="820" data-height="1180" aria-label="Large tablet preview 820 by 1180" aria-pressed="false">iPad</button>
+              <button data-viewport="mobile" data-width="360" data-height="800" aria-label="Android phone preview 360 by 800" aria-pressed="${isApp ? "true" : "false"}">Android</button>
+              <button data-viewport="mobile" data-width="412" data-height="915" aria-label="Samsung Galaxy phone preview 412 by 915" aria-pressed="false">Galaxy</button>
+              <button data-viewport="mobile" data-width="390" data-height="844" aria-label="iPhone preview 390 by 844" aria-pressed="false">iPhone</button>
             </div>
             <button class="btn btn-ghost btn-sm" id="open-fullscreen">${icon("maximize-2", { size: 13 })}Expand</button>
           </div>
@@ -222,14 +226,85 @@ export function createBuilder(type) {
     await loadSlots();
 
     /* ------------------------------------------------------------- existing */
+    /* Opening the builder without an id is not "start again": the account
+       already owns its one website (or app), and there may be a build running
+       or finished while the tab was closed. Both are picked up here, so the
+       owner always lands on the project they already have. */
     if (projectId) {
       await loadProject(projectId);
+      await resumeUnfinishedBuild();
     } else {
-      /* A fresh build has to paint its first stage. Without this the panel kept
-         the "Brief" heading and an empty body — the empty Website Builder screen
-         that looked like a feature that had not been built. `loadProject` paints
-         the stage itself for an existing project. */
-      goStage("brief");
+      const opened = await openOwnedProject();
+      if (!opened) {
+        /* A genuine first visit: paint the brief stage. */
+        goStage("brief");
+      }
+    }
+
+    /**
+     * One project per account per kind. If this account already has one, the
+     * builder opens it and says so; it never offers a second empty canvas.
+     */
+    async function openOwnedProject() {
+      try {
+        const { data: owned } = await sb
+          .from("projects")
+          .select("id")
+          .eq("owner_id", state.user.id)
+          .eq("type", type)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (!owned) return false;
+        const urlId = new URLSearchParams(location.search).get("id");
+        if (urlId !== owned.id) history.replaceState({}, "", `/app/?view=${viewSlug}&id=${owned.id}`);
+        await loadProject(owned.id);
+        await resumeUnfinishedBuild();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    /**
+     * A build that was running when the tab closed (or the laptop slept) is
+     * still on the server. Reattach to it: follow it to the end, or show the
+     * files it already produced. Nothing is regenerated and nothing is lost.
+     */
+    async function resumeUnfinishedBuild() {
+      try {
+        const { job } = await api.ai.buildStatus({ type });
+        if (!job || (S.project && job.projectId && job.projectId !== S.project.id)) return;
+
+        if (job.status === "running") {
+          S.buildJob = job;
+          S.busy = true;
+          applyBuildProgress(job);
+          goStage("generate");
+          paintStage();
+          try {
+            const files = await driveBuild(job.id, { quiet: true });
+            S.busy = false;
+            if (files && Object.keys(files).length) {
+              await finishFromFiles(files, {
+                plannedPages: plannedRoutes(),
+                model: job.model || null,
+                notes: job.notes || ""
+              });
+              toast({ title: "Your build finished", message: "Review the pages, then confirm to save the version." }, { tone: "success" });
+            }
+          } catch (error) {
+            S.busy = false;
+            S.lastError = describeFailure(normalizeError(error));
+            paintStage();
+          }
+        } else if (job.status === "succeeded" && job.files && Object.keys(job.files).length && !S.versions.length) {
+          /* Finished while the tab was closed and no version was saved yet. */
+          await finishFromFiles(job.files, { plannedPages: plannedRoutes(), model: job.model || null, notes: job.notes || "" });
+        }
+      } catch {
+        /* No endpoint or no build: the normal stage flow continues. */
+      }
     }
 
     async function loadProject(id) {
@@ -644,7 +719,11 @@ export function createBuilder(type) {
           <div class="wz-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.stagePercent}">
             <span style="width:${progress.stagePercent}%"></span>
           </div>
-          <div class="wz-progress-label"><span id="build-status">${esc(buildStatusText())}</span><span id="build-elapsed">0s</span></div>
+          <div class="wz-progress-label">
+            <span id="build-status">${esc(buildStatusText())}</span>
+            <span><span data-build-percent>${S.buildJob?.progress ? `${S.buildJob.progress}%` : ""}</span>
+              <span id="build-elapsed">0s</span></span>
+          </div>
         </div>
         <div class="trace" id="trace">
           ${GENERATION_TASKS.map(
@@ -677,9 +756,21 @@ export function createBuilder(type) {
     function cancelBuild() {
       cancelRequested = true;
       S.busy = false;
-      S.lastError = "Cancelled. Nothing was saved.";
+      /* The server saves each step as it goes, so the pages already written are
+         kept. Saying "nothing was saved" would be untrue. */
+      S.lastError = S.buildJob
+        ? "Stopped here. The parts already written are saved on the server."
+        : "Cancelled. Nothing was saved.";
       paintStage();
-      toast({ title: "Build cancelled", message: "Nothing was saved. You can adjust the brief and build again." }, { tone: "warning" });
+      toast(
+        {
+          title: "Build stopped",
+          message: S.buildJob
+            ? "The pages already written are kept. Open the builder again to continue where it stopped."
+            : "You can adjust the brief and build again."
+        },
+        { tone: "warning" }
+      );
     }
 
     /** Mark a task complete. Progress is recomputed from these, never from a clock. */
@@ -705,6 +796,21 @@ export function createBuilder(type) {
       if (node) node.classList.add("active");
     }
 
+    /**
+     * Run a build.
+     *
+     * Two paths, because they are genuinely different jobs:
+     *
+     *   update  — the account already owns this project, so the existing files
+     *             are revised in one call (that output is one document and has
+     *             never hit the runtime limit)
+     *   create  — a chunked build: the server plans, writes the stylesheet and
+     *             writes one page per call, saving each step. The old single
+     *             call returned an entire site at once and the Edge Function was
+     *             killed with "not enough compute resources" before the owner
+     *             saw a single file. Keeping each step small is what makes the
+     *             build finish at all.
+     */
     async function runBuild() {
       if (S.busy) return;
       S.busy = true;
@@ -715,19 +821,15 @@ export function createBuilder(type) {
       S.validation = null;
       paintStage();
 
+      /* Ask for notification permission at the only moment it makes sense: the
+         start of a build the owner may walk away from. */
+      askNotificationPermission().catch(() => undefined);
+
       const startedAt = Date.now();
       const ticker = setInterval(() => {
         const seconds = Math.round((Date.now() - startedAt) / 1000);
         const el = qs("#build-elapsed");
         if (el) el.textContent = `${seconds}s`;
-        const note = qs("[data-trace-note]");
-        if (note && S.busy) {
-          note.hidden = false;
-          note.textContent =
-            seconds > 45
-              ? `${seconds}s elapsed. Large pages take longer; the run continues while this tab stays open.`
-              : `${seconds}s elapsed`;
-        }
       }, 500);
 
       try {
@@ -743,97 +845,56 @@ export function createBuilder(type) {
 
         if (cancelRequested) return;
 
-        /* 3/4/5 — the model returns layouts and code in one response, so those
-           three tasks complete together when the response lands. The bar does
-           not pretend they finish at different times. */
-        startTask("generate_layouts");
-        /* `project` was never declared in this scope: every build threw
-           "project is not defined" at this line, which is why the Website
-           Builder produced nothing at all. The state lives on S.project. */
-        const response = S.project
-          ? await api.ai.revise({
-              type,
-              projectType: type,
-              instruction,
-              files: S.activeVersion?.files || null,
-              projectId: S.project.id,
-              versionId: S.activeVersion?.id || null,
-              singleFile: true,
-              mobileOnly: isApp
-            })
-          : await api.ai.generate(buildPayload(instruction, plannedPages));
-        if (cancelRequested) return;
-        completeTask("generate_layouts");
-        startTask("write_code");
+        let rawFiles = null;
+        let response = null;
 
-        const rawFiles = response?.files || (response?.html ? { "index.html": response.html } : {});
-        if (!Object.keys(rawFiles).length) throw new Error("The AI response did not contain any files. Try again or describe the pages more specifically.");
-        completeTask("write_code");
-
-        /* 5 — assets: uploaded images are embedded, local css/js are inlined */
-        startTask("add_assets");
-        const single = toSingleFile(rawFiles, { entry: response?.entry || "index.html" });
-        const withAssets = embedAssets(single.html);
-        completeTask("add_assets");
-
-        /* 6 — responsiveness is measured on the document that would be saved */
-        startTask("check_responsive");
-        const responsive = checkResponsive(withAssets);
-        completeTask("check_responsive");
-
-        /* 7 — the real validation report */
-        startTask("validate");
-        const validation = validateSiteDocument(withAssets, { requiredRoutes: plannedPages });
-        /* The app tests are measured on the same document, and their findings
-           join one report so the customer reads one list, not two. */
-        if (isApp) {
-          const mobileCheck = validateMobileApp(withAssets);
-          S.mobileCheck = mobileCheck;
-          for (const issue of mobileCheck.issues) {
-            validation.issues.push(issue);
-            validation.counts[issue.level] += 1;
-          }
-          validation.ok = validation.counts.error === 0;
-        }
-        if (!responsive.viewport) {
-          validation.issues.unshift({
-            level: "error",
-            code: "viewport",
-            title: "Not mobile-ready",
-            detail: "The document has no viewport meta tag, so it will not scale on a phone."
+        if (S.project) {
+          /* Update path. */
+          startTask("generate_layouts");
+          response = await api.ai.revise({
+            type,
+            projectType: type,
+            instruction,
+            files: S.activeVersion?.files || null,
+            projectId: S.project.id,
+            versionId: S.activeVersion?.id || null,
+            singleFile: true,
+            mobileOnly: isApp
           });
-          validation.counts.error += 1;
-          validation.ok = false;
+          completeTask("generate_layouts");
+          if (cancelRequested) return;
+          rawFiles = response?.files || (response?.html ? { "index.html": response.html } : {});
+        } else {
+          /* Create path — chunked and resumable. */
+          startTask("generate_layouts");
+          const job = await startOrResumeBuild(buildPayload(instruction, plannedPages));
+          S.buildJob = job;
+          rawFiles = await driveBuild(job.id);
+          completeTask("generate_layouts");
+          if (cancelRequested) return;
+          if (!rawFiles || !Object.keys(rawFiles).length) {
+            throw new Error("The build finished without producing any files. Try again.");
+          }
         }
-        completeTask("validate");
 
-        S.generated = {
-          html: withAssets,
-          files: { "index.html": withAssets },
-          pages: single.pages,
-          warnings: single.warnings,
-          validation,
-          responsive,
-          model: response?.model || null,
-          notes: response?.notes || "",
-          sources: S.research?.sources || [],
+        startTask("write_code");
+        const files = await finishFromFiles(rawFiles, {
           plannedPages,
-          instruction,
-          target: S.target,
-          mobileCheck: S.mobileCheck || null,
-          createdAt: new Date().toISOString()
-        };
-        S.validation = validation;
+          model: response?.model || S.buildJob?.model || null,
+          notes: response?.notes || S.buildJob?.notes || ""
+        });
+        completeTask("write_code");
+        if (!files) return;
 
-        S.completedStages = unique([...S.completedStages, "brief", "information", "generate"]);
-        S.busy = false;
-        showGenerated();
-        paintStage();
-        goStage("review", { keepPreview: true });
+        notifyBuildResult({
+          title: isApp ? "Your app is ready" : "Your website is ready",
+          body: `${S.answers.information.name || "Your project"} finished building. Open the builder to review it.`,
+          tag: `shinzora-build-${S.project?.id || "new"}`
+        });
 
-        if (validation.counts.error) {
+        if (S.validation?.counts?.error) {
           toast(
-            { title: "Built, with problems", message: validationSummary(validation) + " — read the validation panel." },
+            { title: "Built, with problems", message: validationSummary(S.validation) + " — read the validation panel." },
             { tone: "warning", duration: 8000 }
           );
         } else {
@@ -844,10 +905,190 @@ export function createBuilder(type) {
         const normalized = normalizeError(error);
         S.lastError = describeFailure(normalized);
         paintStage();
+
+        /* The server refuses a second project for the same account. When it
+           does, it sends the one that exists — open it instead of leaving the
+           owner on an error they cannot act on. */
+        const existingProject = normalized?.data?.project || normalized?.project || null;
+        if (normalized?.code === "project_exists" && existingProject?.id) {
+          toast({ title: "You already have this project", message: "Opening it so you can update it." }, { tone: "info" });
+          history.replaceState({}, "", `/app/?view=${viewSlug}&id=${existingProject.id}`);
+          await loadProject(existingProject.id);
+          return;
+        }
+        if (normalized?.code === "build_in_progress" && existingProject?.id) {
+          toast({ title: "This project is already building", message: "Reconnecting to the saved background job." }, { tone: "info" });
+          history.replaceState({}, "", `/app/?view=${viewSlug}&id=${existingProject.id}`);
+          await loadProject(existingProject.id);
+          await resumeUnfinishedBuild();
+          return;
+        }
         toastError(normalized);
+        notifyBuildResult({
+          title: isApp ? "The app build stopped" : "The website build stopped",
+          body: S.lastError,
+          tag: `shinzora-build-${S.project?.id || "new"}`
+        });
       } finally {
         clearInterval(ticker);
       }
+    }
+
+    /**
+     * Turn a set of generated files into the preview, the validation report and
+     * the state the review stage works from. Shared by a live build and by a
+     * build that finished while the tab was closed.
+     */
+    async function finishFromFiles(rawFiles, { plannedPages, model, notes, revised }) {
+      startTask("add_assets");
+      const single = toSingleFile(rawFiles, { entry: "index.html" });
+      const withAssets = embedAssets(single.html);
+      completeTask("add_assets");
+
+      startTask("check_responsive");
+      const responsive = checkResponsive(withAssets);
+      completeTask("check_responsive");
+
+      startTask("validate");
+      const validation = validateSiteDocument(withAssets, { requiredRoutes: plannedPages });
+      if (isApp) {
+        const mobileCheck = validateMobileApp(withAssets);
+        S.mobileCheck = mobileCheck;
+        for (const issue of mobileCheck.issues) {
+          validation.issues.push(issue);
+          validation.counts[issue.level] += 1;
+        }
+        validation.ok = validation.counts.error === 0;
+      }
+      if (!responsive.viewport) {
+        validation.issues.unshift({
+          level: "error",
+          code: "viewport",
+          title: "Not mobile-ready",
+          detail: "The document has no viewport meta tag, so it will not scale on a phone."
+        });
+        validation.counts.error += 1;
+        validation.ok = false;
+      }
+      completeTask("validate");
+
+      if (!withAssets) {
+        throw new Error("The generated files did not contain an HTML document.");
+      }
+
+      S.generated = {
+        html: withAssets,
+        files: { "index.html": withAssets },
+        pages: single.pages,
+        warnings: single.warnings,
+        validation,
+        responsive,
+        model,
+        notes,
+        revised,
+        sources: S.research?.sources || [],
+        plannedPages,
+        instruction: buildInstruction(),
+        target: S.target,
+        mobileCheck: S.mobileCheck || null,
+        createdAt: new Date().toISOString()
+      };
+      S.validation = validation;
+      S.completedStages = unique([...S.completedStages, "brief", "information", "generate"]);
+      S.busy = false;
+      showGenerated();
+      paintStage();
+      goStage("review", { keepPreview: true });
+      return S.generated;
+    }
+
+    /* --------------------------------------------------- chunked build loop */
+
+    /** Start a build, or pick up the one this account already has in flight. */
+    async function startOrResumeBuild(payload) {
+      const started = await api.ai.buildStart(payload);
+      if (started?.project) {
+        S.project = { ...(S.project || {}), ...started.project };
+        if (qs("#publish-card")) qs("#publish-card").hidden = false;
+        if (qs("#slug-input") && started.project.slug) qs("#slug-input").value = started.project.slug;
+        history.replaceState({}, "", `/app/?view=${viewSlug}&id=${started.project.id}`);
+      }
+      return started;
+    }
+
+    /**
+     * Follow a build to the end.
+     *
+     * The server chains its own steps, so this is mostly a poll. It nudges the
+     * build only when the row has gone quiet for a while (a killed invocation),
+     * which is what makes "never stop until it is finished" true in practice
+     * rather than a promise.
+     */
+    async function driveBuild(jobId, { quiet = false } = {}) {
+      const deadline = Date.now() + 12 * 60 * 1000;
+      let nudgedAt = 0;
+
+      while (Date.now() < deadline) {
+        if (cancelRequested) throw Object.assign(new Error("Build cancelled"), { code: "cancelled" });
+
+        const { job } = await api.ai.buildStatus({ jobId, type });
+        if (!job) throw new Error("The build record disappeared.");
+
+        applyBuildProgress(job, { quiet });
+
+        if (job.status === "succeeded") return job.files || {};
+        if (job.status === "failed") {
+          throw Object.assign(new Error(job.error || "The build could not finish."), { code: "build_failed" });
+        }
+
+        const quietFor = Date.now() - new Date(job.updatedAt || Date.now()).getTime();
+        if (quietFor > 25000 && Date.now() - nudgedAt > 25000) {
+          nudgedAt = Date.now();
+          /* Nobody has touched the row for 25 seconds: the background chain was
+             cut off. Run the next step here so the build still finishes. */
+          try {
+            const stepped = await api.ai.buildStep({ jobId });
+            if (stepped?.files) return stepped.files;
+            if (stepped) applyBuildProgress(stepped, { quiet });
+          } catch {
+            /* the poll loop tries again */
+          }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2200));
+      }
+
+      throw Object.assign(new Error("The build is taking unusually long. It is saved on the server — reopen the builder to continue."), {
+        code: "build_timeout"
+      });
+    }
+
+    /** Paint the real state of the job: which steps are done, not a timer. */
+    function applyBuildProgress(job, { quiet = false } = {}) {
+      const stages = job.stages || [];
+      const done = (id) => Boolean(stages.find((stage) => stage.id === id)?.done);
+      const pages = stages.filter((stage) => String(stage.id).startsWith("page-"));
+      const pagesDone = pages.filter((stage) => stage.done).length;
+
+      const tasks = [];
+      if (done("plan")) tasks.push("read_brief", "plan_structure");
+      if (done("styles")) tasks.push("generate_layouts");
+      if (pages.length && pagesDone === pages.length) tasks.push("write_code");
+      S.completedTasks = tasks;
+
+      const status = qs("#build-status");
+      if (status) {
+        const active = pages.find((stage) => !stage.done);
+        status.textContent = job.status === "succeeded"
+          ? "Build finished"
+          : active
+            ? `${active.label}${pages.length > 1 ? ` (${pagesDone + 1} of ${pages.length})` : ""}`
+            : stages.find((stage) => !stage.done)?.label || "Building";
+      }
+      const percent = qs("[data-build-percent]");
+      if (percent) percent.textContent = `${Math.max(0, Math.min(100, Number(job.progress || 0)))}%`;
+
+      if (!quiet) paintSteps();
     }
 
     function describeFailure(error) {
@@ -862,6 +1103,10 @@ export function createBuilder(type) {
         return "The AI service is at its current limit, so this build did not start. Nothing was taken from your allowance — try again later.";
       }
       if (code === "timeout") return "The AI service did not answer in time. Nothing was taken from your allowance.";
+      if (code === "project_exists") return "You already have a project of this kind. Open it and update it instead of starting another.";
+      if (code === "build_failed") return "The build could not finish. Your credit was returned and the pages already written are kept.";
+      if (code === "build_timeout") return "The build is still running on the server. Reopen the builder and it will pick up where it stopped.";
+      if (code === "cancelled") return "Stopped. The pages already written are saved.";
       return error?.message || "The build did not finish.";
     }
 
@@ -1041,7 +1286,7 @@ export function createBuilder(type) {
             )}</button>`
         )
         .join("");
-      applyViewport(isApp ? "mobile" : "desktop");
+      applyViewport(isApp ? "mobile" : "tablet", isApp ? 390 : 768, isApp ? 844 : 1024);
       qs("#stage-url").textContent = `${S.project?.slug || "preview"}.shinzora.in`;
     }
 
@@ -1076,13 +1321,20 @@ export function createBuilder(type) {
              Every internal link resolves, no asset is missing, and the inline scripts parse.</span></div>`);
     }
 
-    function applyViewport(mode) {
-      qsa("#viewport-toggle button").forEach((node) => node.setAttribute("aria-pressed", String(node.getAttribute("data-viewport") === mode)));
+    function applyViewport(mode, width = mode === "mobile" ? 390 : 768, height = mode === "mobile" ? 844 : 1024) {
       const frame = qs("#preview-frame");
-      frame.style.maxWidth = mode === "mobile" ? "390px" : mode === "tablet" ? "768px" : "100%";
-      frame.style.margin = mode === "desktop" ? "0" : "0 auto";
-      frame.style.aspectRatio = mode === "mobile" ? "9 / 16" : mode === "tablet" ? "3 / 4" : "16 / 11";
-      frame.style.minHeight = mode === "mobile" ? "640px" : "380px";
+      const w = Math.max(320, Math.min(1200, Number(width) || 390));
+      const h = Math.max(568, Math.min(1600, Number(height) || 844));
+      qsa("#viewport-toggle button").forEach((node) => node.setAttribute("aria-pressed", String(
+        node.getAttribute("data-viewport") === mode && Number(node.getAttribute("data-width")) === w
+      )));
+      frame.style.width = `min(100%, ${w}px)`;
+      frame.style.maxWidth = `${w}px`;
+      frame.style.margin = "0 auto";
+      frame.style.aspectRatio = `${w} / ${h}`;
+      frame.style.height = `min(${h}px, 72vh)`;
+      frame.style.minHeight = "420px";
+      frame.dataset.device = `${mode}-${w}x${h}`;
     }
 
     /* --------------------------------------------------------- stage 4 & 5 */
@@ -1094,7 +1346,7 @@ export function createBuilder(type) {
 
       host.innerHTML = `
         <p class="muted" style="font-size:var(--fs-xs);line-height:1.6">
-          Walk through every page in the preview. Desktop, tablet and phone are all available on the right.
+          Walk through every page in the preview. Tablet and phone-sized device previews are available on the right.
         </p>
         <div class="wz-review">
           <div class="kv"><dt>Pages</dt><dd>${pages.length ? pages.length : "1"} inside one index.html</dd></div>
@@ -1628,23 +1880,21 @@ export function createBuilder(type) {
       const button = event.target.closest("[data-viewport]");
       if (!button) return;
       const mode = button.getAttribute("data-viewport");
-      if (isApp && mode === "desktop") {
-        toast({ title: "Mobile only", message: "An app is laid out for phones; the desktop frame is not offered here." }, { tone: "info" });
-        return;
-      }
-      applyViewport(mode);
+      applyViewport(mode, button.getAttribute("data-width"), button.getAttribute("data-height"));
     });
 
-    on(qs("#open-fullscreen"), "click", () => {
-      const html = S.generated?.html || S.activeVersion?.files?.["index.html"];
-      if (!html) return;
-      openModal({
-        title: `${S.project?.name || config.stageLabel} — full preview`,
-        size: "xl",
-        body: `<div style="height:70vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)">
-          <iframe sandbox="allow-scripts allow-forms" style="width:100%;height:100%;border:0;background:#fff" srcdoc="${escapeAttr(html)}"></iframe></div>`,
-        footer: `<span class="dim" style="font-size:var(--fs-2xs);margin-right:auto">Sandboxed preview · scripts cannot reach your session</span>`
-      });
+    const expandButton = qs("#open-fullscreen");
+    on(expandButton, "click", () => {
+      const expanded = qs(".builder").classList.toggle("is-expanded");
+      expandButton.setAttribute("aria-expanded", String(expanded));
+      expandButton.innerHTML = `${icon(expanded ? "minimize-2" : "maximize-2", { size: 13 })}${expanded ? "Collapse" : "Expand"}`;
+    });
+    on(document, "keydown", (event) => {
+      if (event.key === "Escape" && qs(".builder")?.classList.contains("is-expanded")) {
+        qs(".builder").classList.remove("is-expanded");
+        expandButton.setAttribute("aria-expanded", "false");
+        expandButton.innerHTML = `${icon("maximize-2", { size: 13 })}Expand`;
+      }
     });
 
     on(versionList, "click", async (event) => {
@@ -1704,7 +1954,7 @@ export function createBuilder(type) {
       event.target.value = event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-");
     });
 
-    applyViewport(isApp ? "mobile" : "desktop");
+    applyViewport(isApp ? "mobile" : "tablet", isApp ? 390 : 768, isApp ? 844 : 1024);
   };
 }
 

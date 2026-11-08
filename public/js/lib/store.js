@@ -119,7 +119,7 @@ export const displayName = () =>
   state.profile?.full_name || state.business?.name || state.user?.email?.split("@")[0] || "Founder";
 
 export const hasCompletedOnboarding = () =>
-  Boolean(state.onboarding?.completed_at) || Boolean(state.business?.name);
+  Boolean(state.onboarding?.completed_at || state.onboarding?.is_completed) || Boolean(state.business?.name);
 
 export const aiCredits = () => ({
   used: Number(state.subscription?.ai_credits_used || 0),
