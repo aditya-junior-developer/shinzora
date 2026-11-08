@@ -26,9 +26,9 @@
    this modal.
    ========================================================================== */
 
-import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261107g";
+import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261108a";
 import { icon } from "../lib/icons.js";
-import { platformMark } from "../lib/platform-icons.js?v=20261107g";
+import { platformMark } from "../lib/platform-icons.js?v=20261108a";
 
 const GUIDE_URL = "/install-guide/";
 const MANIFEST_URL = "/downloads/manifest.json";
@@ -240,6 +240,7 @@ async function downloadWithProgress(entry, onProgress) {
 /* ------------------------------------------------------------------- panel */
 
 let openInstance = null;
+let openTrigger = null;
 
 /**
  * Open the download centre.
@@ -260,7 +261,7 @@ export function openInstallPanel(options = {}) {
   const backdrop = document.createElement("div");
   backdrop.className = "ip-backdrop";
   backdrop.innerHTML = `
-    <div class="ip-panel" role="dialog" aria-modal="true" aria-labelledby="ip-title">
+    <div class="ip-panel" role="dialog" aria-modal="true" aria-labelledby="ip-title" id="install-modal">
       <div class="ip-glow" aria-hidden="true"></div>
 
       <button class="ip-close" type="button" data-ip-close aria-label="Close">
@@ -656,21 +657,26 @@ export function openInstallPanel(options = {}) {
   /* ------------------------------------------------------------------ close */
 
   function close() {
+    /* Return focus to whatever opened the dialog, so keyboard users are not
+       dropped back at the top of the document. */
+    const opener = openTrigger;
     backdrop.classList.remove("is-open");
     document.body.classList.remove("ip-open");
     document.removeEventListener("keydown", onKey);
     setTimeout(() => {
       backdrop.remove();
       openInstance = null;
+      if (opener && document.contains(opener)) opener.focus();
     }, 320);
   }
 
   function onKey(event) {
     if (event.key === "Escape") {
       event.preventDefault();
-      /* Escape steps back while inside the flow, and closes at the top. */
-      if (state.step === "device") close();
-      else back();
+      /* Escape always dismisses the dialog (WCAG 2.1.2). It used to step back
+         one screen inside the flow instead, so from a platform list it took
+         several presses before anything closed. */
+      close();
       return;
     }
     if (event.key === "Tab") {
@@ -741,6 +747,7 @@ export function initInstallPanel() {
     const trigger = event.target.closest("[data-install-open]");
     if (!trigger) return;
     event.preventDefault();
+    openTrigger = trigger;
     openInstallPanel();
   });
 

@@ -47,8 +47,12 @@
   --white: #fbfaff;
   --text: #eae6f5;
   --text-2: #a8a1bd;
-  --text-3: #7b7490;
-  --text-4: #57516b;
+  /* Was #7b7490 — 4.48:1 on the darkest surface, which fails WCAG 1.4.3 by a
+     hair. Both dim steps are now above 4.5:1 on every surface they are used on
+     (measured against #0a090e, #0b0a0f, #0e0d12 and #12101a) while keeping the
+     two-step hierarchy visible. */
+  --text-3: #8b84a0;
+  --text-4: #837c99;
 
   /* ---- Lines & strokes -------------------------------------------------- */
   --line: rgba(255, 255, 255, 0.075);
@@ -124,7 +128,9 @@
   --fs-body: 0.94rem;
   --fs-sm: 0.83rem;
   --fs-xs: 0.75rem;
-  --fs-2xs: 0.6875rem;
+  /* 0.6875rem is 11px. Nothing on the site should be below 12px: small copy is
+     the first thing people with low vision lose. */
+  --fs-2xs: 0.75rem;
 
   --lh-tight: 1.06;
   --lh-snug: 1.25;
@@ -326,7 +332,9 @@ h4 {
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 0.86em;
+  /* 0.86em of 13px is 11.2px — below the smallest size anything should render
+     at. The floor keeps the relative sizing without dropping under 12px. */
+  font-size: max(0.86em, var(--fs-2xs));
   letter-spacing: -0.01em;
 }
 
@@ -454,6 +462,9 @@ h4 {
   background: var(--purple-500);
   color: #fff;
   font-weight: 600;
+  /* Above every shell layer, including the sticky nav and the page container,
+     so the first Tab stop is never half-covered. */
+  z-index: 1000;
   transition: top var(--t-base) var(--ease);
 }
 .skip-link:focus {
@@ -580,3 +591,28 @@ h4 {
 /* [hidden] must win over component display rules. Without this, a .btn with
    display:inline-flex stays visible even when the script sets hidden. */
 [hidden] { display: none !important; }
+
+/* ==========================================================================
+   1.4.1 — links inside running text
+   --------------------------------------------------------------------------
+   A link that only changes colour is invisible to people who cannot separate
+   the two colours. Buttons, cards, navigation and icon links keep their own
+   treatment; sentences get an underline.
+   ========================================================================== */
+p a:not(.btn):not(.card):not(.contact-channel),
+li a:not(.btn):not(.nav-link):not(.menu-item):not(.footer-social-link),
+span a:not(.btn),
+dd a,
+figcaption a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+p a:not(.btn):not(.card):not(.contact-channel):hover,
+li a:not(.btn):not(.nav-link):not(.menu-item):not(.footer-social-link):hover,
+span a:not(.btn):hover,
+dd a:hover,
+figcaption a:hover {
+  text-decoration-color: currentColor;
+}

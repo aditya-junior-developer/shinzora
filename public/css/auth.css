@@ -246,7 +246,7 @@
 .auth-preview-row .apr-tag {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--text-4);
 }
 
@@ -511,7 +511,7 @@
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--lavender);
   background: rgba(124, 58, 237, 0.18);

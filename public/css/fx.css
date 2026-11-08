@@ -19,6 +19,11 @@
    -------------------------------------------------------------------------- */
 .hero {
   isolation: isolate;
+  /* The perspective grid and the depth wash are deliberately wider than the
+     viewport (inset -5%), which used to give the whole page a horizontal
+     scrollbar once text was enlarged. `clip` contains them without turning the
+     hero into a scroll container. */
+  overflow: clip;
 }
 
 .fx-stage {

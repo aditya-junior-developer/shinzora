@@ -14,7 +14,7 @@
    single background treatment now, and nothing tracks the pointer over it.
    ========================================================================== */
 
-import { autoMountAurora } from "./aurora.js?v=20261107g";
+import { autoMountAurora } from "./aurora.js?v=20261108a";
 
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
@@ -44,6 +44,13 @@ export function initHeroFx() {
   if (!hero || !stage) return;
 
   const setPaused = (paused) => stage.classList.toggle("fx-paused", paused);
+
+  /* The footer's motion switch stops the looping layers even while the hero is
+     on screen — 2.2.2 needs a user-controlled stop, not just an automatic one. */
+  document.documentElement.addEventListener("shinzora:motion", (event) => {
+    setPaused(event.detail.paused || document.hidden);
+  });
+  if (document.documentElement.classList.contains("motion-paused")) setPaused(true);
 
   if ("IntersectionObserver" in window) {
     new IntersectionObserver(([entry]) => setPaused(!entry.isIntersecting), {

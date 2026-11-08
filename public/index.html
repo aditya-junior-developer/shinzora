@@ -15,11 +15,11 @@
 <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="stylesheet" href="/css/tokens.css?v=20261107g" />
-<link rel="stylesheet" href="/css/components.css?v=20261107g" />
-<link rel="stylesheet" href="/css/marketing.css?v=20261107g" />
-<link rel="stylesheet" href="/css/marketing-sections.css?v=20261107g" />
-<link rel="stylesheet" href="/css/fx.css?v=20261107g" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261108a" />
+<link rel="stylesheet" href="/css/components.css?v=20261108a" />
+<link rel="stylesheet" href="/css/marketing.css?v=20261108a" />
+<link rel="stylesheet" href="/css/marketing-sections.css?v=20261108a" />
+<link rel="stylesheet" href="/css/fx.css?v=20261108a" />
 <script src="/js/config/runtime.js"></script>
 </head>
 <body>
@@ -71,7 +71,7 @@
     <i data-icon="download" data-size="16"></i> Install the app
   </button>
   <a class="btn btn-secondary btn-lg btn-block" href="/auth/login/">Sign in</a>
-  <a class="btn btn-primary btn-lg btn-block" href="/auth/signup/">Start free</a>
+  <a class="btn btn-primary btn-lg btn-block" href="/auth/signup/">Start free<span class="sr-only"> — create your account</span></a>
 </div>
 
 <main id="main">
@@ -93,7 +93,7 @@
     <div class="container hero-grid">
       <div class="hero-copy">
         <div class="hero-badge" data-reveal>
-          <span>AI business operating platform</span>
+          <span><abbr title="Artificial intelligence">AI</abbr> business operating platform</span>
           <span class="badge-tag">v1.0</span>
         </div>
 
@@ -131,7 +131,7 @@
                 "Draft a launch campaign for my skincare brand and a support FAQ."
               ]'></span><span class="caret" aria-hidden="true"></span>
             </div>
-            <a class="btn btn-primary btn-sm" href="/auth/signup/">Generate</a>
+            <a class="btn btn-primary btn-sm" href="/auth/signup/">Generate<span class="sr-only"> a site</span></a>
           </div>
         </div>
         <div class="prompt-hint" data-reveal data-reveal-delay="300">
@@ -188,7 +188,7 @@
                 </div>
                 <div class="pv-kpi">
                   <div class="pv-kpi-label">AI usage</div>
-                  <div class="pv-kpi-value">312<span style="font-size:9px;color:var(--text-4)">/800</span></div>
+                  <div class="pv-kpi-value">312<span class="pv-kpi-unit">/800</span></div>
                   <div class="pv-kpi-delta">resets monthly</div>
                 </div>
               </div>
@@ -321,7 +321,7 @@
           <div class="showcase-point">
             <span class="sp-index">01</span>
             <div>
-              <h4>Brief in natural language</h4>
+              <h3>Brief in natural language</h3>
               <p>Describe the business, audience and pages you need. Shinzora answers with clarifying questions
                 before writing any code.</p>
             </div>
@@ -329,7 +329,7 @@
           <div class="showcase-point">
             <span class="sp-index">02</span>
             <div>
-              <h4>Structure and design system first</h4>
+              <h3>Structure and design system first</h3>
               <p>Pages, sections, navigation and a visual system are proposed as structured data you can inspect and
                 edit — before generation begins.</p>
             </div>
@@ -337,7 +337,7 @@
           <div class="showcase-point">
             <span class="sp-index">03</span>
             <div>
-              <h4>Generate, preview, revise</h4>
+              <h3>Generate, preview, revise</h3>
               <p>HTML, CSS and JavaScript are produced and rendered in a sandboxed iframe. Ask for changes in plain
                 language; each revision becomes a numbered version.</p>
             </div>
@@ -345,7 +345,7 @@
           <div class="showcase-point">
             <span class="sp-index">04</span>
             <div>
-              <h4>Publish or hand off to GitHub</h4>
+              <h3>Publish or hand off to GitHub</h3>
               <p>Publish to a Shinzora subdomain, connect your own domain, or push the files to GitHub and deploy on
                 Vercel — only confirmed states are ever shown.</p>
             </div>
@@ -408,7 +408,8 @@
             <div class="ops-viewport">
               <div class="ops-view is-active" data-ops-view="orders">
                 <table class="ops-table">
-                  <thead><tr><th>Order</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+                  <caption class="sr-only">Recent orders, with customer, amount and fulfilment status</caption>
+                  <thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Amount</th><th scope="col">Status</th></tr></thead>
                   <tbody>
                     <tr><td class="ops-strong">#1042</td><td>Aarav Mehta</td><td>₹4,290</td><td><span class="ops-badge ok">Fulfilled</span></td></tr>
                     <tr><td class="ops-strong">#1041</td><td>Ishita Rao</td><td>₹1,850</td><td><span class="ops-badge warn">Processing</span></td></tr>
@@ -419,18 +420,20 @@
               </div>
               <div class="ops-view" data-ops-view="inventory">
                 <table class="ops-table">
-                  <thead><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Status</th></tr></thead>
+                  <caption class="sr-only">Inventory levels by product and SKU</caption>
+                  <thead><tr><th scope="col">Product</th><th scope="col">SKU</th><th scope="col">Stock</th><th scope="col">Status</th></tr></thead>
                   <tbody>
                     <tr><td class="ops-strong">Linen overshirt</td><td>SA-LO-04</td><td>38</td><td><span class="ops-badge ok">Healthy</span></td></tr>
                     <tr><td class="ops-strong">Silk scarf</td><td>SA-SS-11</td><td>6</td><td><span class="ops-badge warn">Low</span></td></tr>
-                    <tr><td class="ops-strong">Wide-leg trouser</td><td>SA-WT-02</td><td>0</td><td><span class="ops-badge" style="color:#fda4af;background:rgba(251,113,133,.14)">Out</span></td></tr>
+                    <tr><td class="ops-strong">Wide-leg trouser</td><td>SA-WT-02</td><td>0</td><td><span class="ops-badge bad">Out</span></td></tr>
                     <tr><td class="ops-strong">Cotton tote</td><td>SA-CT-07</td><td>124</td><td><span class="ops-badge ok">Healthy</span></td></tr>
                   </tbody>
                 </table>
               </div>
               <div class="ops-view" data-ops-view="support">
                 <table class="ops-table">
-                  <thead><tr><th>Ticket</th><th>Subject</th><th>Draft</th><th>Status</th></tr></thead>
+                  <caption class="sr-only">Support tickets with their draft reply and status</caption>
+                  <thead><tr><th scope="col">Ticket</th><th scope="col">Subject</th><th scope="col">Draft</th><th scope="col">Status</th></tr></thead>
                   <tbody>
                     <tr><td class="ops-strong">#318</td><td>Exchange for size M</td><td>AI draft ready</td><td><span class="ops-badge info">In review</span></td></tr>
                     <tr><td class="ops-strong">#317</td><td>Delivery delay in Pune</td><td>AI draft ready</td><td><span class="ops-badge ok">Resolved</span></td></tr>
@@ -738,13 +741,13 @@
 
       <div class="pricing-grid">
         <article class="price-card" data-reveal>
-          <div class="price-name">Free</div>
+          <h3 class="price-name">Free</h3>
           <div class="price-value">
             <span class="price-amount" data-price-monthly="₹0" data-price-yearly="₹0">₹0</span>
             <span class="price-period" data-period>forever</span>
           </div>
           <p class="price-tagline">Validate an idea and ship a first page without paying anything.</p>
-          <a class="btn btn-secondary" href="/auth/signup/?plan=free">Start free</a>
+          <a class="btn btn-secondary" href="/auth/signup/?plan=free">Start free<span class="sr-only"> on the Free plan</span></a>
           <ul class="price-features">
             <li><i data-icon="check" data-size="14" data-stroke="2.4"></i>1 project — website, app or store</li>
             <li><i data-icon="check" data-size="14" data-stroke="2.4"></i>30 AI generations per month</li>
@@ -756,13 +759,13 @@
 
         <article class="price-card is-featured" data-reveal data-reveal-delay="80">
           <span class="price-flag">Most chosen</span>
-          <div class="price-name">Pro</div>
+          <h3 class="price-name">Pro</h3>
           <div class="price-value">
             <span class="price-amount" data-price-monthly="₹2,499" data-price-yearly="₹24,990">₹2,499</span>
             <span class="price-period" data-period>/month</span>
           </div>
           <p class="price-tagline">For founders running the whole business on Shinzora.</p>
-          <a class="btn btn-primary" href="/auth/signup/?plan=pro">Choose Pro</a>
+          <a class="btn btn-primary" href="/auth/signup/?plan=pro">Choose Pro<span class="sr-only"> — ₹2,499 per month</span></a>
           <ul class="price-features">
             <li><i data-icon="check" data-size="14" data-stroke="2.4"></i>15 projects, multi-page generation</li>
             <li><i data-icon="check" data-size="14" data-stroke="2.4"></i>800 AI generations per month</li>
@@ -775,13 +778,13 @@
         </article>
 
         <article class="price-card" data-reveal data-reveal-delay="160">
-          <div class="price-name">Enterprise</div>
+          <h3 class="price-name">Enterprise</h3>
           <div class="price-value">
             <span class="price-amount" data-price-monthly="₹9,999" data-price-yearly="₹99,990">₹9,999</span>
             <span class="price-period" data-period>/month</span>
           </div>
           <p class="price-tagline">Managed operations for established teams with multiple brands.</p>
-          <a class="btn btn-secondary" href="/auth/signup/?plan=enterprise">Talk to us</a>
+          <a class="btn btn-secondary" href="/auth/signup/?plan=enterprise">Talk to us<span class="sr-only"> about the Enterprise plan</span></a>
           <ul class="price-features">
             <li><i data-icon="check" data-size="14" data-stroke="2.4"></i>100 projects, unlimited pages</li>
             <li><i data-icon="check" data-size="14" data-stroke="2.4"></i>6,000 AI generations per month</li>
@@ -819,7 +822,7 @@
       </div>
 
       <div class="faq-list" data-accordion>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             Do I need technical skills to use Shinzora?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -829,7 +832,7 @@
             JavaScript are yours to read and export if you are technical, but nothing requires you to write code.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             Which AI model is used, and where does my data go?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -840,7 +843,7 @@
             review and delete them.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             Is generated code safe to run?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -851,7 +854,7 @@
             explicit action.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             Can I connect my own domain?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -863,7 +866,7 @@
             invent availability or prices.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             How are payments verified?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -874,7 +877,7 @@
             the same flows switch to signature-verified webhooks instead.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             What happens if I cancel? Do I lose my website?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -884,7 +887,7 @@
             Downgrading to Free applies Free plan limits to new generations and projects rather than deleting your work.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             Is there a mobile or desktop app?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -894,7 +897,7 @@
             there is no separate native app to download, and we do not pretend otherwise.
           </div></div>
         </div>
-        <div class="faq-item" data-acc-item aria-expanded="false">
+        <div class="faq-item" data-acc-item>
           <button class="faq-trigger" data-acc-trigger aria-expanded="false">
             Who can see my business data?
             <span class="faq-icon"><i data-icon="plus" data-size="13" data-stroke="2.2"></i></span>
@@ -1020,7 +1023,7 @@
           instead of eleven.</p>
       </div>
       <div class="footer-col">
-        <h4>Product</h4>
+        <h3 class="footer-col-title">Product</h3>
         <ul>
           <li><a href="#ai-builder">AI website builder</a></li>
           <li><a href="#operations">Business OS</a></li>
@@ -1033,7 +1036,7 @@
         </ul>
       </div>
       <div class="footer-col">
-        <h4>Account</h4>
+        <h3 class="footer-col-title">Account</h3>
         <ul>
           <li><a href="/auth/signup/">Create account</a></li>
           <li><a href="/auth/login/">Sign in</a></li>
@@ -1043,7 +1046,7 @@
         </ul>
       </div>
       <div class="footer-col">
-        <h4>Company</h4>
+        <h3 class="footer-col-title">Company</h3>
         <ul>
           <li><a href="#contact">Contact</a></li>
           <li><a href="#faq">FAQ</a></li>
@@ -1054,14 +1057,17 @@
       </div>
     </div>
     <div class="footer-bottom">
+      <button class="footer-motion" type="button" data-motion-toggle aria-pressed="false">
+        <i data-icon="pause" data-size="13"></i><span data-motion-label>Pause motion</span>
+      </button>
       <span class="footer-copyright">© <span data-year>2026</span> Shinzora. All rights reserved.</span>
       <nav class="footer-social" aria-label="Shinzora on social platforms">
         <a class="footer-social-link" href="https://www.instagram.com/shinzora.ai/" target="_blank" rel="noopener noreferrer"
-           aria-label="Shinzora on Instagram" title="Instagram"><i data-icon="instagram" data-size="16"></i></a>
+           aria-label="Shinzora on Instagram (opens in a new tab)" title="Instagram"><i data-icon="instagram" data-size="16"></i></a>
         <a class="footer-social-link" href="https://www.youtube.com/@ai.shinzora" target="_blank" rel="noopener noreferrer"
-           aria-label="Shinzora on YouTube" title="YouTube"><i data-icon="youtube" data-size="16"></i></a>
+           aria-label="Shinzora on YouTube (opens in a new tab)" title="YouTube"><i data-icon="youtube" data-size="16"></i></a>
         <a class="footer-social-link" href="http://wa.me/917703815245?text=hello%20shinzora" target="_blank" rel="noopener noreferrer"
-           aria-label="Chat with Shinzora on WhatsApp" title="WhatsApp"><i data-icon="whatsapp" data-size="16"></i></a>
+           aria-label="Chat with Shinzora on WhatsApp (opens in a new tab)" title="WhatsApp"><i data-icon="whatsapp" data-size="16"></i></a>
         <a class="footer-social-link" href="mailto:official.shinzora@proton.me"
            aria-label="Email Shinzora at official.shinzora@proton.me" title="Email"><i data-icon="mail" data-size="16"></i></a>
       </nav>
@@ -1091,7 +1097,7 @@
 </div>
 
 <script src="/js/vendor/supabase-js.js"></script>
-<script type="module" src="/js/boot/site-auth.js?v=20261107g"></script>
-<script type="module" src="/js/boot/landing.js?v=20261107g"></script>
+<script type="module" src="/js/boot/site-auth.js?v=20261108a"></script>
+<script type="module" src="/js/boot/landing.js?v=20261108a"></script>
 </body>
 </html>

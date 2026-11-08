@@ -283,7 +283,7 @@
   color: var(--text-2);
   transition: transform var(--t-base) var(--ease), background var(--t-base) var(--ease), color var(--t-base) var(--ease);
 }
-.faq-item[aria-expanded="true"] .faq-icon {
+.faq-item.is-open .faq-icon {
   transform: rotate(45deg);
   background: rgba(124, 58, 237, 0.28);
   border-color: rgba(168, 85, 247, 0.5);
@@ -293,6 +293,11 @@
   max-height: 0;
   overflow: hidden;
   transition: max-height var(--t-slow) var(--ease);
+}
+/* A collapsed panel is `hidden`, so it must not be laid out at all: the class
+   rule above is a no-op on a hidden element, and this keeps it that way. */
+.faq-panel[hidden] {
+  display: none;
 }
 .faq-panel-inner {
   padding-bottom: var(--s-4);
@@ -493,7 +498,7 @@
   color: var(--text-3);
   line-height: 1.65;
 }
-.footer-col h4 {
+.footer-col-title {
   font-size: var(--fs-2xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;

@@ -171,27 +171,56 @@ export function initTyping() {
   tick();
 }
 
-/** Accordion behaviour for the FAQ (one open at a time, keyboard friendly). */
+/**
+ * Accordion behaviour for the FAQ (one open at a time, keyboard friendly).
+ *
+ * The open/closed state belongs to the <button>. Putting `aria-expanded` on the
+ * wrapping <div> announced nothing — a plain div has no supported ARIA state —
+ * so the state now lives on the trigger, the panel carries the id the trigger
+ * points at with `aria-controls`, and a closed panel is `hidden` instead of
+ * merely collapsed to zero height (a zero-height panel was still read out by
+ * screen readers and still reachable with the Tab key).
+ */
 export function initAccordion(root = document) {
-  root.querySelectorAll("[data-accordion]").forEach((group) => {
+  root.querySelectorAll("[data-accordion]").forEach((group, groupIndex) => {
+    /* Wire each trigger to its panel once, so the relationship survives without
+       hand-written ids in the markup. */
+    group.querySelectorAll("[data-acc-item]").forEach((item, itemIndex) => {
+      const trigger = item.querySelector("[data-acc-trigger]");
+      const panel = item.querySelector("[data-acc-panel]");
+      if (!trigger || !panel) return;
+      if (!panel.id) panel.id = `faq-panel-${groupIndex + 1}-${itemIndex + 1}`;
+      trigger.setAttribute("aria-controls", panel.id);
+      trigger.setAttribute("aria-expanded", "false");
+      if (trigger.tagName === "BUTTON" && !trigger.getAttribute("type")) trigger.type = "button";
+      panel.hidden = true;
+      item.classList.remove("is-open");
+    });
+
+    const setOpen = (item, open) => {
+      const trigger = item.querySelector("[data-acc-trigger]");
+      const panel = item.querySelector("[data-acc-panel]");
+      if (!trigger || !panel) return;
+      trigger.setAttribute("aria-expanded", String(open));
+      item.classList.toggle("is-open", open);
+      if (open) {
+        panel.hidden = false;
+        panel.style.maxHeight = `${panel.scrollHeight}px`;
+      } else {
+        panel.style.maxHeight = "0px";
+        panel.hidden = true;
+      }
+    };
+
     group.addEventListener("click", (event) => {
       const trigger = event.target.closest("[data-acc-trigger]");
       if (!trigger) return;
       const item = trigger.closest("[data-acc-item]");
-      const panel = item.querySelector("[data-acc-panel]");
-      const open = item.getAttribute("aria-expanded") === "true";
+      const open = trigger.getAttribute("aria-expanded") === "true";
       if (!group.hasAttribute("data-accordion-multi")) {
-        group.querySelectorAll("[data-acc-item]").forEach((other) => {
-          other.setAttribute("aria-expanded", "false");
-          other.querySelector("[data-acc-panel]").style.maxHeight = "0px";
-          other.querySelector("[data-acc-trigger]").setAttribute("aria-expanded", "false");
-        });
+        group.querySelectorAll("[data-acc-item]").forEach((other) => setOpen(other, false));
       }
-      if (!open) {
-        item.setAttribute("aria-expanded", "true");
-        trigger.setAttribute("aria-expanded", "true");
-        panel.style.maxHeight = `${panel.scrollHeight}px`;
-      }
+      if (!open) setOpen(item, true);
     });
   });
 }

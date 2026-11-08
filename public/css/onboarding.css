@@ -78,7 +78,7 @@
   border-radius: 50%;
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.03);
-  font-size: 10.5px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--text-3);
   transition: all var(--t-base) var(--ease);
@@ -440,7 +440,7 @@
   padding: 2px 7px;
   border-radius: var(--r-pill);
   background: var(--grad-brand);
-  font-size: 9px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;

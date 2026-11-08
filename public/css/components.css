@@ -725,7 +725,7 @@
   padding-inline: 5px;
   border-radius: 5px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-2xs);
   color: var(--text-3);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--line-strong);
@@ -1883,7 +1883,7 @@ body.ip-open {
   color: var(--text-3);
 }
 .ip-here {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--violet-soft, #c4b5fd);
@@ -1892,7 +1892,7 @@ body.ip-open {
   padding: 1px 7px;
 }
 .ip-chip {
-  font-size: 10.5px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.04em;
   color: var(--text-3);
   border: 1px solid var(--line);

@@ -72,7 +72,7 @@ function paint() {
   wrap.className = "site-account";
   wrap.innerHTML = `
     <button class="site-account-btn" type="button" aria-haspopup="menu" aria-expanded="false"
-            aria-label="Account menu for ${esc(who)}">
+            aria-label="${esc(initials(who))} — account menu for ${esc(who)}">
       <span class="site-account-avatar" data-site-account-initials>${esc(initials(who))}</span>
     </button>
     <div class="menu site-account-menu" role="menu" hidden>

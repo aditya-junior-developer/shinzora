@@ -257,6 +257,17 @@ export function mountAurora(canvas, options = {}) {
     else if (observer) start();
   });
 
+  /* The footer's pause switch (WCAG 2.2.2) stops the canvas on a still frame
+     and resumes the drift when motion is turned back on. */
+  document.documentElement.addEventListener("shinzora:motion", (event) => {
+    if (event.detail.paused) {
+      stop();
+      draw(0);
+    } else if (!document.hidden) {
+      start();
+    }
+  });
+
   const onMotionChange = (event) => {
     if (event.matches) {
       stop();
