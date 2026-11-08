@@ -96,7 +96,17 @@
       "permanent": false
     },
     {
+      "source": "/dashboard/",
+      "destination": "/app/",
+      "permanent": false
+    },
+    {
       "source": "/login",
+      "destination": "/auth/login/",
+      "permanent": false
+    },
+    {
+      "source": "/login/",
       "destination": "/auth/login/",
       "permanent": false
     },
@@ -106,7 +116,17 @@
       "permanent": false
     },
     {
+      "source": "/signup/",
+      "destination": "/auth/signup/",
+      "permanent": false
+    },
+    {
       "source": "/pricing",
+      "destination": "/#pricing",
+      "permanent": false
+    },
+    {
+      "source": "/pricing/",
       "destination": "/#pricing",
       "permanent": false
     }
@@ -114,6 +134,10 @@
   "rewrites": [
     {
       "source": "/site/:slug",
+      "destination": "/site/index.html?p=:slug"
+    },
+    {
+      "source": "/site/:slug/",
       "destination": "/site/index.html?p=:slug"
     }
   ]
