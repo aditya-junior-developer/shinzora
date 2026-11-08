@@ -20,7 +20,7 @@ export function providerFlags() {
       configured: geminiConfigured(),
       model: geminiConfigured() ? env("SHINZORA_AI_MODEL") || env("GEMINI_MODEL") || "gemini-2.0-flash" : null,
       // Names the operator the exact secret to set when AI is not configured.
-      key_env: geminiConfigured() ? null : "SHINZORA_AI_API_KEY"
+      key_env: geminiConfigured() ? null : "SHINZORA_AI_API_KEY_1"
     },
     payments: {
       upi_configured: Boolean(upiId),

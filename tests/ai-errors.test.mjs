@@ -93,13 +93,13 @@ check("no developer URL leaks", !/generativelanguage|ai\.google\.dev|rate-limits
 /* The provider limit belongs to the platform's own account. Telling a customer
    "your allowance is used up" was a false statement about their plan. */
 check("the limit is not blamed on the customer's plan", !/your (plan|allowance is used)/i.test(quota.message), quota.message);
-check("the customer is told the build did not start", /did not start/i.test(quota.message), quota.message);
-check("the customer is told nothing was charged", /Nothing was taken from your allowance/i.test(quota.message), quota.message);
+check("the customer is not told the background build never started", !/did not start/i.test(quota.message), quota.message);
+check("the customer is told no AI credit was charged", /No AI credit was charged/i.test(quota.message), quota.message);
 
 const zero = providerError(429, ZERO_LIMIT_BODY);
-check("a zero limit is described as the provider account, not the customer's plan",
-  /not enabled on the provider account/i.test(zero.message), zero.message);
-check("a zero limit also promises no charge", /Nothing was taken from your allowance/i.test(zero.message), zero.message);
+check("a zero limit stays provider-neutral",
+  !/provider account|key [1-4]/i.test(zero.message), zero.message);
+check("a zero limit also promises no charge", /No AI credit was charged/i.test(zero.message), zero.message);
 
 const rate = providerError(429, "Too many requests. Retry in 12s.");
 check("a fast limit stays a fast limit", rate.code === "ai_rate_limited", rate.code);

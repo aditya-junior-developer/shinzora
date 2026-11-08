@@ -107,7 +107,15 @@ export function modelLabel(id: string): string {
 }
 
 function key(): string {
-  for (const name of ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"]) {
+  for (const name of [
+    "SHINZORA_AI_API_KEY_1",
+    "SHINZORA_AI_API_KEY_2",
+    "SHINZORA_AI_API_KEY_3",
+    "SHINZORA_AI_API_KEY_4",
+    "SHINZORA_AI_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY"
+  ]) {
     const value = (Deno.env.get(name) ?? "").trim();
     if (value) return value;
   }

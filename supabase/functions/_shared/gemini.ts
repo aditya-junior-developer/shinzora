@@ -132,17 +132,14 @@ export function providerError(status: number, detail: string): GeminiError {
   const retryAfter = extractRetrySeconds(detail);
 
   if (status === 429) {
-    /* This limit belongs to the platform's own provider account. A customer
-       reading "your allowance is used up" was reading about somebody else's
-       key, so the message now says what happened, says the build did not start,
-       and says nothing was charged. */
+    /* Credential counts and rotation are internal implementation details. */
     if (isQuotaExhausted(detail)) {
       const window = retryAfter ? ` It resets in ${describeWait(retryAfter)}.` : "";
       const zeroLimit = /limit:\s*0\b/.test(detail);
       return new GeminiError(
         zeroLimit
-          ? "This AI feature is not enabled on the provider account this platform uses, so the build did not start. Nothing was taken from your allowance."
-          : `The AI service has reached its current limit, so this build did not start.${window} Nothing was taken from your allowance.`,
+          ? "The AI service is temporarily unavailable. No AI credit was charged. Try again later."
+          : `The AI service is temporarily unavailable.${window} No AI credit was charged. Try again later.`,
         "ai_quota_exhausted",
         429,
         retryAfter
@@ -179,18 +176,40 @@ export function providerError(status: number, detail: string): GeminiError {
  * changes. `GEMINI_API_KEY` is still honoured so an existing deployment that
  * already set it keeps working without a rename.
  */
-const AI_KEY_NAMES = ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
+const ROTATING_AI_KEY_NAMES = [
+  "SHINZORA_AI_API_KEY_1",
+  "SHINZORA_AI_API_KEY_2",
+  "SHINZORA_AI_API_KEY_3",
+  "SHINZORA_AI_API_KEY_4"
+] as const;
+const LEGACY_AI_KEY_NAMES = ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
+let preferredKeyIndex = 0;
+type ConfiguredAIKey = { name: string; value: string };
+
+function configuredAIKeys(): ConfiguredAIKey[] {
+  const numbered = ROTATING_AI_KEY_NAMES
+    .map((name) => ({ name, value: (Deno.env.get(name) ?? "").trim() }))
+    .filter((key) => key.value.length > 10);
+  if (numbered.length) return numbered;
+  for (const name of LEGACY_AI_KEY_NAMES) {
+    const value = (Deno.env.get(name) ?? "").trim();
+    if (value.length > 10) return [{ name, value }];
+  }
+  return [];
+}
 
 export function geminiKey(): string {
-  for (const name of AI_KEY_NAMES) {
-    const value = (Deno.env.get(name) ?? "").trim();
-    if (value) return value;
-  }
-  return "";
+  const keys = configuredAIKeys();
+  return keys.length ? keys[Math.min(preferredKeyIndex, keys.length - 1)].value : "";
 }
 
 export function geminiConfigured(): boolean {
-  return geminiKey().length > 10;
+  return configuredAIKeys().length > 0;
+}
+
+/** Test seam; does not affect production request behavior. */
+export function __resetGeminiKeyRotationForTest() {
+  preferredKeyIndex = 0;
 }
 
 type Part = { text: string };
@@ -213,9 +232,38 @@ export interface GeminiOptions {
   thinkingBudget?: number;
 }
 
-/** Low-level call. Throws GeminiError with a stable code for the UI. */
+/** Low-level call; credential failover is internal and quota-only. */
 export async function gemini(parts: string | Part[], options: GeminiOptions = {}): Promise<string> {
-  const key = geminiKey();
+  const keys = configuredAIKeys();
+  if (!keys.length) throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
+  const chain = options.model ? [options.model] : await resolvedModelChain(options.capability ?? "site");
+  const start = Math.min(preferredKeyIndex, keys.length - 1);
+  let exhausted: GeminiError | null = null;
+  for (let offset = 0; offset < keys.length; offset++) {
+    const index = (start + offset) % keys.length;
+    try {
+      const result = await geminiWithKey(parts, options, keys[index].value, chain);
+      preferredKeyIndex = index;
+      return result;
+    } catch (error) {
+      if (error instanceof GeminiError && error.code === "ai_quota_exhausted") {
+        exhausted = error;
+        preferredKeyIndex = (index + 1) % keys.length;
+        continue;
+      }
+      throw error;
+    }
+  }
+  preferredKeyIndex = 0;
+  throw exhausted || new GeminiError("The AI service is temporarily unavailable.", "ai_quota_exhausted", 429);
+}
+
+async function geminiWithKey(
+  parts: string | Part[],
+  options: GeminiOptions,
+  key: string,
+  chain: string[]
+): Promise<string> {
   if (!geminiConfigured()) {
     throw new GeminiError(
       "AI generation is not configured on this deployment.",
@@ -254,7 +302,6 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
   /* An explicit model is honoured exactly: if the caller asked for it, guessing
      a different one would make the choice in the UI a lie. Otherwise the live
      chain is used. */
-  const chain = options.model ? [options.model] : await resolvedModelChain(options.capability ?? "site");
   let lastRetryable: GeminiError | null = null;
 
   for (const model of chain) {
@@ -397,10 +444,35 @@ export async function geminiGrounded(
   prompt: string,
   options: GeminiOptions = {}
 ): Promise<GroundedAnswer> {
-  const key = geminiKey();
-  if (!geminiConfigured()) {
-    throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
+  const keys = configuredAIKeys();
+  if (!keys.length) throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
+  const start = Math.min(preferredKeyIndex, keys.length - 1);
+  let exhausted: GeminiError | null = null;
+  for (let offset = 0; offset < keys.length; offset++) {
+    const index = (start + offset) % keys.length;
+    try {
+      const answer = await geminiGroundedWithKey(prompt, options, keys[index].value);
+      preferredKeyIndex = index;
+      return answer;
+    } catch (error) {
+      if (error instanceof GeminiError && error.code === "ai_quota_exhausted") {
+        exhausted = error;
+        preferredKeyIndex = (index + 1) % keys.length;
+        continue;
+      }
+      throw error;
+    }
   }
+  preferredKeyIndex = 0;
+  throw exhausted || new GeminiError("The AI service is temporarily unavailable.", "ai_quota_exhausted", 429);
+}
+
+async function geminiGroundedWithKey(
+  prompt: string,
+  options: GeminiOptions,
+  key: string
+): Promise<GroundedAnswer> {
+  if (!key || !geminiConfigured()) throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
 
   const body: Record<string, unknown> = {
     contents: [{ role: "user", parts: [{ text: prompt }] }],

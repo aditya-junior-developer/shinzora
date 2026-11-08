@@ -14,9 +14,12 @@
 // ============================================================================
 
 import { assertEquals, assertRejects, assertStringIncludes } from "jsr:@std/assert@1";
-import { defaultModel, GeminiError, estimateTokens, gemini, geminiConfigured, geminiJson, geminiKey, modelChain } from "./gemini.ts";
+import { __resetGeminiKeyRotationForTest, defaultModel, GeminiError, estimateTokens, gemini, geminiConfigured, geminiJson, geminiKey, modelChain } from "./gemini.ts";
 
-const KEY_VARS = ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
+const KEY_VARS = [
+  "SHINZORA_AI_API_KEY_1", "SHINZORA_AI_API_KEY_2", "SHINZORA_AI_API_KEY_3", "SHINZORA_AI_API_KEY_4",
+  "SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
+] as const;
 
 function clearKeys() {
   for (const name of KEY_VARS) Deno.env.delete(name);
@@ -80,18 +83,45 @@ Deno.test("a key shorter than a real key counts as unconfigured", () => {
   clearKeys();
 });
 
-Deno.test("key precedence: SHINZORA_AI_API_KEY beats GEMINI_API_KEY beats GOOGLE_API_KEY", () => {
-  withKeys({ SHINZORA_AI_API_KEY: "primary-key-0000000000", GEMINI_API_KEY: "secondary-key-0000", GOOGLE_API_KEY: "tertiary-key-00000" });
-  assertEquals(geminiKey(), "primary-key-0000000000");
-
-  withKeys({ GEMINI_API_KEY: "secondary-key-0000", GOOGLE_API_KEY: "tertiary-key-00000" });
-  assertEquals(geminiKey(), "secondary-key-0000");
-
+Deno.test("numbered server keys take priority in order; legacy keys remain compatible", () => {
+  __resetGeminiKeyRotationForTest();
+  withKeys({ SHINZORA_AI_API_KEY_1: "rotation-one-key-000000", SHINZORA_AI_API_KEY_2: "rotation-two-key-000000", SHINZORA_AI_API_KEY: "legacy-key-0000000000" });
+  assertEquals(geminiKey(), "rotation-one-key-000000");
+  clearKeys();
+  withKeys({ SHINZORA_AI_API_KEY: "legacy-key-0000000000", GEMINI_API_KEY: "secondary-key-0000", GOOGLE_API_KEY: "tertiary-key-00000" });
+  assertEquals(geminiKey(), "legacy-key-0000000000");
+  withKeys({ GEMINI_API_KEY: "secondary-key-0000000000", GOOGLE_API_KEY: "tertiary-key-00000" });
+  assertEquals(geminiKey(), "secondary-key-0000000000");
   withKeys({ GOOGLE_API_KEY: "tertiary-key-00000" });
   assertEquals(geminiKey(), "tertiary-key-00000");
   clearKeys();
 });
 
+Deno.test("provider quota on one key silently tries the next key with the same model", async () => {
+  __resetGeminiKeyRotationForTest();
+  withKeys({ SHINZORA_AI_API_KEY_1: "rotation-one-key-000000", SHINZORA_AI_API_KEY_2: "rotation-two-key-000000" });
+  const stub = stubFetch((call) => {
+    const headers = new Headers(call.init.headers);
+    if (headers.get("x-goog-api-key") === "rotation-one-key-000000") {
+      return new Response(JSON.stringify({ error: { message: "You exceeded your current quota. Please retry in 1h." } }), { status: 429 });
+    }
+    return okResponse("built by the next key");
+  });
+  try {
+    const result = await gemini("build", { model: "gemini-3.8-flash" });
+    assertEquals(result, "built by the next key");
+    const calls = generationCalls(stub.calls);
+    assertEquals(calls.length, 2);
+    assertEquals(new Headers(calls[0].init.headers).get("x-goog-api-key"), "rotation-one-key-000000");
+    assertEquals(new Headers(calls[1].init.headers).get("x-goog-api-key"), "rotation-two-key-000000");
+    assertStringIncludes(calls[0].url, "gemini-3.8-flash");
+    assertStringIncludes(calls[1].url, "gemini-3.8-flash");
+  } finally {
+    stub.restore();
+    clearKeys();
+    __resetGeminiKeyRotationForTest();
+  }
+});
 Deno.test("surrounding whitespace in the secret is tolerated", () => {
   withKeys({ SHINZORA_AI_API_KEY: "  key-with-padding-0000000  \n" });
   assertEquals(geminiKey(), "key-with-padding-0000000");
