@@ -133,12 +133,12 @@
   ],
   "rewrites": [
     {
-      "source": "/site/:slug",
-      "destination": "/site/index.html?p=:slug"
+      "source": "/site/:slug/",
+      "destination": "/site/?p=:slug"
     },
     {
-      "source": "/site/:slug/",
-      "destination": "/site/index.html?p=:slug"
+      "source": "/site/:slug",
+      "destination": "/site/?p=:slug"
     }
   ]
 }
