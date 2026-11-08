@@ -322,7 +322,10 @@ export function createBuilder(type) {
     /* --------------------------------------------------------------- fields */
     function fieldMarkup(field) {
       const value = S.answers[S.stage]?.[field.id];
-      const label = `<label class="field-label" for="f-${field.id}">${esc(field.label)}${field.required ? "" : ' <span class="dim">optional</span>'}</label>`;
+      /* "optional" is a promise, so a field that a later stage will insist on
+         must not carry it. `field.optionalNote` replaces the word. */
+      const marker = field.required ? "" : ` <span class="dim">${esc(field.optionalNote || "optional")}</span>`;
+      const label = `<label class="field-label" for="f-${field.id}">${esc(field.label)}${marker}</label>`;
       const hint = field.hint ? `<div class="field-hint">${esc(field.hint)}</div>` : "";
 
       if (field.type === "textarea") {
