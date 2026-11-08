@@ -7,6 +7,10 @@
 //
 //   action: chat            { message, conversationId?, context? }
 //   action: generate        { type, name, brief, pages[], style, projectId?, business? }
+//   action: build_start     { type, name, brief, pages[], style, business? }
+//                           → creates the project + job, answers immediately
+//   action: build_step      { jobId }  → runs one unit of work, saves, returns
+//   action: build_status    { jobId }  → honest progress for the builder UI
 //   action: revise          { files, instruction, projectId?, versionId? }
 //   action: domain_ideas    { business?, count? }
 //   action: copy            { kind: 'marketing_plan' | 'product', ... }
@@ -38,6 +42,9 @@ import {
   geminiJson
 } from "../_shared/gemini.ts";
 import {
+  buildPagePrompt,
+  buildPlanPrompt,
+  buildStylesPrompt,
   CHAT_SYSTEM,
   DOMAIN_IDEAS_PROMPT,
   generationPrompt,
@@ -88,6 +95,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    /* Reading a build is free, and stepping one must never spend a second
+       credit: one build is one generation from the owner's allowance. */
+    if (action === "build_status") return await handleBuildStatus(caller, body);
+    if (action === "build_step") return await handleBuildStep(caller, req, body);
+
     const quota = await ensureQuota(caller.user.id, mode);
     if (quota && quota.ok !== false) charged = true;
     if (quota && quota.ok === false) {
@@ -102,6 +114,8 @@ Deno.serve(async (req) => {
         return await handleChat(caller, body);
       case "generate":
         return await handleGenerate(caller, body, quota);
+      case "build_start":
+        return await handleBuildStart(caller, body, req, quota);
       case "revise":
         return await handleRevise(caller, body);
       case "domain_ideas":
@@ -751,4 +765,500 @@ async function handleSupportReply(caller: Caller, body: Record<string, unknown>)
 
   await logUsage(caller.user.id, "support_reply", JSON.stringify(ticket).slice(0, 400), reply);
   return json({ reply, needs_owner: Boolean(parsed.needs_owner) });
+}
+
+/* ============================================================================
+   Chunked, resumable build
+   ----------------------------------------------------------------------------
+   Why this exists: one call that generated the whole site — plan, every page,
+   the stylesheet and the script — produced a response bigger than the runtime
+   can parse, and the invocation was killed with HTTP 546 ("Function failed due
+   to not having enough compute resources"). The owner saw a red line instead of
+   a website.
+
+   The build is therefore split into small steps that are each saved before the
+   next one starts:
+
+     plan    → design system, page list, section outline          (one small call)
+     styles  → styles.css + app.js                                (one small call)
+     page N  → one HTML document                                  (one small call)
+     finish  → mark the job done, notify the owner
+
+   Each step is claimed with a compare-and-set on `updated_at`, so two tabs (or
+   the background chain and a polling client) can never run the same step twice.
+   The state lives in `ai_generation_jobs.meta`, so a step that fails — provider
+   hiccup, rate limit, killed invocation — resumes exactly where it stopped
+   instead of throwing the work away.
+   ========================================================================== */
+
+const BUILD_MAX_PAGES = 3;
+const BUILD_MAX_ATTEMPTS = 3;
+const BUILD_STEPS = ["plan", "styles", "pages", "finish"] as const;
+
+type BuildJob = Record<string, any>;
+
+function buildProgress(meta: BuildJob, plan: BuildJob | null, done = false): number {
+  if (done) return 100;
+  if (!plan) return Math.min(8, 2 + Number(meta.attempts || 0));
+  const pages: any[] = plan.pages || [];
+  const totalPages = Math.max(pages.length, 1);
+  const pageIndex = Number(meta.page_index || 0);
+  if (!meta.styles) return 20;
+  if (pageIndex < pages.length) return 20 + Math.round((pageIndex / totalPages) * 65);
+  return 92;
+}
+
+function buildStages(meta: BuildJob, plan: BuildJob | null, done = false) {
+  const pages: any[] = plan?.pages || [];
+  const pageIndex = Number(meta.page_index || 0);
+  return [
+    { id: "plan", label: "Reading the brief and planning the pages", done: Boolean(plan) },
+    { id: "styles", label: "Designing the shared stylesheet", done: Boolean(meta.styles) },
+    ...pages.map((page: any, index: number) => ({
+      id: `page-${index + 1}`,
+      label: `Writing ${page.name || page.file}`,
+      done: done || index < pageIndex
+    })),
+    { id: "finish", label: "Checking the result and saving the version", done }
+  ];
+}
+
+function buildPayload(job: BuildJob, extra: Record<string, unknown> = {}) {
+  const meta = job.meta || {};
+  return {
+    jobId: job.id,
+    projectId: job.project_id,
+    status: job.status,
+    stage: job.stage,
+    progress: Number(job.progress || 0),
+    stages: buildStages(meta, meta.plan || null, job.status === "succeeded"),
+    pagesTotal: (meta.plan?.pages || []).length,
+    pagesDone: Number(meta.page_index || 0),
+    notes: meta.plan?.notes || null,
+    error: job.error || null,
+    updatedAt: job.updated_at,
+    ...extra
+  };
+}
+
+/** Queue the next step of a build so it continues without a browser open. */
+function scheduleBuildStep(req: Request, jobId: string) {
+  const url = `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/ai`;
+  const authorization = req.headers.get("authorization") ?? "";
+  const apikey = Deno.env.get("SUPABASE_ANON_KEY") ?? req.headers.get("apikey") ?? "";
+  if (!url.startsWith("http") || !authorization) return;
+
+  const run = fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization, apikey },
+    body: JSON.stringify({ action: "build_step", jobId })
+  }).then((response) => response.text()).catch(() => undefined);
+
+  /* On Supabase the request finishes as soon as the response is written, unless
+     the work is handed to waitUntil. Without it the chain would be cut off at
+     the first step. */
+  const runtime = (globalThis as any).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(run);
+  else void run;
+}
+
+/* --------------------------------------------------------------- build_start */
+
+async function handleBuildStart(
+  caller: Caller,
+  body: Record<string, unknown>,
+  req: Request,
+  quota: Record<string, unknown> | null = null
+) {
+  const type = (clean(body.type, 20) || "website") as "website" | "app" | "store";
+  if (!["website", "app", "store"].includes(type)) {
+    return fail(400, "invalid_input", "type must be website, app or store.");
+  }
+
+  const brief = clean(body.brief, 4000);
+  if (brief.length < 20) {
+    return fail(400, "invalid_input", "Describe the project in at least a sentence or two.", {
+      hint: "A good brief says what the business sells, who it serves and what the main action should be."
+    });
+  }
+
+  const name = clean(body.name, 90) || "Untitled project";
+  const style = clean(body.style, 400) || "Editorial dark, restrained, premium";
+  const pages = cleanList(body.pages, 8).slice(0, BUILD_MAX_PAGES);
+
+  const chosen = clean(body.model, 80);
+  if (chosen && !(await isUsable(chosen, "site"))) {
+    return fail(400, "model_unavailable", "That model is not available on this deployment right now.", {
+      hint: "Pick another model, or leave it on Automatic."
+    });
+  }
+
+  const db = admin();
+
+  /* One website, one app, one store per account.
+     A second build would leave the owner with two half-finished sites and no
+     clear answer to "which one is mine?" — so the server refuses it and sends
+     the builder to the project that already exists, where the same work becomes
+     an update. */
+  const { data: existing } = await db
+    .from("projects")
+    .select("id, name, type, status, version_count, slug")
+    .eq("owner_id", caller.user.id)
+    .eq("type", type)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    /* A build already running for this account: hand back its id instead of
+       starting a second one. Two jobs writing to one project would each think
+       they own the result. */
+    const { data: live } = await db
+      .from("ai_generation_jobs")
+      .select("id, status, progress")
+      .eq("project_id", existing.id)
+      .in("status", ["queued", "running"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (live) {
+      return fail(409, "build_in_progress", "A build for this project is already running.", {
+        hint: "The builder is following it. It continues on the server even if the tab is closed.",
+        job: { id: live.id, status: live.status, progress: live.progress },
+        project: { id: existing.id, name: existing.name, status: existing.status, slug: existing.slug }
+      });
+    }
+
+    /* Anything already produced — a saved version, or a build that finished but
+       was never confirmed — is the owner's project. A second one would split
+       their work in two, so the answer is "update that one". */
+    const { data: finished } = await db
+      .from("ai_generation_jobs")
+      .select("id")
+      .eq("project_id", existing.id)
+      .eq("status", "succeeded")
+      .limit(1)
+      .maybeSingle();
+
+    if (Number(existing.version_count || 0) > 0 || finished) {
+      return fail(409, "project_exists", `You already have a ${type === "app" ? "app" : "website"} called “${existing.name}”.`, {
+        hint: "Open it and update it: a new project would replace nothing and divide your work in two.",
+        project: { id: existing.id, name: existing.name, status: existing.status, slug: existing.slug }
+      });
+    }
+  }
+
+  /* An interrupted earlier build leaves a project with no saved version. That
+     project is reused rather than duplicated. */
+  let project = existing;
+  if (!project) {
+    const slug = `${(name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project").slice(0, 40)}-${Math.random().toString(36).slice(2, 6)}`;
+    const { data: created, error } = await db
+      .from("projects")
+      .insert({
+        owner_id: caller.user.id,
+        business_id: null,
+        name,
+        description: brief.slice(0, 280),
+        type,
+        status: "building",
+        slug,
+        framework: "html",
+        preview_data: { pages, chunked: true }
+      })
+      .select("id, name, type, status, version_count, slug")
+      .single();
+    if (error) throw new Error(`Could not create the project: ${error.message}`);
+    project = created;
+  } else {
+    await db.from("projects").update({ name, status: "building", updated_at: new Date().toISOString() }).eq("id", project.id);
+  }
+
+  const { data: job, error: jobError } = await db
+    .from("ai_generation_jobs")
+    .insert({
+      user_id: caller.user.id,
+      project_id: project.id,
+      kind: type,
+      status: "running",
+      stage: "plan",
+      stages: [],
+      progress: 2,
+      prompt: brief,
+      meta: {
+        name,
+        type,
+        brief,
+        style,
+        pages,
+        model: chosen || null,
+        plan: null,
+        styles: null,
+        page_index: 0,
+        attempts: 0,
+        files: {},
+        started_by: "builder"
+      }
+    })
+    .select("*")
+    .single();
+  if (jobError) throw new Error(`Could not queue the build: ${jobError.message}`);
+
+  /* The first step starts immediately in the background; the answer above did
+     not wait for any model call, which is why the builder now responds at once. */
+  scheduleBuildStep(req, job.id);
+
+  return json(
+    {
+      ...buildPayload(job),
+      project: { id: project.id, name: project.name, slug: project.slug },
+      reused_project: Boolean(existing),
+      usage: quota && quota.ok ? { used: quota.used, limit: quota.limit, plan: quota.plan } : null
+    },
+    202
+  );
+}
+
+/* ---------------------------------------------------------------- build_step */
+
+async function handleBuildStep(caller: Caller, req: Request, body: Record<string, unknown>) {
+  const jobId = clean(body.jobId, 60);
+  if (!jobId) return fail(400, "invalid_input", "jobId is required.");
+
+  const db = admin();
+  const { data: job, error } = await db
+    .from("ai_generation_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .eq("user_id", caller.user.id)
+    .maybeSingle();
+  if (error || !job) return fail(404, "not_found", "That build does not exist.");
+  if (job.status !== "running") return json(buildPayload(job, { files: job.meta?.files || null }));
+
+  /* Claim the step: the update only succeeds while `updated_at` is still the
+     value that was just read, so a second runner backs off instead of paying
+     for the same model call twice. */
+  const claim = new Date().toISOString();
+  const { data: claimed } = await db
+    .from("ai_generation_jobs")
+    .update({ updated_at: claim })
+    .eq("id", job.id)
+    .eq("updated_at", job.updated_at)
+    .select("id");
+  if (!claimed?.length) {
+    const { data: fresh } = await db.from("ai_generation_jobs").select("*").eq("id", job.id).maybeSingle();
+    return json(buildPayload(fresh || job, { claimed: false }));
+  }
+
+  const meta: BuildJob = { ...(job.meta || {}) };
+  const plan = meta.plan || null;
+
+  try {
+    let stage = "plan";
+    let progress = 2;
+
+    if (!plan) {
+      /* --- plan -------------------------------------------------------- */
+      const planned = await geminiJson<Record<string, any>>(
+        buildPlanPrompt({ type: meta.type, name: meta.name, brief: meta.brief, pages: meta.pages || [], style: meta.style, business: await businessFor(caller.user.id, undefined) }),
+        { maxOutputTokens: 2048, thinkingBudget: 0, timeoutMs: 40000, temperature: 0.7 }
+      );
+      const pages = Array.isArray(planned?.pages) ? planned.pages : [];
+      if (!pages.length) throw new GeminiError("The plan came back empty.", "ai_bad_json", 502);
+      meta.plan = {
+        design_system: planned.design_system ?? {},
+        pages: pages.slice(0, BUILD_MAX_PAGES).map((page: any, index: number) => ({
+          name: clean(page?.name, 60) || `Page ${index + 1}`,
+          file: clean(page?.file, 60) || (index === 0 ? "index.html" : `page-${index + 1}.html`),
+          title: clean(page?.title, 90) || clean(page?.name, 60) || `Page ${index + 1}`,
+          purpose: clean(page?.purpose, 220),
+          sections: Array.isArray(page?.sections) ? page.sections.slice(0, 8) : []
+        })),
+        nav: Array.isArray(planned?.nav) ? planned.nav.slice(0, 8) : [],
+        seo: planned?.seo ?? null,
+        notes: clean(planned?.notes, 500)
+      };
+      stage = "styles";
+      progress = 12;
+    } else if (!meta.styles) {
+      /* --- styles ------------------------------------------------------ */
+      stage = "styles";
+      const sheet = await geminiJson<Record<string, any>>(
+        buildStylesPrompt({ type: meta.type, name: meta.name, brief: meta.brief, pages: meta.pages || [], style: meta.style, business: null }, meta.plan),
+        { maxOutputTokens: 4096, thinkingBudget: 0, timeoutMs: 50000, temperature: 0.6 }
+      );
+      const css = typeof sheet?.css === "string" ? sheet.css : "";
+      if (!css.trim()) throw new GeminiError("The stylesheet came back empty.", "ai_bad_json", 502);
+      meta.styles = { css: css.slice(0, 60_000), js: typeof sheet?.js === "string" ? sheet.js.slice(0, 30_000) : "" };
+      stage = "pages";
+      progress = 22;
+    } else if (Number(meta.page_index || 0) < (meta.plan.pages || []).length) {
+      /* --- one page ---------------------------------------------------- */
+      stage = "pages";
+      const pages: any[] = meta.plan.pages || [];
+      const index = Number(meta.page_index || 0);
+      const page = pages[index];
+      const built = await geminiJson<Record<string, any>>(
+        buildPagePrompt(
+          { type: meta.type, name: meta.name, brief: meta.brief, pages: meta.pages || [], style: meta.style, business: null },
+          meta.plan,
+          page,
+          index,
+          pages.length
+        ),
+        { maxOutputTokens: 6144, thinkingBudget: 0, timeoutMs: 55000, temperature: 0.7 }
+      );
+      const html = typeof built?.html === "string" ? built.html : "";
+      if (!html.trim()) throw new GeminiError(`The page ${page.file} came back empty.`, "ai_bad_json", 502);
+      meta.files = { ...(meta.files || {}), [page.file]: html };
+      meta.page_index = index + 1;
+      progress = buildProgress(meta, meta.plan);
+    }
+
+    /* --- finish --------------------------------------------------------- */
+    const pages: any[] = meta.plan?.pages || [];
+    const finished = Number(meta.page_index || 0) >= pages.length && Boolean(meta.styles);
+
+    if (!finished) {
+      const { data: updated } = await db
+        .from("ai_generation_jobs")
+        .update({ stage, progress, meta, updated_at: new Date().toISOString() })
+        .eq("id", job.id)
+        .select("*")
+        .single();
+      scheduleBuildStep(req, job.id);
+      return json(buildPayload(updated || job, { running: true }));
+    }
+
+    const files: Record<string, string> = {
+      ...(meta.files || {}),
+      "styles.css": meta.styles.css,
+      ...(meta.styles.js ? { "app.js": meta.styles.js } : {})
+    };
+
+    const { data: done } = await db
+      .from("ai_generation_jobs")
+      .update({
+        status: "succeeded",
+        stage: "finish",
+        progress: 100,
+        finished_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        meta: { ...meta, files }
+      })
+      .eq("id", job.id)
+      .select("*")
+      .single();
+
+    await db
+      .from("projects")
+      .update({ status: "ready", updated_at: new Date().toISOString() })
+      .eq("id", job.project_id);
+
+    /* Tell the owner, in the app and in the browser, that the build they walked
+       away from is finished. The row is written by the server so it is there
+       even if the tab was closed. */
+    await db.from("notifications").insert({
+      user_id: caller.user.id,
+      type: type_notification(meta.type),
+      title: `Your ${meta.type === "app" ? "app" : "website"} is ready`,
+      body: meta.name,
+      link: `/app/?view=${meta.type === "app" ? "app-builder" : "website-builder"}&id=${job.project_id}`,
+      meta: { job_id: job.id, kind: "build_finished" }
+    });
+
+    await logUsage(caller.user.id, "generate", String(meta.brief || "").slice(0, 2000), JSON.stringify(Object.keys(files)));
+
+    return json(buildPayload(done || job, { files, projectId: job.project_id, done: true }));
+  } catch (error) {
+    const attempts = Number(meta.attempts || 0) + 1;
+    const message = (error as Error)?.message || "The build step failed.";
+    const exhausted = attempts >= BUILD_MAX_ATTEMPTS;
+
+    const { data: failed } = await db
+      .from("ai_generation_jobs")
+      .update({
+        status: exhausted ? "failed" : "running",
+        error: message.slice(0, 400),
+        progress: Number(job.progress || 0),
+        meta: { ...meta, attempts },
+        updated_at: new Date().toISOString(),
+        finished_at: exhausted ? new Date().toISOString() : null
+      })
+      .eq("id", job.id)
+      .select("*")
+      .single();
+
+    if (exhausted) {
+      /* Nothing was produced, so nothing is charged. */
+      await refundCredit(caller.user.id, "generate");
+      await db.from("projects").update({ status: "draft" }).eq("id", job.project_id);
+      await db.from("notifications").insert({
+        user_id: caller.user.id,
+        type: type_notification(meta.type),
+        title: `The ${meta.type === "app" ? "app" : "website"} build could not finish`,
+        body: "Nothing was saved and your AI credit was returned. Open the builder to try again.",
+        link: `/app/?view=${meta.type === "app" ? "app-builder" : "website-builder"}&id=${job.project_id}`,
+        meta: { job_id: job.id, kind: "build_failed" }
+      });
+      return fail(502, "build_failed", "The build could not finish.", {
+        hint: "Your credit was returned. The parts that were already written are kept, so trying again resumes from there.",
+        job: failed ? buildPayload(failed) : null
+      });
+    }
+
+    /* Retryable: schedule the next server-side step from the persisted point.
+       The browser may be closed; relying on its polling loop here would strand
+       the job in `running` with no one left to nudge it. */
+    scheduleBuildStep(req, job.id);
+    return json(
+      buildPayload(failed || job, {
+        retrying: true,
+        attempt: attempts,
+        retry_after_seconds: 3
+      }),
+      200
+    );
+  }
+}
+
+function type_notification(type: string) {
+  return type === "app" ? "app" : type === "store" ? "store" : "website";
+}
+
+/* -------------------------------------------------------------- build_status */
+
+async function handleBuildStatus(caller: Caller, body: Record<string, unknown>) {
+  const jobId = clean(body.jobId, 60);
+  const requestedKind = clean(body.type, 20);
+  if (requestedKind && !["website", "app", "store"].includes(requestedKind)) {
+    return fail(400, "invalid_input", "type must be website, app or store.");
+  }
+  const db = admin();
+
+  if (!jobId) {
+    /* No id means "what is the newest build for this account?" — the builder
+       asks this on load so a refresh, a different tab or a revisit picks up an
+       unfinished build instead of starting a second one. */
+    const { data: latest } = await db
+      .from("ai_generation_jobs")
+      .select("*")
+      .eq("user_id", caller.user.id)
+      .in("kind", requestedKind ? [requestedKind] : ["website", "app", "store"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!latest) return json({ job: null });
+    return json({ job: buildPayload(latest, { files: latest.meta?.files || null }) });
+  }
+
+  const { data: job } = await db
+    .from("ai_generation_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .eq("user_id", caller.user.id)
+    .maybeSingle();
+  if (!job || (requestedKind && job.kind !== requestedKind)) return fail(404, "not_found", "That build does not exist.");
+  return json({ job: buildPayload(job, { files: job.meta?.files || null }) });
 }

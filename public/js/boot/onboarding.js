@@ -79,7 +79,8 @@ async function loadSavedProgress() {
       );
     }
   }
-  if (data?.data) applyDraft(data.data);
+  const savedDraft = data?.data ?? data?.answers;
+  if (savedDraft) applyDraft(savedDraft);
   if (data?.current_step) step = Math.min(TOTAL_STEPS, Math.max(1, data.current_step));
 
   // Prefill from an existing business record (returning users).
@@ -326,19 +327,41 @@ function bindUpload(inputSel, pickSel, clearSel, previewSel, bucket, prefix, rou
 /* ------------------------------------------------------------ persistence */
 const queueSave = debounce(() => persist(false), 700);
 
+async function upsertProgress(payload) {
+  const compatiblePayload = { ...payload, answers: payload.data ?? draft };
+  compatiblePayload.is_completed = Boolean(payload.completed_at);
+  let result = await sb.from("onboarding_progress").upsert(compatiblePayload, { onConflict: "user_id" });
+  if (!result.error) return result;
+  let message = result.error.message || "";
+  if (!/column .* (?:answers|is_completed|data|completed_at).* does not exist|schema cache/i.test(message)) return result;
+
+  result = await sb.from("onboarding_progress").upsert(payload, { onConflict: "user_id" });
+  if (!result.error) return result;
+  message = result.error.message || "";
+  if (!/column .* (?:data|completed_at).* does not exist|schema cache/i.test(message)) return result;
+
+  // Old installations use `answers` plus a boolean instead of `data` and
+  // `completed_at`; retry with only columns known to that schema.
+  return sb.from("onboarding_progress").upsert({
+    user_id: payload.user_id,
+    current_step: payload.current_step,
+    answers: payload.data ?? draft,
+    is_completed: Boolean(payload.completed_at),
+    updated_at: payload.updated_at
+  }, { onConflict: "user_id" });
+}
+
 async function persist(silent = false) {
   markSaving();
   try {
     if (!state.user) throw new Error("No session");
-    const { error } = await sb.from("onboarding_progress").upsert(
-      {
-        user_id: state.user.id,
-        current_step: step,
-        data: draft,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "user_id" }
-    );
+    const payload = {
+      user_id: state.user.id,
+      current_step: step,
+      data: draft,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await upsertProgress(payload);
     if (error) throw normalizeError(error);
     markSaved();
     return true;
@@ -624,16 +647,14 @@ async function finish() {
     }
 
     // 5. Mark onboarding complete
-    const { error: obError } = await sb.from("onboarding_progress").upsert(
-      {
-        user_id: userId,
-        current_step: TOTAL_STEPS,
-        data: draft,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "user_id" }
-    );
+    const completionPayload = {
+      user_id: userId,
+      current_step: TOTAL_STEPS,
+      data: draft,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const { error: obError } = await upsertProgress(completionPayload);
     if (obError) throw normalizeError(obError);
 
     /* 6. Prove it stuck before telling anybody it worked.
@@ -642,7 +663,7 @@ async function finish() {
        filtered what came back. Re-read both rows as the customer and refuse to
        claim success unless they are really there. */
     const [{ data: savedOnboarding, error: verifyError }, { data: savedBusiness }] = await Promise.all([
-      sb.from("onboarding_progress").select("completed_at").eq("user_id", userId).maybeSingle(),
+      sb.from("onboarding_progress").select("*").eq("user_id", userId).maybeSingle(),
       sb.from("businesses").select("id, name").eq("owner_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle()
     ]);
     if (verifyError) throw normalizeError(verifyError);
@@ -652,7 +673,7 @@ async function finish() {
         hint: "Nothing was lost — press Finish again. If this repeats, check that migrations 0001–0010 are applied."
       });
     }
-    if (!savedOnboarding?.completed_at) {
+    if (!savedOnboarding?.completed_at && !savedOnboarding?.is_completed) {
       throw new AppError("Setup was saved but could not be marked complete.", {
         code: "verify_failed",
         hint: "Press Finish again. If this repeats, apply migration 0010 so the database accepts onboarding writes."
@@ -685,13 +706,14 @@ async function finish() {
        out instead of leaving a disabled Finish button on screen. */
     setTimeout(() => {
       if (document.visibilityState === "hidden") return;
+      submitting = false;
       setBusy(nextBtn, false);
-      setAlert(
-        alertBox,
-        "success",
-        "Setup complete",
-        `Your workspace is saved. <a href="${target}">Open the dashboard</a> if you are not taken there automatically.`
-      );
+      setAlert(alertBox, "success", "Setup complete", "Your workspace is saved.");
+      const link = document.createElement("a");
+      link.href = target;
+      link.className = "btn btn-primary btn-sm";
+      link.textContent = "Open dashboard";
+      alertBox.appendChild(link);
     }, 2500);
   } catch (error) {
     submitting = false;

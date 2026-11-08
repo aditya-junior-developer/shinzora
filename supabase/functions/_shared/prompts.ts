@@ -178,3 +178,132 @@ Rules:
 
 Return one JSON object:
 { "reply": "the message body", "needs_owner": true }`;
+
+/* ============================================================================
+   Chunked build — plan, styles, one page at a time
+   ----------------------------------------------------------------------------
+   A single call that returned a whole site (plan + HTML + CSS + JS) was bigger
+   than the Edge Function runtime can parse: the invocation was killed with
+   HTTP 546 ("not enough compute resources") before the owner saw anything.
+   The build is now four kinds of small call, each well inside the limits, and
+   each one is saved before the next starts, so a failure resumes instead of
+   starting over.
+   ========================================================================== */
+
+const businessContext = (business: Record<string, unknown> | null): string =>
+  Object.entries(business ?? {})
+    .filter(([, value]) => value !== null && value !== "" && !(Array.isArray(value) && value.length === 0))
+    .map(([key, value]) => `- ${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`)
+    .join("\n");
+
+/** Step 1 — the plan. Structure only: no HTML, so the answer stays small. */
+export function buildPlanPrompt(input: GenerationInput): string {
+  const requested = input.pages.length ? input.pages.slice(0, 3) : ["Home"];
+  return `${HOUSE_STYLE}
+
+TASK: plan a ${input.type} called "${input.name}" before any code is written.
+
+BRIEF
+"""
+${input.brief}
+"""
+
+TYPE CONTRACT
+${TYPE_CONTRACT[input.type]}
+
+VISUAL DIRECTION
+${input.style}
+
+BUSINESS CONTEXT
+${businessContext(input.business) || "- nothing supplied; keep product claims generic and verifiable"}
+
+Plan exactly ${requested.length + 1} files: index.html plus ${requested.slice(1).join(", ") || "no other page"}${requested.length === 1 ? "" : ""}.
+Also plan shared "styles.css" and "app.js".
+Write real, specific copy in the headings and section bodies — no lorem ipsum, no invented testimonials, no invented statistics.
+
+Return ONE JSON object, no markdown fences:
+{
+  "design_system": {
+    "colors": { "background": "<hex>", "surface": "<hex>", "primary": "<hex>", "accent": "<hex>", "text": "<hex>", "muted": "<hex>" },
+    "fonts": { "display": "<system stack>", "body": "<system stack>" },
+    "radius": "<css value>",
+    "spacing": "<css value>",
+    "mood": "<one sentence>"
+  },
+  "pages": [
+    { "name": "Home", "file": "index.html", "title": "<page title>", "purpose": "<one sentence>",
+      "sections": [ { "type": "hero|features|about|pricing|faq|contact|footer", "heading": "<real heading>", "body": "<one or two real sentences>", "cta": "<button label or empty>" } ] }
+  ],
+  "nav": [ { "label": "Home", "file": "index.html" } ],
+  "seo": { "title": "<60 chars>", "description": "<150 chars>", "keywords": ["...", "..."] },
+  "notes": "<two sentences: what this will be, what the owner should check>"
+}
+Rules: contrast-safe palette on the chosen background (WCAG AA), 3–6 sections per page, no emoji, Indian English, prices in INR if any.`;
+}
+
+/** Step 2 — the shared stylesheet and the small shared script. */
+export function buildStylesPrompt(input: GenerationInput, plan: Record<string, any>): string {
+  const design = plan?.design_system ?? {};
+  return `${HOUSE_STYLE}
+
+TASK: write the shared "styles.css" and "app.js" for the ${input.type} "${input.name}".
+
+DESIGN SYSTEM (use these exact values as CSS custom properties)
+${JSON.stringify(design).slice(0, 2000)}
+
+PAGES THAT WILL USE IT
+${(plan?.pages ?? []).map((page: any) => `- ${page.file}: ${page.name} (${page.purpose || ""})`).join("\n")}
+
+RULES
+- Mobile-first, responsive down to 320px and up to 1440px. No horizontal scrolling at 320px.
+- Every text/background pair meets WCAG AA contrast. Visible :focus-visible ring on all interactive elements.
+- System font stacks only — no @import, no Google Fonts, no CDN, no frameworks.
+- app.js is a small ES module: mobile navigation toggle, any accordion, and defensive guards so it never throws on a page that lacks the element. No console spam, no alert().
+- No emoji. Inline SVG only, and only if the CSS cannot do the job.
+
+Return ONE JSON object, no markdown fences: { "css": "<full styles.css>", "js": "<full app.js>" }
+Keep the pair under 22 KB together.`;
+}
+
+/** Step 3..n — one page, one call. */
+export function buildPagePrompt(
+  input: GenerationInput,
+  plan: Record<string, any>,
+  page: Record<string, any>,
+  index: number,
+  total: number
+): string {
+  const design = plan?.design_system ?? {};
+  const nav = plan?.nav ?? [];
+  const sections = (page.sections ?? [])
+    .map((section: any) => `- ${section.type}: heading "${section.heading}" — ${section.body}${section.cta ? ` — CTA "${section.cta}"` : ""}`)
+    .join("\n");
+
+  return `${HOUSE_STYLE}
+
+TASK: write ONE HTML document — "${page.file}" (${index + 1} of ${total}) for the ${input.type} "${input.name}".
+
+BRIEF
+"""
+${input.brief}
+"""
+
+DESIGN SYSTEM (already implemented in styles.css — do not redefine colours)
+${JSON.stringify(design).slice(0, 1200)}
+
+SHARED NAVIGATION
+${nav.map((item: any) => `<a href="${item.file}">${item.label}</a>`).join(" ")}
+
+SECTIONS TO BUILD, in this order
+${sections || "- hero, one content section, footer"}
+
+HARD RULES
+- Return a complete HTML5 document: <!doctype html>, <html lang="en">, <head>, <body>.
+- Link the shared assets with relative paths: <link rel="stylesheet" href="styles.css"> and <script type="module" src="app.js"></script>. Do NOT inline a second stylesheet and do NOT add external URLs.
+- Exactly one <h1>. Semantic landmarks (header, nav, main, footer). A skip link. alt text on every image — and no invented image URLs (use CSS gradients or inline SVG).
+- Forms must not post anywhere; show an inline confirmation instead.
+- Real copy written for this business, in the brand voice. No lorem ipsum, no invented reviews, statistics or client names.
+- Keep the document under 22 KB.
+
+Return ONE JSON object, no markdown fences: { "html": "<the full document>" }`;
+}

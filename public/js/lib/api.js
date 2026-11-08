@@ -70,12 +70,13 @@ async function invokeOnce(name, action, payload = {}, opts = {}) {
         hint: detail?.hint || "",
         detail: detail?.detail || "",
         status,
-        retryable: status >= 500 || status === 429
+        retryable: status >= 500 || status === 429,
+        data: detail
       });
     }
 
     if (data && data.error) {
-      throw new AppError(data.error, { code: data.code || "fn_error", hint: data.hint || "", detail: data.detail || "" });
+      throw new AppError(data.error, { code: data.code || "fn_error", hint: data.hint || "", detail: data.detail || "", data });
     }
     return data;
   } catch (error) {
@@ -154,6 +155,20 @@ export const api = {
     models: (capability = "site") => invoke("ai", "models", { capability }),
     /** Generate a full site/app structure + files. */
     generate: (payload) => invoke("ai", "generate", payload, { timeout: 180000 }),
+    /**
+     * Start a chunked build. Answers as soon as the project and the job row
+     * exist — no model call happens before the response, so the builder never
+     * sits on a blank screen waiting for the provider.
+     */
+    buildStart: (payload) => invoke("ai", "build_start", payload, { timeout: 30000 }),
+    /**
+     * Run one unit of work of a build (plan, stylesheet, one page, finish).
+     * Each call is small enough to finish well inside the Edge Function limits,
+     * and everything it produced is saved before it returns.
+     */
+    buildStep: (payload) => invoke("ai", "build_step", payload, { timeout: 90000 }),
+    /** Honest progress for a job, including after a reload or in another tab. */
+    buildStatus: (payload = {}) => invoke("ai", "build_status", payload, { timeout: 20000 }),
     /** Apply a natural-language revision to an existing project version. */
     revise: (payload) => invoke("ai", "revise", payload, { timeout: 180000 }),
     /** Domain name ideas from a business description. */
