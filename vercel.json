@@ -129,16 +129,17 @@
       "source": "/pricing/",
       "destination": "/#pricing",
       "permanent": false
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/site/:slug/",
-      "destination": "/site/?p=:slug"
     },
     {
       "source": "/site/:slug",
-      "destination": "/site/?p=:slug"
+      "destination": "/site/?p=:slug",
+      "permanent": false
+    },
+    {
+      "source": "/site/:slug/",
+      "destination": "/site/?p=:slug",
+      "permanent": false
     }
-  ]
+  ],
+  "rewrites": []
 }
