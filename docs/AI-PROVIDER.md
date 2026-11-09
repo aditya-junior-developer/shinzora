@@ -36,21 +36,23 @@ no key, no key fragment.
 
 The provider answers a spent allowance with a 429 and a retry delay. The updated server code tries the next configured server-side credential, in order, using the same model. This failover is internal; no credential, key slot, or provider response is sent to the browser when a later key succeeds. If every key is exhausted, the build is saved and the user gets a safe unavailable message.
 
-**Release status (updated):** five numbered secrets (`SHINZORA_AI_API_KEY_1`
-through `_5`) and `SHINZORA_AI_MODEL=gemini-3.8-flash` are now stored in the
-Supabase project `zmkgfmlcpzjfgxdmbtvi`. Each of the five keys was checked
+**Release status (9 November 2026):** five numbered secrets
+(`SHINZORA_AI_API_KEY_1` … `_5`) and `SHINZORA_AI_MODEL=gemini-3.8-flash` are
+stored in the Supabase project `zmkgfmlcpzjfgxdmbtvi`. Each key was checked
 directly against the provider: `GET /v1beta/models` returned `200` for all five,
 and all five list `models/gemini-3.8-flash`.
 
-Two gaps remain and neither is hidden:
+What is live now:
 
-1. The `ai` Edge Function has **not** been redeployed with the keyring code, so
-   the live function still reads the legacy single-key secret and does not rotate
-   across the numbered keys yet.
-2. Model execution could not be confirmed from the build environment: the
-   `generateContent` calls made while writing this document either returned
-   `503 This model is currently experiencing high demand` or hung until the
-   client timeout. Key validity is proven; a live generation is not.
+| Step | State |
+| --- | --- |
+| Code merged to `main` | `273f076` — keyring, cooldowns, and failover |
+| Migrations `0017`, `0018` | applied to production, verified (`5` team tables, `5` with RLS, `11` RPCs, `team-chat-files` bucket) |
+| `SHINZORA_AI_API_KEY` (legacy name the deployed function reads) | rotated to verified key `_1`, so production AI runs on a fresh credential |
+| `ai` Edge Function redeployed with keyring code | **not yet** — the deployment tooling available in this build can publish a single-file function, but `ai` imports seven modules under `_shared/`. A single-file shim importing the repository over a CDN was tested on a canary and returned `BOOT_ERROR`, so it was removed. Deploy needs `supabase functions deploy ai` (CLI, access token) or the dashboard. |
+
+Consequence, stated plainly: production rotates credentials only after that
+redeploy. Until then it uses exactly one working key, not five.
 
 1. The client said **"rate limiting — try again in a minute"**, which was false
    for a quota that resets in 84 minutes.
