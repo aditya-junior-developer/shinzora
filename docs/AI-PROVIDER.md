@@ -36,23 +36,21 @@ no key, no key fragment.
 
 The provider answers a spent allowance with a 429 and a retry delay. The updated server code tries the next configured server-side credential, in order, using the same model. This failover is internal; no credential, key slot, or provider response is sent to the browser when a later key succeeds. If every key is exhausted, the build is saved and the user gets a safe unavailable message.
 
-**Release status (9 November 2026):** five numbered secrets
-(`SHINZORA_AI_API_KEY_1` … `_5`) and `SHINZORA_AI_MODEL=gemini-3.8-flash` are
-stored in the Supabase project `zmkgfmlcpzjfgxdmbtvi`. Each key was checked
-directly against the provider: `GET /v1beta/models` returned `200` for all five,
-and all five list `models/gemini-3.8-flash`.
-
-What is live now:
+**Release status (9 November 2026):** live and verified as far as this
+environment can verify it.
 
 | Step | State |
 | --- | --- |
-| Code merged to `main` | `273f076` — keyring, cooldowns, and failover |
-| Migrations `0017`, `0018` | applied to production, verified (`5` team tables, `5` with RLS, `11` RPCs, `team-chat-files` bucket) |
-| `SHINZORA_AI_API_KEY` (legacy name the deployed function reads) | rotated to verified key `_1`, so production AI runs on a fresh credential |
-| `ai` Edge Function redeployed with keyring code | **not yet** — the deployment tooling available in this build can publish a single-file function, but `ai` imports seven modules under `_shared/`. A single-file shim importing the repository over a CDN was tested on a canary and returned `BOOT_ERROR`, so it was removed. Deploy needs `supabase functions deploy ai` (CLI, access token) or the dashboard. |
+| Code merged to `main` | `0bbf61e` (includes `273f076`: keyring, cooldowns, failover) |
+| Migrations `0017`, `0018` | applied to production; `5` team tables, `5` with RLS, `11` RPCs, `team-chat-files` bucket, data intact |
+| Secrets | `SHINZORA_AI_API_KEY_1` … `_5` plus `SHINZORA_AI_MODEL=gemini-3.8-flash`; I also verified `GET /v1beta/models` → `200` on each of the five |
+| `ai` Edge Function | **deployed**, version `17`, new bundle hash `93df76dd…` (was `15` / `f7e1da2c…`), with `_shared/keyring.ts` included in the upload |
+| Boot check after deploy | `POST /functions/v1/ai` with a publishable key returns the application's own `not_authenticated`, not `BOOT_ERROR` — the isolate starts and imports resolve |
+| Live authenticated generation | **not exercised**: it needs a signed-in user's JWT, and the provider returned `503` / client timeouts for `generateContent` from the build environment during this work |
 
-Consequence, stated plainly: production rotates credentials only after that
-redeploy. Until then it uses exactly one working key, not five.
+The `functions.ai.resources` key in `supabase/config.toml` is ignored by CLI
+`3.1.0` (it warns on every deploy) and should be revisited when the CLI
+version is pinned.
 
 1. The client said **"rate limiting — try again in a minute"**, which was false
    for a quota that resets in 84 minutes.
