@@ -11,6 +11,9 @@ import { emptyState } from "../../dashboard/components.js";
 import { confirmDialog, formDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 
+let sendingAnnouncement = false;
+let pendingRequestKey = null;
+
 export default async function render(root, { view }) {
   if (view === "messaging") return renderMessaging(root);
   if (view === "activity") return renderActivity(root);
@@ -91,15 +94,20 @@ async function renderMessaging(root) {
     if (!ok) return;
 
     const button = qs("#ann-send");
+    if (sendingAnnouncement) return;
+    sendingAnnouncement = true;
+    pendingRequestKey ||= crypto.randomUUID();
     button.disabled = true;
     try {
-      const response = await adminApi.announcementCreate({ title, body, audience });
+      const response = await adminApi.announcementCreate({ title, body, audience, requestKey: pendingRequestKey });
+      pendingRequestKey = null;
       toast({ title: "Announcement sent", message: `Delivered to ${response.delivered ?? 0} accounts.` }, { tone: "success" });
       qs("#announce-form").reset();
       await loadHistory();
     } catch (error) {
       toastError(error);
     } finally {
+      sendingAnnouncement = false;
       button.disabled = false;
     }
   });

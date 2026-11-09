@@ -1281,15 +1281,14 @@ const AI_TEXT_ACTIONS = new Set(["chat", "copy", "support_reply", "domain_ideas"
 
 async function ai(root, session, body) {
   const action = text(body.action, 40);
-  const key = process.env.SHINZORA_AI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  const model = process.env.SHINZORA_AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const keyed = sandboxAi.aiConfigured();
 
-  if (!key) {
+  if (!keyed) {
     throw new FunctionError("AI is not configured on this server.", {
       status: 503,
       code: "ai_unconfigured",
       hint:
-        "Set SHINZORA_AI_API_KEY in .env (local) or in the Vercel project settings, then reload. The pre-launch account is fully wired — the key is the only missing piece."
+        "Set SHINZORA_AI_API_KEY_1 (or SHINZORA_AI_API_KEY) in .env (local) or in the Vercel project settings, then reload. The pre-launch account is fully wired — the key is the only missing piece."
     });
   }
 
@@ -1577,7 +1576,7 @@ export async function handleFunction(root, name, action, payload, session) {
      and model names only — never a key. The AI flag is the real one, so the UI
      can tell the operator exactly which secret is missing. */
   if (name === "config") {
-    const aiKey = process.env.SHINZORA_AI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const aiKey = sandboxAi.aiConfigured();
     const model = process.env.SHINZORA_AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash";
     return {
       available: true,

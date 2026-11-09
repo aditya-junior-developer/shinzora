@@ -652,47 +652,22 @@ async function announcements() {
 async function announcementCreate(adminId: string, body: Record<string, unknown>) {
   const title = clean(body.title, 160);
   const message = clean(body.body, 4000);
-  const audience = clean(body.audience, 30) || "all";
+  const audience = clean(body.audience, 80) || "all";
+  const requestKey = clean(body.requestKey, 36);
   if (!title || !message) return fail(400, "invalid_input", "Title and message are required.");
-
-  const db = admin();
-  const { data: announcement, error } = await db
-    .from("admin_announcements")
-    .insert({ title, body: message, audience, created_by: adminId })
-    .select("*")
-    .single();
-  if (error) return fail(500, "admin_error", error.message);
-
-  // Fan out one notification per recipient so read state is per user.
-  let recipients: string[] = [];
-  if (audience === "all") {
-    const { data } = await db.from("profiles").select("id").limit(5000);
-    recipients = (data ?? []).map((row) => row.id);
-  } else if (["customers", "free", "pro", "enterprise"].includes(audience)) {
-    const plan = ["free", "pro", "enterprise"].includes(audience) ? audience : null;
-    let query = db.from("subscriptions").select("user_id").limit(5000);
-    if (plan) query = query.eq("plan", plan);
-    const { data } = await query;
-    recipients = (data ?? []).map((row) => row.user_id);
-  } else if (audience.startsWith("user:")) {
-    recipients = [audience.slice(5)];
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) {
+    return fail(400, "invalid_input", "A valid announcement request key is required.");
   }
 
-  if (recipients.length) {
-    const rows = recipients.map((userId) => ({
-      user_id: userId,
-      title,
-      body: message,
-      type: "admin",
-      link: "/app/?view=notifications",
-      meta: { announcement_id: announcement.id, audience }
-    }));
-    for (let i = 0; i < rows.length; i += 500) {
-      await db.from("notifications").insert(rows.slice(i, i + 500));
-    }
-  }
-
-  return json({ ok: true, announcement, delivered: recipients.length });
+  const { data, error } = await admin().rpc("admin_create_announcement", {
+    p_admin_id: adminId,
+    p_title: title,
+    p_body: message,
+    p_audience: audience,
+    p_request_key: requestKey
+  });
+  if (error) return fail(500, "admin_error", "The announcement could not be delivered.");
+  return json({ ok: true, ...(data ?? {}) });
 }
 
 /* ---------------------------------------------------------------- activity */

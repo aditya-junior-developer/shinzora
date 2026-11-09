@@ -392,6 +392,7 @@ html {
   box-shadow: var(--shadow-md);
 }
 
+
 .builder.is-expanded {
   position: fixed;
   z-index: 1000;
@@ -1883,4 +1884,24 @@ html {
   }
   .chat-pane-thread { min-height: 52vh; }
   .bubble { max-width: 92%; }
+}
+
+/* Team collaboration ------------------------------------------------------- */
+.messages-channel-tabs { display: inline-flex; gap: 4px; margin: 0 0 var(--s-4); padding: 4px; }
+.messages-channel-tabs [aria-selected="true"] { color: var(--white); background: var(--panel-3); }
+.team-invite-bar { padding: var(--s-3); border-bottom: 1px solid var(--line); }
+.team-invite-bar .input { min-width: 150px; }
+.team-compose-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; grid-column: 1 / -1; }
+.team-compose-tools label { cursor: pointer; }
+.team-attachments { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+.team-attachment { display: inline-flex; align-items: center; gap: 6px; color: var(--lavender); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.team-attachment:hover { color: var(--white); }
+.team-chat .chat-compose { grid-template-columns: minmax(0, 1fr) auto; }
+.team-chat .chat-compose .team-compose-tools { grid-column: 1 / -1; }
+.team-chat .bubble-text a { color: var(--lavender); text-decoration: underline; }
+@media (max-width: 760px) {
+  .messages-channel-tabs { width: 100%; }
+  .messages-channel-tabs button { flex: 1; }
+  .team-chat .chat-compose { grid-template-columns: minmax(0, 1fr); }
+  .team-chat .chat-send { justify-self: end; }
 }

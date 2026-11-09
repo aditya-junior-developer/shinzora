@@ -5,7 +5,7 @@
 // `config` function exposes only booleans; secrets stay in the runtime.
 // ============================================================================
 
-import { geminiConfigured } from "./gemini.ts";
+import { geminiConfigured, primaryModel } from "./gemini.ts";
 
 const env = (key: string) => (Deno.env.get(key) ?? "").trim();
 
@@ -18,7 +18,7 @@ export function providerFlags() {
     environment: env("SITE_ENV") || "production",
     ai: {
       configured: geminiConfigured(),
-      model: geminiConfigured() ? env("SHINZORA_AI_MODEL") || env("GEMINI_MODEL") || "gemini-2.0-flash" : null,
+      model: geminiConfigured() ? primaryModel() : null,
       // Names the operator the exact secret to set when AI is not configured.
       key_env: geminiConfigured() ? null : "SHINZORA_AI_API_KEY"
     },

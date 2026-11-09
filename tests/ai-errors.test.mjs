@@ -46,7 +46,7 @@ await build({
   logLevel: "silent"
 });
 const mod = await import(pathToFileURL(outfile).href);
-const { extractRetrySeconds, describeWait, isQuotaExhausted, providerError, gemini, GeminiError } = mod;
+const { extractRetrySeconds, describeWait, isQuotaExhausted, providerError, gemini, GeminiError, resetGeminiKeyHealth } = mod;
 
 /* The real payload Gemini returned for this project, verbatim. */
 const QUOTA_BODY = JSON.stringify({
@@ -93,12 +93,12 @@ check("no developer URL leaks", !/generativelanguage|ai\.google\.dev|rate-limits
 /* The provider limit belongs to the platform's own account. Telling a customer
    "your allowance is used up" was a false statement about their plan. */
 check("the limit is not blamed on the customer's plan", !/your (plan|allowance is used)/i.test(quota.message), quota.message);
-check("the customer is told the build did not start", /did not start/i.test(quota.message), quota.message);
-check("the customer is told nothing was charged", /Nothing was taken from your allowance/i.test(quota.message), quota.message);
+check("the customer is told the build did not start", /build did not start/i.test(quota.message), quota.message);
+check("the customer is told no allowance was taken", /Nothing was taken from your allowance/i.test(quota.message), quota.message);
 
 const zero = providerError(429, ZERO_LIMIT_BODY);
-check("a zero limit is described as the provider account, not the customer's plan",
-  /not enabled on the provider account/i.test(zero.message), zero.message);
+check("a zero limit stays provider-neutral",
+  !/provider account|key [1-4]|provider project/i.test(zero.message), zero.message);
 check("a zero limit also promises no charge", /Nothing was taken from your allowance/i.test(zero.message), zero.message);
 
 const rate = providerError(429, "Too many requests. Retry in 12s.");
@@ -138,6 +138,7 @@ check("only one model was tried", calls.length === 1, `tried ${calls.join(", ")}
 check("the error carries the wait", thrown?.retryAfter === 5055);
 check("the key never appears in the message", !String(thrown?.message).includes(ENV.SHINZORA_AI_API_KEY));
 check("the key never appears in the stack or JSON", !JSON.stringify({ ...thrown, message: thrown?.message }).includes(ENV.SHINZORA_AI_API_KEY));
+resetGeminiKeyHealth(); // isolate the following model-fallback scenario from quota backoff
 
 console.log("\nMAX_TOKENS is not an empty answer");
 /* A second model, so "fall through on an exhausted budget" is actually

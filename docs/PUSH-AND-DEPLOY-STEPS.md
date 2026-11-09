@@ -119,22 +119,3 @@ node scripts/deploy-functions.mjs      # needs the Supabase CLI and the project 
 | 2 | me | one force-push, verified, confirmed back to you |
 | 3 | https://vercel.com/new | import `shinzora`, build `node scripts/generate-config.mjs`, output `public`, deploy |
 | 4 | any | revoke the token: https://github.com/settings/tokens |
-
----
-
-## Troubleshooting: `403 Permission denied` on push
-
-Seen on the first attempt with this token. GitHub's API answered
-`Resource not accessible by personal access token` when asked to write a blob, which means the token
-itself carries **no write permission** — the identity and the repository are correct.
-
-Two settings cause it, and both are on the token page:
-
-1. **Repository access** was left on *Public repositories (read-only)*. It must be
-   **Only select repositories** with `shinzora` ticked.
-2. **Contents** was set to *Read-only*, or set under **Account permissions** instead of
-   **Repository permissions**. It must be **Repository permissions → Contents → Read and write**.
-
-Edit them at `https://github.com/settings/personal-access-tokens/22553970` → change both → **Save**.
-The token value does not change when permissions are saved, so the same string starts working
-immediately; no new token is needed.

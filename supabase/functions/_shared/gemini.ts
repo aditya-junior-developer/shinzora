@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { resolveChain, type Capability } from "./models.ts";
+import { configuredGeminiKeys, primaryGeminiKey, type GeminiApiKey } from "./keyring.ts";
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -21,7 +22,7 @@ const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
  * just burn quota to fail again.
  */
 export function primaryModel(): string {
-  return (Deno.env.get("SHINZORA_AI_MODEL") ?? Deno.env.get("GEMINI_MODEL") ?? "gemini-3-flash-preview").trim();
+  return (Deno.env.get("SHINZORA_AI_MODEL") ?? Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash").trim();
 }
 
 /**
@@ -66,7 +67,7 @@ export function defaultModel(): string {
 }
 
 /** Statuses that mean "try another model", not "this request is wrong". */
-const RETRYABLE = new Set([404, 429, 503]);
+const RETRYABLE = new Set([404, 408, 425, 429, 500, 502, 503, 504]);
 
 export class GeminiError extends Error {
   code: string;
@@ -141,7 +142,7 @@ export function providerError(status: number, detail: string): GeminiError {
       const zeroLimit = /limit:\s*0\b/.test(detail);
       return new GeminiError(
         zeroLimit
-          ? "This AI feature is not enabled on the provider account this platform uses, so the build did not start. Nothing was taken from your allowance."
+          ? "This AI feature is not enabled for this project right now, so the build did not start. Nothing was taken from your allowance."
           : `The AI service has reached its current limit, so this build did not start.${window} Nothing was taken from your allowance.`,
         "ai_quota_exhausted",
         429,
@@ -156,7 +157,7 @@ export function providerError(status: number, detail: string): GeminiError {
     );
   }
 
-  if (status === 400 && /api key/i.test(detail)) {
+  if ((status === 400 || status === 401) && /api key|unauthorized|invalid key/i.test(detail)) {
     return new GeminiError("The AI provider rejected the configured key.", "ai_bad_key", 502);
   }
 
@@ -179,18 +180,178 @@ export function providerError(status: number, detail: string): GeminiError {
  * changes. `GEMINI_API_KEY` is still honoured so an existing deployment that
  * already set it keeps working without a rename.
  */
-const AI_KEY_NAMES = ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
-
 export function geminiKey(): string {
-  for (const name of AI_KEY_NAMES) {
-    const value = (Deno.env.get(name) ?? "").trim();
-    if (value) return value;
-  }
-  return "";
+  return primaryGeminiKey();
 }
 
 export function geminiConfigured(): boolean {
-  return geminiKey().length > 10;
+  return configuredGeminiKeys().length > 0;
+}
+
+/** Safe operator metadata; secret values are deliberately omitted. */
+export function geminiKeyMetadata() {
+  return configuredGeminiKeys().map(({ id, projectId, priority }) => ({ id, projectId, priority }));
+}
+
+/* Per-isolate circuit breakers reduce repeated calls to known-bad or exhausted
+   keys. Quota is tracked by Google Cloud project when configured; an unknown
+   project identity is handled conservatively and blocks all keys for a short
+   backoff rather than pretending they represent independent quota pools. */
+const keyCooldownUntil = new Map<string, number>();
+const keyFailureCount = new Map<string, number>();
+const projectCooldownUntil = new Map<string, number>();
+let ambiguousQuotaUntil = 0;
+let unknownProjectCooldownUntil = 0;
+let rotationCursor = 0;
+const MAX_KEYS_PER_REQUEST = 8;
+
+function keyIsCooling(key: GeminiApiKey, now = Date.now()): boolean {
+  return now < (keyCooldownUntil.get(key.id) || 0)
+    || now < (projectCooldownUntil.get(key.projectId) || 0)
+    || now < unknownProjectCooldownUntil && key.projectId.includes("unclassified")
+    || now < ambiguousQuotaUntil;
+}
+
+function orderedAvailableKeys(): GeminiApiKey[] {
+  const keys = configuredGeminiKeys();
+  if (!keys.length) return [];
+  const start = rotationCursor % keys.length;
+  const rotated = [...keys.slice(start), ...keys.slice(0, start)];
+  return rotated.filter((key) => !keyIsCooling(key)).slice(0, MAX_KEYS_PER_REQUEST);
+}
+
+function coolKey(key: GeminiApiKey, requestedSeconds: number | null = null, fixedMs?: number) {
+  const failures = (keyFailureCount.get(key.id) || 0) + 1;
+  keyFailureCount.set(key.id, failures);
+  const delay = fixedMs ?? (requestedSeconds
+    ? Math.min(24 * 60 * 60_000, Math.max(1_000, requestedSeconds * 1_000))
+    : Math.min(60_000, 1_000 * 2 ** Math.min(failures - 1, 6)));
+  keyCooldownUntil.set(key.id, Date.now() + delay);
+}
+
+function coolProject(projectId: string, requestedSeconds: number | null) {
+  // This is a backoff, not a claim about when Google's quota resets.
+  const delay = requestedSeconds
+    ? Math.min(24 * 60 * 60_000, Math.max(1_000, requestedSeconds * 1_000))
+    : 5 * 60_000;
+  const until = Date.now() + delay;
+  if (projectId.includes("unclassified")) ambiguousQuotaUntil = Math.max(ambiguousQuotaUntil, until);
+  else {
+    projectCooldownUntil.set(projectId, until);
+    unknownProjectCooldownUntil = Math.max(unknownProjectCooldownUntil, until);
+  }
+}
+
+/** Test-only circuit-breaker reset; it never reads or writes a secret. */
+export function resetGeminiKeyHealth() {
+  keyCooldownUntil.clear();
+  keyFailureCount.clear();
+  projectCooldownUntil.clear();
+  ambiguousQuotaUntil = 0;
+  unknownProjectCooldownUntil = 0;
+  rotationCursor = 0;
+}
+
+async function requestWithKeyFailover(model: string, body: Record<string, unknown>, timeoutMs: number): Promise<Response> {
+  const keys = configuredGeminiKeys();
+  if (!keys.length) throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
+  const candidates = orderedAvailableKeys();
+  if (!candidates.length) {
+    const next = Math.min(...keys.map((key) => Math.max(
+      keyCooldownUntil.get(key.id) || 0,
+      projectCooldownUntil.get(key.projectId) || 0,
+      key.projectId.includes("unclassified") ? unknownProjectCooldownUntil : 0,
+      ambiguousQuotaUntil
+    )).filter((at) => at > Date.now()));
+    throw new GeminiError("Gemini keys are temporarily cooling down; retry after the current backoff.", "ai_key_cooldown", 503,
+      Number.isFinite(next) ? Math.max(1, Math.ceil((next - Date.now()) / 1000)) : null);
+  }
+
+  let lastRetryable: GeminiError | null = null;
+  let lastQuota: GeminiError | null = null;
+  let lastPermanent: GeminiError | null = null;
+  let retryResponse: { status: number; statusText: string; headers: Headers; text: string } | null = null;
+
+  for (const key of candidates) {
+    // A project quota can be exhausted while this invocation is iterating; do
+    // not burn the next same-project key after that project is cooled.
+    if (keyIsCooling(key)) continue;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(`${API_ROOT}/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key.key },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (error) {
+      const aborted = (error as Error)?.name === "AbortError";
+      lastRetryable = new GeminiError(
+        aborted ? "The AI request timed out. Try again shortly." : "Could not reach the AI provider.",
+        aborted ? "ai_timeout" : "ai_unreachable",
+        aborted ? 504 : 502
+      );
+      coolKey(key);
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (response.ok) {
+      keyFailureCount.delete(key.id);
+      keyCooldownUntil.delete(key.id);
+      const index = keys.findIndex((entry) => entry.id === key.id);
+      rotationCursor = index < 0 ? 0 : (index + 1) % keys.length;
+      return response;
+    }
+
+    // Model retirement/capability errors are model-scoped, not key-scoped.
+    if (response.status === 404) return response;
+    const detail = await response.clone().text().catch(() => "");
+    const mapped = providerError(response.status, detail);
+
+    if (mapped.code === "ai_quota_exhausted") {
+      lastQuota = mapped;
+      coolProject(key.projectId, mapped.retryAfter);
+      continue;
+    }
+    if (mapped.code === "ai_bad_key" || response.status === 401) {
+      lastPermanent = mapped.code === "ai_bad_key"
+        ? mapped
+        : new GeminiError("The AI provider rejected a configured key.", "ai_bad_key", 502);
+      coolKey(key, null, 60 * 60_000);
+      continue;
+    }
+    if (response.status === 403) {
+      lastPermanent = mapped;
+      coolProject(key.projectId, null);
+      continue;
+    }
+    if (RETRYABLE.has(response.status)) {
+      lastRetryable = mapped;
+      coolKey(key, mapped.retryAfter);
+      const text = await response.text().catch(() => detail);
+      retryResponse = { status: response.status, statusText: response.statusText, headers: response.headers, text };
+      continue;
+    }
+    return response;
+  }
+
+  if (lastQuota && !lastRetryable && !lastPermanent) throw lastQuota;
+  if (lastPermanent && !lastRetryable) throw lastPermanent;
+  if (lastQuota) throw lastQuota;
+  if (retryResponse) {
+    return new Response(retryResponse.text, {
+      status: retryResponse.status,
+      statusText: retryResponse.statusText,
+      headers: retryResponse.headers
+    });
+  }
+  if (lastRetryable) throw lastRetryable;
+  if (lastPermanent) throw lastPermanent;
+  throw new GeminiError("No Gemini key is available for this request.", "functions_unavailable", 503);
 }
 
 type Part = { text: string };
@@ -215,13 +376,8 @@ export interface GeminiOptions {
 
 /** Low-level call. Throws GeminiError with a stable code for the UI. */
 export async function gemini(parts: string | Part[], options: GeminiOptions = {}): Promise<string> {
-  const key = geminiKey();
   if (!geminiConfigured()) {
-    throw new GeminiError(
-      "AI generation is not configured on this deployment.",
-      "functions_unavailable",
-      503
-    );
+    throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
   }
 
   const contents: Content[] = [
@@ -258,31 +414,14 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
   let lastRetryable: GeminiError | null = null;
 
   for (const model of chain) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 120000);
-
     let response: Response;
     try {
-      response = await fetch(`${API_ROOT}/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
+      response = await requestWithKeyFailover(model, body, options.timeoutMs ?? 120000);
     } catch (error) {
-      clearTimeout(timer);
-      const aborted = (error as Error)?.name === "AbortError";
-      // A timeout on the primary model is worth one fallback attempt only if
-      // another model is configured; otherwise report it.
-      const fallbackError = new GeminiError(
-        aborted ? "The AI request timed out. Try a shorter brief or fewer pages." : "Could not reach the AI provider.",
-        aborted ? "ai_timeout" : "ai_unreachable",
-        aborted ? 504 : 502
-      );
-      lastRetryable = fallbackError;
+      const mapped = error instanceof GeminiError ? error : new GeminiError("Could not reach the AI provider.", "ai_unreachable", 502);
+      if (["ai_quota_exhausted", "ai_bad_key", "ai_forbidden", "functions_unavailable"].includes(mapped.code)) throw mapped;
+      lastRetryable = mapped;
       continue;
-    } finally {
-      clearTimeout(timer);
     }
 
     if (!response.ok) {
@@ -397,7 +536,6 @@ export async function geminiGrounded(
   prompt: string,
   options: GeminiOptions = {}
 ): Promise<GroundedAnswer> {
-  const key = geminiKey();
   if (!geminiConfigured()) {
     throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
   }
@@ -423,28 +561,14 @@ export async function geminiGrounded(
   let lastRetryable: GeminiError | null = null;
 
   for (const model of chain) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 90000);
-
     let response: Response;
     try {
-      response = await fetch(`${API_ROOT}/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
+      response = await requestWithKeyFailover(model, body, options.timeoutMs ?? 90000);
     } catch (error) {
-      clearTimeout(timer);
-      const aborted = (error as Error)?.name === "AbortError";
-      lastRetryable = new GeminiError(
-        aborted ? "The research request timed out." : "Could not reach the AI provider.",
-        aborted ? "ai_timeout" : "ai_unreachable",
-        aborted ? 504 : 502
-      );
+      const mapped = error instanceof GeminiError ? error : new GeminiError("Could not reach the AI provider.", "ai_unreachable", 502);
+      if (["ai_quota_exhausted", "ai_bad_key", "ai_forbidden", "functions_unavailable"].includes(mapped.code)) throw mapped;
+      lastRetryable = mapped;
       continue;
-    } finally {
-      clearTimeout(timer);
     }
 
     if (!response.ok) {

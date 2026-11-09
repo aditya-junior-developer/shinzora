@@ -135,12 +135,62 @@ ${OUTPUT_FORMAT}`;
 
 /* ------------------------------------------------------------------ models */
 
+/* Mirrors supabase/functions/_shared/keyring.ts: numbered secrets first, then
+   the legacy single-key names. Values stay server-side and are never logged. */
+export function keyring() {
+  const values = [];
+  const seen = new Set();
+  const add = (value) => {
+    const key = String(value || "").trim();
+    if (key.length <= 10 || seen.has(key) || values.length >= 32) return;
+    seen.add(key);
+    values.push(key);
+  };
+
+  for (let index = 1; index <= 32; index += 1) {
+    add(process.env[`SHINZORA_AI_API_KEY_${index}`] ?? process.env[`GEMINI_API_KEY_${index}`]);
+  }
+  add(process.env.SHINZORA_AI_API_KEY);
+  add(process.env.GEMINI_API_KEY);
+  add(process.env.GOOGLE_API_KEY);
+  return values;
+}
+
+/* A key the provider has refused is parked for a while so the next request is
+   not spent hitting the same wall. Bounded to avoid growth in a long process. */
+const cooldowns = new Map();
+const COOLDOWN_MS = 60_000;
+
+export function resetKeyHealth() {
+  cooldowns.clear();
+}
+
+function availableKeys() {
+  const now = Date.now();
+  return keyring().filter((key) => {
+    const until = cooldowns.get(key);
+    if (!until) return true;
+    if (until <= now) {
+      cooldowns.delete(key);
+      return true;
+    }
+    return false;
+  });
+}
+
+function park(key, ms = COOLDOWN_MS) {
+  if (cooldowns.size > 64) cooldowns.clear();
+  cooldowns.set(key, Date.now() + ms);
+}
+
+/** The first healthy key, for metadata calls that need only one credential. */
 function apiKey() {
-  return process.env.SHINZORA_AI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+  const healthy = availableKeys();
+  return healthy.length ? healthy[0] : keyring()[0] || "";
 }
 
 export function aiConfigured() {
-  return apiKey().length > 10;
+  return keyring().length > 0;
 }
 
 function primaryModel() {
@@ -284,13 +334,13 @@ function parseJson(text) {
   }
 }
 
-async function callModel(model, prompt, { timeoutMs = 120000 } = {}) {
+async function callModel(model, prompt, { timeoutMs = 120000, key = apiKey() } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${API_ROOT}/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey() },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -348,12 +398,25 @@ export async function completeJson(prompt, { model = "" } = {}) {
 
   let last = null;
   for (const candidate of chain) {
-    try {
-      return { text: await callModel(candidate, prompt), model: candidate };
-    } catch (error) {
-      last = error;
-      /* A spent allowance or a bad key will not clear by trying the next model. */
-      if (!error?.retryable) throw error;
+    /* Rotate credentials before giving up on the model: one spent or rejected
+       key is an operator problem, not a reason to fail the customer's build. */
+    /* If every key is cooling down, try them anyway: a stale cooldown must
+       never become an outage, and the provider's own answer is the truth. */
+    const healthy = availableKeys();
+    const attemptKeys = healthy.length ? healthy : keyring();
+    for (const key of attemptKeys) {
+      try {
+        return { text: await callModel(candidate, prompt, { key }), model: candidate };
+      } catch (error) {
+        last = error;
+        /* Only a key-specific refusal parks the credential. A retired model or
+           a provider fault keeps the key and moves on to the next model. */
+        if (error?.code === "ai_bad_key" || error?.code === "ai_quota_exhausted") {
+          park(key, error?.retryAfter ? error.retryAfter * 1000 : COOLDOWN_MS);
+        } else if (!error?.retryable) {
+          throw error;
+        }
+      }
     }
   }
   throw last || new SandboxAiError("Every configured AI model is unavailable right now.", { code: "ai_provider_error" });

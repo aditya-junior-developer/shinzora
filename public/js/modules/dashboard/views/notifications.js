@@ -163,7 +163,9 @@ export default async function render(root) {
     }
   });
 
-  qs("#mark-all").addEventListener("click", async () => {
+  qs("#mark-all").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
     try {
       await markAllNotificationsRead();
       rows.forEach((row) => (row.read_at = row.read_at || new Date().toISOString()));
@@ -172,6 +174,8 @@ export default async function render(root) {
       toast({ title: "All notifications marked as read" }, { tone: "success" });
     } catch (error) {
       toastError(normalizeError(error));
+    } finally {
+      button.disabled = false;
     }
   });
 }

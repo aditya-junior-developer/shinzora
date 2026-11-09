@@ -65,7 +65,7 @@ try {
    Typed application error
    -------------------------------------------------------------------------- */
 export class AppError extends Error {
-  constructor(message, { code = "app_error", detail = "", hint = "", status = 0, retryable = false } = {}) {
+  constructor(message, { code = "app_error", detail = "", hint = "", status = 0, retryable = false, data = null } = {}) {
     super(message);
     this.name = "AppError";
     this.code = code;
@@ -73,6 +73,10 @@ export class AppError extends Error {
     this.hint = hint;
     this.status = status;
     this.retryable = retryable;
+    /* The whole error body from an Edge Function. Structured facts (which
+       project already exists, which job failed) travel here so a caller never
+       has to parse English to act on them. */
+    this.data = data;
   }
 }
 

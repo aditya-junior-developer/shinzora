@@ -100,6 +100,16 @@ export default async function render(root) {
             <input class="input" id="full_name" name="full_name" value="${esc(profile.full_name || "")}" autocomplete="name" />
             <div class="field-error"></div>
           </div>
+          <div class="field" data-field="member_type">
+            <label class="field-label" for="member_type">Role</label>
+            <select class="input" id="member_type" name="member_type">
+              <option value="freelancer" ${profile.member_type === "freelancer" || !profile.member_type ? "selected" : ""}>Freelancer</option>
+              <option value="agent" ${profile.member_type === "agent" ? "selected" : ""}>Agent</option>
+              <option value="agency" ${profile.member_type === "agency" ? "selected" : ""}>Agency</option>
+              <option value="other" ${profile.member_type === "other" ? "selected" : ""}>Other</option>
+            </select>
+            <div class="field-error"></div>
+          </div>
           <div class="field" data-field="phone">
             <label class="field-label" for="phone">Phone</label>
             <input class="input" id="phone" name="phone" value="${esc(profile.phone || "")}" placeholder="+91" autocomplete="tel" />
@@ -124,6 +134,7 @@ export default async function render(root) {
       const form = event.currentTarget;
       const values = {
         full_name: form.full_name.value.trim(),
+        member_type: form.member_type.value,
         phone: form.phone.value.trim()
       };
       const { valid, errors } = validateForm(values, {

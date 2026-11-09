@@ -126,7 +126,9 @@ export const APPLICATION_TABLES = [
   "migration_archive", "integrations", "integration_tokens",
   "ai_generation_jobs", "conversion_jobs", "marketing_accounts",
   "marketing_requests", "marketing_request_events",
-  "admin_conversations", "admin_conversation_participants", "admin_messages"
+  "admin_conversations", "admin_conversation_participants", "admin_messages",
+  "business_team_invites", "business_team_members", "team_conversations",
+  "team_conversation_members", "team_chat_messages"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

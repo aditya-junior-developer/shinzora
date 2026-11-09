@@ -18,6 +18,8 @@
 // Server-side only. The key is read from Edge Function secrets.
 // ============================================================================
 
+import { configuredGeminiKeys, primaryGeminiKey } from "./keyring.ts";
+
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /** What a model can be used for in this product. */
@@ -107,19 +109,15 @@ export function modelLabel(id: string): string {
 }
 
 function key(): string {
-  for (const name of ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"]) {
-    const value = (Deno.env.get(name) ?? "").trim();
-    if (value) return value;
-  }
-  return "";
+  return primaryGeminiKey();
 }
 
 export function modelsConfigured(): boolean {
-  return key().length > 10;
+  return configuredGeminiKeys().length > 0;
 }
 
 function primary(): string {
-  return (Deno.env.get("SHINZORA_AI_MODEL") ?? Deno.env.get("GEMINI_MODEL") ?? "").trim();
+  return (Deno.env.get("SHINZORA_AI_MODEL") ?? Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash").trim();
 }
 
 /* --------------------------------------------------------------------------
@@ -144,7 +142,8 @@ export async function discoveredModels({ force = false } = {}): Promise<string[]
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(`${API_ROOT}?key=${encodeURIComponent(key())}&pageSize=200`, {
+    const response = await fetch(`${API_ROOT}?pageSize=200`, {
+      headers: { "x-goog-api-key": key() },
       signal: controller.signal
     });
     if (!response.ok) return cache?.ids ?? [];

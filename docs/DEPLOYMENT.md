@@ -258,14 +258,15 @@ If `configured` is false, the functions return
 is exactly what the builder shows the customer, and what `npm run test:fn-unit` locks down.
 
 ```bash
-# Required for AI — SHINZORA_AI_API_KEY is the documented name.
-# GEMINI_API_KEY and GOOGLE_API_KEY are still honoured as aliases.
-supabase secrets set SHINZORA_AI_API_KEY=<key> SHINZORA_AI_MODEL=gemini-3.8-flash
+# Required for AI — ordered server-only credentials. Never put these in the
+# frontend or a committed file. Quota exhaustion silently advances to the next.
+supabase secrets set SHINZORA_AI_API_KEY_1=<key-1> SHINZORA_AI_API_KEY_2=<key-2> \
+  SHINZORA_AI_API_KEY_3=<key-3> SHINZORA_AI_API_KEY_4=<key-4> \
+  SHINZORA_AI_MODEL=gemini-3.8-flash
 
-# Gemini retires model ids and throttles busy ones (a listed model can still
-# answer 503 under load, and 2.5-flash now 404s). Keep a fallback chain so one
-# unavailable model never takes the whole builder offline:
-supabase secrets set SHINZORA_AI_MODEL_FALLBACKS=gemini-3-flash-preview,gemini-3.1-flash-lite
+# Existing single-key deployments remain supported through SHINZORA_AI_API_KEY,
+# GEMINI_API_KEY or GOOGLE_API_KEY. Model fallback chains remain configured
+# separately from credential failover.
 
 # Domains — free availability, then a registrar for prices
 #

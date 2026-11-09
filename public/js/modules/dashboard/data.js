@@ -144,6 +144,7 @@ export async function notifications(limit = 40) {
     await db()
       .from("notifications")
       .select("*")
+      .eq("user_id", uid())
       .order("created_at", { ascending: false })
       .limit(limit)
   );
@@ -213,7 +214,7 @@ export async function overview() {
       client.from("store_customers").select("id", { count: "exact", head: true }),
       client.from("store_products").select("id, name, stock", { count: "exact" }).limit(500),
       client.from("support_tickets").select("id, status", { count: "exact" }).eq("status", "open"),
-      client.from("notifications").select("id, title, body, type, created_at, read_at").order("created_at", { ascending: false }).limit(6),
+      client.from("notifications").select("id, title, body, type, created_at, read_at").eq("user_id", uid()).order("created_at", { ascending: false }).limit(6),
       client.from("customer_activity").select("action, entity_type, created_at, meta").order("created_at", { ascending: false }).limit(8),
       client.from("payments").select("id, amount, status, purpose, created_at").order("created_at", { ascending: false }).limit(10)
     ]);
@@ -250,16 +251,25 @@ export async function overview() {
 
 /* ---------------------------------------------------------------- writes */
 export async function markNotificationRead(id) {
-  const { error } = await db().from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+  const { data, error } = await db()
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", uid())
+    .select("id");
   if (error) throw normalizeError(error);
+  return data || [];
 }
 
 export async function markAllNotificationsRead() {
-  const { error } = await db()
+  const { data, error } = await db()
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
-    .is("read_at", null);
+    .eq("user_id", uid())
+    .is("read_at", null)
+    .select("id");
   if (error) throw normalizeError(error);
+  return data || [];
 }
 
 export async function logActivity(action, entityType, entityId, meta = {}) {

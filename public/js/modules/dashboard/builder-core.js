@@ -26,7 +26,7 @@ import { state, plan, canCreateProject } from "../../lib/store.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { api, runtimeConfig } from "../../lib/api.js";
 import { toast, toastError } from "../../ui/toast.js";
-import { confirmDialog } from "../../ui/modal.js";
+import { confirmDialog, openModal } from "../../ui/modal.js";
 import { pageHead, emptyState, setupNotice } from "./components.js";
 import {
   stagesFor,
@@ -1286,7 +1286,7 @@ export function createBuilder(type) {
             )}</button>`
         )
         .join("");
-      applyViewport(isApp ? "mobile" : "tablet", isApp ? 390 : 768, isApp ? 844 : 1024);
+      applyViewport(isApp ? "mobile" : "desktop");
       qs("#stage-url").textContent = `${S.project?.slug || "preview"}.shinzora.in`;
     }
 
@@ -1346,7 +1346,7 @@ export function createBuilder(type) {
 
       host.innerHTML = `
         <p class="muted" style="font-size:var(--fs-xs);line-height:1.6">
-          Walk through every page in the preview. Tablet and phone-sized device previews are available on the right.
+          Walk through every page in the preview. Desktop, tablet and phone are all available on the right.
         </p>
         <div class="wz-review">
           <div class="kv"><dt>Pages</dt><dd>${pages.length ? pages.length : "1"} inside one index.html</dd></div>
@@ -1954,7 +1954,7 @@ export function createBuilder(type) {
       event.target.value = event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-");
     });
 
-    applyViewport(isApp ? "mobile" : "tablet", isApp ? 390 : 768, isApp ? 844 : 1024);
+    applyViewport(isApp ? "mobile" : "desktop");
   };
 }
 

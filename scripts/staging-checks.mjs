@@ -590,8 +590,8 @@ export async function run(db, api, { fixtures }) {
   );
   const revokedRow = await one(db, `select count(*)::int as n from public.admin_users where user_id = $1`, [otherId]);
   const revokedProfile = await one(db, `select role from public.profiles where id = $1`, [otherId]);
-  revoked[0]?.result?.role === "none" && revokedRow.n === 0 && revokedProfile.role === "owner"
-    ? pass("0009", "revoking an administrator removes the row and returns the profile to owner")
+  revoked[0]?.result?.role === "none" && revokedRow.n === 0 && revokedProfile.role === "customer"
+    ? pass("0009", "revoking an administrator removes the row and returns the profile to customer")
     : fail("0009", `revoke left admin_rows=${revokedRow.n}, profile=${revokedProfile.role}`);
 
   /* every privileged change is in the audit trail, with actor and reason */

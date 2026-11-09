@@ -8,7 +8,7 @@ this project actually received.
 
 | Setting | Value |
 | --- | --- |
-| Key | `SHINZORA_AI_API_KEY` (server-side only: `.env` locally, `supabase secrets set` live) |
+| Key | `SHINZORA_AI_API_KEY_1`–`SHINZORA_AI_API_KEY_5` or `SHINZORA_AI_KEYRING` (server-side only; legacy single-key names remain supported) |
 | Model | `gemini-3.8-flash` |
 | Endpoint | `https://generativelanguage.googleapis.com/v1beta` |
 | Reads the key | `supabase/functions/_shared/gemini.ts` (Edge Function) and `server/prelaunch/functions.mjs` (local sandbox) |
@@ -31,39 +31,48 @@ no key, no key fragment.
 
 | Metric | Limit observed | Meaning |
 | --- | --- | --- |
-| `generate_content_free_tier_requests` for `gemini-3.8-flash` | **20 requests / day** | One website generation = one request. A day of iteration exhausts this in minutes. |
+| `generate_content_free_tier_requests` for `gemini-3.8-flash` | Provider-specific; key/project quotas may differ | A chunked website build makes several small model calls (plan, styles, and each page). The provider remains the source of truth for resets. |
 | Image model requests | **0** on the free tier | Image generation needs billing enabled on the provider project. |
 
-The provider answers a spent allowance with a 429 whose message ends
-`Please retry in 1h24m15.473309721s`. Two defects followed from that and are now
-fixed:
+The provider answers a spent allowance with a 429 and a retry delay. The updated server code tries the next configured server-side credential, in order, using the same model. This failover is internal; no credential, key slot, or provider response is sent to the browser when a later key succeeds. If every key is exhausted, the build is saved and the user gets a safe unavailable message.
+
+**Release status (updated):** five numbered secrets (`SHINZORA_AI_API_KEY_1`
+through `_5`) and `SHINZORA_AI_MODEL=gemini-3.8-flash` are now stored in the
+Supabase project `zmkgfmlcpzjfgxdmbtvi`. Each of the five keys was checked
+directly against the provider: `GET /v1beta/models` returned `200` for all five,
+and all five list `models/gemini-3.8-flash`.
+
+Two gaps remain and neither is hidden:
+
+1. The `ai` Edge Function has **not** been redeployed with the keyring code, so
+   the live function still reads the legacy single-key secret and does not rotate
+   across the numbered keys yet.
+2. Model execution could not be confirmed from the build environment: the
+   `generateContent` calls made while writing this document either returned
+   `503 This model is currently experiencing high demand` or hung until the
+   client timeout. Key validity is proven; a live generation is not.
 
 1. The client said **"rate limiting — try again in a minute"**, which was false
    for a quota that resets in 84 minutes.
 2. The message reached customers as provider prose mentioning
    `generativelanguage.googleapis.com` and a rate-limits URL.
 
-Now (both code paths, verified live against a real 429):
+When every configured credential is exhausted, the user-facing response is
+provider-neutral and does not reveal that credential failover exists:
 
 ```
 code:    ai_quota_exhausted
 status:  429
-message: The AI provider's allowance for this project is used up. It resets in about 1h 23m.
-hint:    Wait for the allowance to reset, or raise the limit in the AI provider's plan.
-extra:   { "retry_after_seconds": 4977 }
+message: The AI service is temporarily unavailable. It may be available again in about 1h 23m.
+         No AI credit was charged. Try again later.
 ```
 
-A zero allowance is reported differently — it is a plan matter, not a wait:
+If a later credential succeeds, the user sees only the normal completed response.
 
-```
-code:    ai_quota_exhausted
-message: This AI feature is not included in the provider plan this project is on.
-         The owner can enable it in the AI provider's billing settings.
-```
-
-Fail-fast rule: when the allowance itself is spent, the model fallback chain is
-**not** walked — every model in the chain answers 429 for the same project, and
-walking it only replaces the true reason with a generic one.
+Quota rule: when a credential returns a quota-exhausted response, the current
+model chain stops and the next configured credential is tried. The user's
+selected/default model is preserved across credential rotation. If all configured
+credentials are quota-exhausted, the server stops rather than burning more calls.
 
 `ai_max_tokens` is also distinct now: a thinking model that spends its whole
 output budget returns an empty candidate, which used to be reported as "the AI
@@ -74,15 +83,12 @@ model in the chain is tried.
 
 **Owner action (cannot be done from inside this workspace):**
 
-1. Open the provider project that owns this key → **Billing** → enable it. This
-   raises the text quota and unlocks the image models.
-2. If you want a different text model, set `SHINZORA_AI_MODEL` (local `.env` or
-   `supabase secrets set`). Model names are checked against `GET /v1beta/models`
-   before use — the app never assumes one exists.
-3. Image generation is required by Parts 4.1, 4.2 (site imagery), 4.3/9 (logos,
-   thumbnails). Until billing is on, those surfaces must stay honestly disabled
-   with the reason shown — they will not fall back to stock photos pretending to
-   be generated.
+1. Review the provider's own usage page for each credential; separate keys may
+   still share a project-level quota.
+2. `SHINZORA_AI_MODEL` selects the default. This deployment is configured for
+   `gemini-3.8-flash`; explicit user model choices remain supported where enabled.
+3. Image generation has its own capability and quota; credential failover does
+   not create an image model entitlement or pretend an image was generated.
 
 ## How spend is controlled in code
 

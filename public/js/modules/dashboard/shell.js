@@ -256,7 +256,7 @@ let notificationRows = [];
 
 export async function refreshNotificationBadge() {
   if (!sb || !uid()) return;
-  const { count } = await sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null);
+  const { count } = await sb.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", uid()).is("read_at", null);
   state.unreadNotifications = count || 0;
   const badges = [qs("#notif-badge"), qs("[data-notif-badge]")].filter(Boolean);
   badges.forEach((badge) => {
@@ -344,6 +344,8 @@ function bindNotificationDrawer() {
   on(qs("#notif-mark-all"), "click", async () => {
     try {
       await markAllNotificationsRead();
+      const readAt = new Date().toISOString();
+      notificationRows.forEach((row) => { row.read_at = row.read_at || readAt; });
       qsa("#notif-list .notif").forEach((n) => n.classList.remove("is-unread"));
       await refreshNotificationBadge();
       toast({ title: "All notifications marked as read" }, { tone: "success" });

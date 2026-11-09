@@ -16,7 +16,7 @@
 import { assertEquals, assertRejects, assertStringIncludes } from "jsr:@std/assert@1";
 import { defaultModel, GeminiError, estimateTokens, gemini, geminiConfigured, geminiJson, geminiKey, modelChain } from "./gemini.ts";
 
-const KEY_VARS = ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
+const KEY_VARS = ["SHINZORA_AI_KEYRING", "SHINZORA_AI_API_KEYS", "SHINZORA_AI_KEY_PROJECT_ID", "SHINZORA_AI_API_KEY_1", "SHINZORA_AI_API_KEY_2", "SHINZORA_AI_API_KEY_3", "SHINZORA_AI_API_KEY_4", "GEMINI_API_KEY_1", "GEMINI_API_KEY_2", "SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
 
 function clearKeys() {
   for (const name of KEY_VARS) Deno.env.delete(name);
