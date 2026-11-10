@@ -52,10 +52,27 @@ export function configuredGeminiKeys(): GeminiApiKey[] {
   const configuredRing = parseJsonRing(Deno.env.get("SHINZORA_AI_KEYRING") ?? "");
   for (const entry of configuredRing) add(entry);
 
-  // A delimited secret is a migration path for operators who haven't moved to
-  // the structured keyring. Unknown project identity is not treated as extra
-  // capacity: every such key shares the same conservative quota group.
-  const sharedProject = (Deno.env.get("SHINZORA_AI_KEY_PROJECT_ID") ?? "").trim() || "legacy-unclassified";
+  /* Quota grouping.
+     Google meters generation per Google Cloud project, and a free-tier API key
+     created from a different Google account belongs to a different project with
+     its own allowance. Treating such keys as one pool would throw away working
+     capacity the moment the first account hits its daily limit, so the default
+     is now "each slot is its own project".
+
+     Set SHINZORA_AI_SHARED_QUOTA=1 when every key really does come from one
+     project: they then share a single conservative pool, so one spent allowance
+     parks the whole ring instead of pointlessly retrying siblings that would
+     answer 429 too. Per-slot identity can also be stated outright with
+     SHINZORA_AI_KEY_PROJECT_<n>, or per entry in SHINZORA_AI_KEYRING. */
+  const sharedQuota = /^(1|true|yes|on)$/i.test((Deno.env.get("SHINZORA_AI_SHARED_QUOTA") ?? "").trim());
+  const legacyProject = (Deno.env.get("SHINZORA_AI_KEY_PROJECT_ID") ?? "").trim();
+  const sharedProject = legacyProject || "legacy-unclassified";
+  const slotProject = (index: number, fallback: string) => {
+    if (sharedQuota) return sharedProject;
+    const explicit = (Deno.env.get(`SHINZORA_AI_KEY_PROJECT_${index}`) ?? "").trim();
+    if (explicit) return safeId(explicit, fallback);
+    return fallback;
+  };
   const list = Deno.env.get("SHINZORA_AI_API_KEYS") ?? "";
   let listValues: string[] = [];
   try {
@@ -65,19 +82,29 @@ export function configuredGeminiKeys(): GeminiApiKey[] {
     listValues = list.split(/[\n,;]+/);
   }
   listValues.slice(0, 32).forEach((key, index) => add({
-    id: `env-list-${index + 1}`, key: cleanKey(key), projectId: sharedProject, priority: 100 + index
+    id: `env-list-${index + 1}`,
+    key: cleanKey(key),
+    projectId: slotProject(index + 1, `list-slot-${index + 1}`),
+    priority: 100 + index
   }));
 
   for (let index = 1; index <= 16; index++) {
     for (const name of [`SHINZORA_AI_API_KEY_${index}`, `GEMINI_API_KEY_${index}`]) {
       const key = cleanKey(Deno.env.get(name));
-      if (key) add({ id: `env-${index}`, key, projectId: sharedProject, priority: 200 + index });
+      if (key) add({
+        id: `env-${index}`,
+        key,
+        projectId: slotProject(index, `slot-${index}`),
+        priority: 200 + index
+      });
     }
   }
 
   for (const [index, name] of ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"].entries()) {
     const key = cleanKey(Deno.env.get(name));
-    if (key) add({ id: `legacy-${index + 1}`, key, projectId: sharedProject, priority: 300 + index });
+    if (key) add({
+      id: `legacy-${index + 1}`, key, projectId: slotProject(1, "legacy-slot-1"), priority: 300 + index
+    });
   }
 
   return entries.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));

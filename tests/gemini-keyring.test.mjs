@@ -82,6 +82,8 @@ try {
   assert.equal(await ai.gemini("Retry safely"), "second key worked", "a key-level rate limit rotates to the next key");
   assert.deepEqual(generateCalls().map((call) => call.key), [fakeKeys[0], fakeKeys[1]]);
 
+  /* An explicit keyring with no project ids is deliberately conservative: those
+     keys might share one project, so one spent allowance parks the ring. */
   configure([
     { id: "unknown-a", key: fakeKeys[0], priority: 1 },
     { id: "unknown-b", key: fakeKeys[1], priority: 2 }
@@ -91,7 +93,7 @@ try {
     return responseJson({ error: { message: "Quota exceeded for project." } }, 429);
   });
   await assert.rejects(() => ai.gemini("Do not assume spare quota"), (error) => error.code === "ai_quota_exhausted");
-  assert.equal(generateCalls().length, 1, "keys without project assignments share a conservative quota group");
+  assert.equal(generateCalls().length, 1, "an unlabelled keyring shares one conservative quota group");
 
   configure([
     { id: "disabled", key: "fake-disabled-key-0004", projectId: "project-a", enabled: false },
@@ -99,6 +101,57 @@ try {
   ]);
   assert.equal(ai.geminiKey(), fakeKeys[2], "disabled keys are never selected");
   assert.equal(ai.geminiConfigured(), true);
+
+  /* ---- one Gmail account per API key ------------------------------------ */
+  /* Five keys created from five different Google accounts are five separate
+     free-tier allowances. A spent allowance on the first must rotate to the
+     second, not park the whole ring: that is the entire point of five accounts. */
+  ai.resetGeminiKeyHealth();
+  for (const name of Object.keys(ENV)) if (name.startsWith("SHINZORA_AI_")) delete ENV[name];
+  ENV.SHINZORA_AI_MODEL = "gemini-3.8-flash";
+  ENV.SHINZORA_AI_MODEL_FALLBACKS = "";
+  ENV.SHINZORA_AI_API_KEY_1 = "account-one-key-000000001";
+  ENV.SHINZORA_AI_API_KEY_2 = "account-two-key-000000002";
+  ENV.SHINZORA_AI_API_KEY_3 = "account-three-key-000003";
+  ai.resetGeminiKeyHealth();
+
+  const projects = ai.geminiKeyMetadata().map((entry) => entry.projectId);
+  assert.equal(new Set(projects).size, 3, "each numbered key is its own quota pool by default");
+  assert.ok(projects.every((id) => !id.includes("unclassified")), "numbered keys are not lumped into one shared pool");
+
+  stub((call) => {
+    if (!call.url.includes(":generateContent")) return responseJson({ models: [] });
+    if (call.key === "account-one-key-000000001") {
+      return responseJson({ error: { message: "You exceeded your current quota." } }, 429);
+    }
+    return responseJson({ candidates: [{ content: { parts: [{ text: "second account answered" }] } }] });
+  });
+  const fromSecond = await ai.gemini("Use another account");
+  assert.equal(fromSecond, "second account answered", "a spent daily quota rotates to the next account");
+  assert.deepEqual(
+    generateCalls().map((call) => call.key),
+    ["account-one-key-000000001", "account-two-key-000000002"],
+    "exactly two accounts were tried, in order"
+  );
+
+  /* Opting back in to a shared pool restores the conservative behaviour. */
+  ai.resetGeminiKeyHealth();
+  ENV.SHINZORA_AI_SHARED_QUOTA = "1";
+  const grouped = ai.geminiKeyMetadata().map((entry) => entry.projectId);
+  assert.equal(new Set(grouped).size, 1, "SHINZORA_AI_SHARED_QUOTA=1 puts every key in one pool");
+  delete ENV.SHINZORA_AI_SHARED_QUOTA;
+
+  /* An explicit per-slot project wins over both defaults. */
+  ai.resetGeminiKeyHealth();
+  ENV.SHINZORA_AI_KEY_PROJECT_2 = "google-project-two";
+  const labelled = ai.geminiKeyMetadata();
+  assert.equal(labelled.find((entry) => entry.id === "env-2")?.projectId, "google-project-two", "a slot can state its project");
+  delete ENV.SHINZORA_AI_KEY_PROJECT_2;
+  for (const name of Object.keys(ENV)) if (name.startsWith("SHINZORA_AI_API_KEY_")) delete ENV[name];
+  ai.resetGeminiKeyHealth();
+
+  /* Restore a normal ring for the scenarios that follow. */
+  configure([{ id: "alpha", key: fakeKeys[0], projectId: "project-a", priority: 1 }]);
 
   /* ---- automatic model switching ---------------------------------------- */
   ai.resetGeminiModelHealth();
@@ -172,6 +225,7 @@ try {
   console.log("  ✓ Gemini keyring priority, same-model failover, project quota grouping, per-key rate limits, disabled keys, and URL secrecy");
   console.log("  ✓ model auto-switching: congestion demotes, shape 400s recover, bad keys stay bad");
   console.log("  ✓ the configured model is the only model: discovery never widens the chain");
+  console.log("  ✓ five accounts are five quota pools: a spent allowance rotates instead of parking the ring");
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
