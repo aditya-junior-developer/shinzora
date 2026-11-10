@@ -1186,6 +1186,57 @@ html {
   color: var(--c-text-dim);
 }
 
+/* The 24-hour verification terms, shown between the UPI ID and the QR. */
+.pay-terms {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 var(--s-4);
+  padding: 0;
+  list-style: none;
+}
+
+.pay-terms li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  align-items: start;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--c-text-dim);
+}
+
+.pay-terms li svg {
+  margin-top: 2px;
+  color: var(--c-accent-soft, #c4b5fd);
+}
+
+.pay-terms strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.pay-consent {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  align-items: start;
+  padding: 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-border);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  cursor: pointer;
+}
+
+.pay-consent input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--c-accent, #8b5cf6);
+  cursor: pointer;
+}
+
 .pay-hint {
   font-size: var(--fs-xs);
   line-height: 1.65;

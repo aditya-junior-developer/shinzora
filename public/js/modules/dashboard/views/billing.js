@@ -115,13 +115,9 @@ export default async function render(root) {
                   ${
                     item.id === plan.id
                       ? `<button class="btn btn-secondary btn-sm btn-block" disabled>Your plan</button>`
-                      : item.id === "enterprise"
-                        ? `<a class="btn btn-secondary btn-sm btn-block" href="mailto:${esc(
-                            "official.shinzora@proton.me"
-                          )}?subject=Shinzora%20Enterprise">Talk to us</a>`
-                        : `<button class="btn btn-primary btn-sm btn-block" data-upgrade="${item.id}">
-                            ${item.priceMonthly > plan.priceMonthly ? "Upgrade" : "Switch"} to ${esc(item.name)}
-                          </button>`
+                      : `<button class="btn btn-primary btn-sm btn-block" data-upgrade="${item.id}">
+                          ${item.priceMonthly > plan.priceMonthly ? "Upgrade" : "Switch"} to ${esc(item.name)}
+                        </button>`
                   }
                 </div>`
               ).join("")}
@@ -363,6 +359,10 @@ export default async function render(root) {
     let payerUpi = "";
     const currency = payment?.currency || "INR";
     const amountText = money(amount, currency);
+    /* A plan change is not instant: a person checks the UTR against the bank
+       statement. Saying so before money moves is the difference between a
+       customer who waits and a customer who thinks it failed. */
+    const isPlan = String(payment?.purpose || "").startsWith("subscription:") || Boolean(payment?.plan);
 
     const modal = openModal({
       title: "Complete your payment",
@@ -388,6 +388,26 @@ export default async function render(root) {
               <span>Next screen shows the amount and the payment QR.</span>
             </div>`;
           next.textContent = "Continue to payment";
+        };
+
+        const paintTerms = () => {
+          body.innerHTML = `
+            <div class="pay-amount">
+              <span class="pay-amount-label">Amount</span>
+              <strong class="pay-amount-value">${esc(amountText)}</strong>
+              <span class="pay-amount-note">Reference <span class="mono">${esc(payment?.reference || "—")}</span></span>
+            </div>
+            <ul class="pay-terms">
+              <li>${icon("clock", { size: 14 })}<span><strong>Verification takes up to 24 hours.</strong> A person matches your UTR against the bank statement — it is not automatic.</span></li>
+              <li>${icon("hourglass", { size: 14 })}<span>Until then the payment shows as <strong>under process</strong>. Your plan does not change yet.</span></li>
+              <li>${icon("shield-check", { size: 14 })}<span>Your plan activates the moment the payment is verified, and we notify you. You are charged this amount once.</span></li>
+              <li>${icon("x", { size: 14 })}<span>Closing this window or this page does not mark anything as paid.</span></li>
+            </ul>
+            <label class="pay-consent">
+              <input type="checkbox" id="pay-terms-ok" />
+              <span>I understand the payment is verified within 24 hours before my plan changes.</span>
+            </label>`;
+          next.textContent = "Show the payment QR";
         };
 
         const paintQr = () => {
@@ -457,8 +477,8 @@ export default async function render(root) {
           body.innerHTML = `
             <div class="pay-done">
               <span class="pay-done-icon">${icon("hourglass", { size: 22 })}</span>
-              <h3>Payment submitted</h3>
-              <p>You can close this page now. Your payment is confirmed within 24 hours and your plan becomes active the moment it is.</p>
+              <h3>Payment under process</h3>
+              <p>You can close this page now. The payment is verified within 24 hours, and your ${isPlan ? "plan" : "order"} becomes active the moment it is.</p>
               <div class="kv" style="margin-top:var(--s-4)"><dt>Amount</dt><dd><strong>${esc(amountText)}</strong></dd></div>
               <div class="kv"><dt>Reference</dt><dd class="mono">${esc(payment?.reference || "")}</dd></div>
               <div class="kv"><dt>Paid from</dt><dd class="mono">${esc(payerUpi)}</dd></div>
@@ -479,6 +499,25 @@ export default async function render(root) {
               return;
             }
             payerUpi = value;
+            if (isPlan) {
+              step = "terms";
+              paintTerms();
+              return;
+            }
+            step = "qr";
+            paintQr();
+            return;
+          }
+
+          if (step === "terms") {
+            if (!qs("#pay-terms-ok", dialog)?.checked) {
+              toast({
+                title: "Confirm the 24-hour verification",
+                message: "Tick the box so we know the timing is clear — your plan changes only after the payment is verified.",
+                tone: "warning"
+              });
+              return;
+            }
             step = "qr";
             paintQr();
             return;
