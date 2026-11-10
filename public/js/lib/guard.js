@@ -8,6 +8,7 @@
 
 import { sb, getSession, signOut } from "./supabase.js";
 import { loadIdentity, state, hasCompletedOnboarding, resetIdentity } from "./store.js";
+import { retrySession, classifySessionError, withDeadline, SESSION_LOOKUP_LIMIT_MS } from "./identity-retry.js";
 import { toast } from "../ui/toast.js";
 
 const withNext = (base, next) => {
@@ -71,21 +72,44 @@ export async function requireSession(opts = {}) {
   showBootOverlay();
   let session = null;
   try {
-    session = await getSession();
+    /* A dropped connection is worth a second attempt; a dead refresh token is
+       not. Retrying the first and signing out for the second is the whole
+       difference between "slow network" and "you were logged out". */
+    session = await withDeadline(
+      retrySession(() => getSession()),
+      SESSION_LOOKUP_LIMIT_MS,
+      "Checking your session"
+    );
   } catch (error) {
-    /* A session lookup that throws (offline, storage blocked, revoked token)
-       must not strand the user behind the overlay. */
     hideBootOverlay();
-    console.warn("[shinzora] session lookup failed:", error?.message);
-    toast({ title: "Could not restore your session", message: "Check your connection and sign in again." }, { tone: "error" });
-    location.replace("/auth/login/?reason=session_unavailable");
-    return { session: null, ok: false };
+    const kind = classifySessionError(error);
+    console.warn("[shinzora] session lookup failed:", kind, error?.message);
+
+    if (kind === "auth") {
+      /* The stored session is genuinely unusable. Clear it so the next visit
+         starts clean, and ask for a sign-in instead of looping on a dead token. */
+      try {
+        await signOut();
+      } catch {
+        /* signing out locally is enough; the token is already dead */
+      }
+      resetIdentity();
+      const next = opts.next || location.pathname + location.search;
+      location.replace(withNext(opts.redirect || "/auth/login/?reason=session_expired", next));
+      return { session: null, ok: false, reason: "auth", error };
+    }
+
+    toast({ title: "Could not restore your session", message: "Check your connection, then try again." }, { tone: "error" });
+    /* Deliberately not a redirect: the user is probably still signed in, and
+       sending them to the login page would look like a logout. The caller
+       renders a retry panel instead. */
+    return { session: null, ok: false, reason: "unavailable", error };
   }
   if (!session) {
     hideBootOverlay();
     const next = opts.next || location.pathname + location.search;
     location.replace(withNext(opts.redirect || "/auth/login/", next));
-    return { session: null, ok: false };
+    return { session: null, ok: false, reason: "signed_out" };
   }
 
   try {
@@ -93,8 +117,11 @@ export async function requireSession(opts = {}) {
   } catch (error) {
     hideBootOverlay();
     console.warn("[shinzora] identity load failed:", error?.message);
-    toast({ title: "Could not load your workspace", message: "Reload the page, or sign in again if this repeats." }, { tone: "error" });
-    return { session, ok: false };
+    /* The session is real; only the data behind it is missing. Returning
+       ok:false here used to abandon the shell entirely — an empty sidebar and
+       an empty page with a toast that disappeared. Report the failure instead
+       and let the caller paint a usable, retryable shell. */
+    return { session, ok: true, identityError: error };
   }
 
   if (opts.admin && state.isAdmin !== true) {

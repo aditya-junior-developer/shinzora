@@ -66,30 +66,157 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
   }
 
   const userId = session.user.id;
-  const [profileRes, businessRes, subRes, onboardRes, adminRes, notifRes] = await Promise.all([
-    sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
-    sb.from("businesses").select("*").eq("owner_id", userId).order("created_at", { ascending: true }).limit(1).maybeSingle(),
-    sb.from("subscriptions").select("*").eq("user_id", userId).maybeSingle(),
-    sb.from("onboarding_progress").select("*").eq("user_id", userId).maybeSingle(),
-    sb.rpc("is_admin"),
-    sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null)
-  ]);
+  /* Named so a failure can be reported against the thing that actually broke,
+     and settled individually: one denied query used to reject the whole batch
+     and blank the dashboard. A missing subscription row must not cost the user
+     their profile. */
+  const calls = {
+    profile: () => sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    business: () => sb.from("businesses").select("*").eq("owner_id", userId).order("created_at", { ascending: true }).limit(1).maybeSingle(),
+    subscription: () => sb.from("subscriptions").select("*").eq("user_id", userId).maybeSingle(),
+    onboarding: () => sb.from("onboarding_progress").select("*").eq("user_id", userId).maybeSingle(),
+    admin: () => sb.rpc("is_admin"),
+    notifications: () => sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null)
+  };
+  const names = Object.keys(calls);
+  /* supabase-js query builders are thenables, not Promises — they have no
+     .catch — so wrap before attaching one. */
+  const settled = await Promise.allSettled(
+    names.map((name) => Promise.resolve(calls[name]()).catch((error) => ({ __threw: error })))
+  );
+  const result = {};
+  const failures = [];
+  settled.forEach((entry, index) => {
+    const name = names[index];
+    if (entry.status === "rejected") {
+      failures.push({ area: name, error: entry.reason });
+      result[name] = null;
+      return;
+    }
+    const value = entry.value;
+    if (value && value.__threw) {
+      failures.push({ area: name, error: value.__threw });
+      result[name] = null;
+      return;
+    }
+    if (value && value.error && !/no rows/i.test(value.error.message || "")) {
+      failures.push({ area: name, error: value.error });
+    }
+    result[name] = value;
+  });
 
-  if (profileRes.error && !/no rows/i.test(profileRes.error.message || "")) {
-    // A missing table is surfaced by the views; don't hard-fail identity load.
-    console.warn("[shinzora] profile load:", normalizeError(profileRes.error).message);
+  state.identityFailures = failures;
+  if (failures.length) {
+    console.warn(
+      "[shinzora] identity partial:",
+      failures.map((f) => `${f.area}: ${normalizeError(f.error).message}`).join(" | ")
+    );
   }
 
-  state.profile = one(profileRes.data);
-  state.business = one(businessRes.data);
-  state.subscription = one(subRes.data);
-  state.onboarding = one(onboardRes.data);
-  state.isAdmin = adminRes.data === true;
-  state.unreadNotifications = notifRes.count || 0;
+  state.profile = one(result.profile?.data);
+  state.business = one(result.business?.data);
+  state.subscription = one(result.subscription?.data);
+  state.onboarding = one(result.onboarding?.data);
+  state.isAdmin = result.admin?.data === true;
+  state.unreadNotifications = result.notifications?.count || 0;
   state.loadedAt = Date.now();
+
+  if (state.profile) {
+    rememberIdentity({
+      userId,
+      fullName: state.profile.full_name || "",
+      accountType: state.profile.account_type || "owner",
+      businessName: state.business?.name || ""
+    });
+  }
 
   emit("identity", state);
   return state;
+}
+
+/* --------------------------------------------------------------------------
+   Remembering just enough to paint the right shell
+   --------------------------------------------------------------------------
+   Identity lives in memory, so a page load during an outage had nothing to
+   paint with: an agent saw the business-owner navigation (or, before the boot
+   fix, nothing at all). These three facts — who they are, which kind of account
+   they have, and their business name — are all the chrome needs. Nothing
+   sensitive, nothing authoritative: the database still decides every
+   permission, this only decides which links to draw.
+   -------------------------------------------------------------------------- */
+
+const IDENTITY_CACHE_KEY = "shinzora.identity.shell";
+
+function identityStorage() {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The last known shell-relevant identity, or null. Never throws. */
+export function cachedIdentity() {
+  const store = identityStorage();
+  if (!store) return null;
+  try {
+    const raw = store.getItem(IDENTITY_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberIdentity(data) {
+  const store = identityStorage();
+  if (!store) return;
+  try {
+    if (!data || !data.userId) {
+      store.removeItem(IDENTITY_CACHE_KEY);
+      return;
+    }
+    store.setItem(IDENTITY_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    /* private mode or a full quota: the cache is a convenience, not a need */
+  }
+}
+
+/**
+ * Seed the in-memory profile from the remembered shell identity, for a boot
+ * that could not load it. Deliberately minimal — id, name and account type are
+ * what the chrome reads — and overwritten by the real row on the next
+ * successful load. Permissions never come from here.
+ * @returns {boolean} whether anything was seeded
+ */
+export function applyShellIdentity() {
+  if (state.profile) return false;
+  const remembered = cachedIdentity();
+  if (!remembered) return false;
+  state.profile = {
+    id: remembered.userId || null,
+    full_name: remembered.fullName || "",
+    account_type: remembered.accountType === "agent" ? "agent" : "owner",
+    __provisional: true
+  };
+  return true;
+}
+
+/**
+ * Paint-able identity for a boot that cannot reach the database.
+ * Uses the live state when it is there, otherwise the last known values.
+ */
+export function shellIdentity() {
+  if (state.profile) {
+    return {
+      userId: state.user?.id || null,
+      fullName: state.profile.full_name || "",
+      accountType: state.profile.account_type || "owner",
+      businessName: state.business?.name || ""
+    };
+  }
+  return cachedIdentity();
 }
 
 /** Clear cached identity on sign-out. */
@@ -103,8 +230,10 @@ export function resetIdentity() {
     onboarding: null,
     isAdmin: false,
     unreadNotifications: 0,
+    identityFailures: [],
     loadedAt: 0
   });
+  rememberIdentity(null);
   emit("identity", state);
 }
 
