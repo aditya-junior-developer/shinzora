@@ -5,6 +5,10 @@
    want: search by handle, name, or skill, scan a card, then open the full
    profile in a modal.
 
+   Only agents appear here — the list RPC filters out business-owner accounts
+   that never built an agent profile, so a card always describes a person you
+   could actually hire.
+
    Two round trips on purpose. The list RPC (`find_team_search`) returns enough
    for a card; the modal calls `agent_public_profile` only when opened, so the
    directory stays cheap even with a large roster.
@@ -32,6 +36,10 @@ const amount = (value, currency = "INR") => {
   }
 };
 
+/* "1 years" was on screen in the old modal. One helper, used everywhere the
+   number is printed, so the plural never regresses. */
+const years = (n) => (n === 1 ? "1 year" : `${n} years`);
+
 let results = [];
 let query = "";
 let lastError = null;
@@ -46,7 +54,7 @@ function paint(root) {
   root.innerHTML = `
     ${pageHead({
       title: "Find Team",
-      desc: "Search people by their @username, their name, or a skill. Open a card to see experience, portfolio and availability."
+      desc: "Freelancers and agents you can bring onto a project. Search by @username, by name, or by skill."
     })}
     <div class="toolbar">
       <form class="ft-search" id="ft-form" role="search">
@@ -72,6 +80,16 @@ function paint(root) {
   delegate(root, "click", "[data-person]", (_event, card) => openProfile(card.dataset.person));
 }
 
+/* A real photo when one was uploaded, initials when not. Same classes either
+   way, so a mixed roster still lines up. */
+function personAvatar(person, size = "lg") {
+  if (!person || !person.avatarUrl) return avatar(person?.name, null, size);
+  const variant = size.startsWith("avatar-") ? size : `avatar-${size}`;
+  return `<span class="avatar ${variant} ft-avatar"><img src="${esc(person.avatarUrl)}" alt="" loading="lazy" /></span>`;
+}
+
+const pill = (text, tone = "") => `<span class="ft-pill${tone ? ` ${tone}` : ""}">${esc(text)}</span>`;
+
 function paintResults(root) {
   const grid = qs("#ft-results", root);
   const count = qs("#ft-count", root);
@@ -87,8 +105,8 @@ function paintResults(root) {
       icon: "users",
       title: query ? "Nobody matches that yet" : "No one to show yet",
       desc: query
-        ? `No account matches “${query}”. Check the spelling, or invite them by email from Team.`
-        : "As people join and publish a profile, they appear here."
+        ? `No freelancer matches “${query}”. Check the spelling, or invite them by email from Team.`
+        : "As agents join and publish a profile, they appear here."
     });
     return;
   }
@@ -96,24 +114,49 @@ function paintResults(root) {
   grid.innerHTML = results
     .map((person) => {
       const rate = amount(person.expectedRate, person.currency);
+      const skills = (person.skills || []).slice(0, 3);
+      const extra = Math.max(0, (person.skills || []).length - 3);
+      const available = String(person.availability || "").toLowerCase() === "available";
       return `<article class="card ft-card" data-person="${esc(person.username || "")}" tabindex="0" role="button"
           aria-label="Open ${esc(person.name)}’s profile">
         <div class="card-body">
           <div class="ft-top">
-            ${avatar(person.name, null, "lg")}
+            ${personAvatar(person, "lg")}
             <div class="ft-ident">
-              <h3 class="mk-title">${esc(person.name)}</h3>
-              <div class="mk-note">@${esc(person.username || "no-handle")}</div>
+              <h3 class="ft-name">${esc(person.name)}</h3>
+              <div class="ft-handle">@${esc(person.username || "no-handle")}</div>
             </div>
-            ${person.availability ? `<span class="mk-status mk-${person.availability === "available" ? "positive" : "muted"}">${esc(person.availability)}</span>` : ""}
+            ${person.availability ? pill(person.availability, available ? "is-available" : "") : ""}
           </div>
-          ${person.headline ? `<p class="mk-desc">${esc(person.headline)}</p>` : ""}
-          <div class="mk-chips">${(person.skills || []).slice(0, 6).map((s) => `<span class="mk-chip">${esc(s)}</span>`).join("")}</div>
-          <dl class="mk-facts">
-            <div><dt>Experience</dt><dd>${person.yearsExperience ? `${person.yearsExperience} yr` : "Not stated"}</dd></div>
-            <div><dt>Rate</dt><dd>${rate ? esc(rate) : "Open"}</dd></div>
-            <div><dt>Equity</dt><dd>${person.equityOk || person.esopOk ? "Open to equity" : "Cash only"}</dd></div>
-          </dl>
+
+          ${
+            person.headline
+              ? `<p class="ft-headline">${esc(person.headline)}</p>`
+              : `<p class="ft-headline is-empty">No headline yet</p>`
+          }
+
+          ${
+            skills.length
+              ? `<div class="mk-chips ft-chips">${skills
+                  .map((skill) => `<span class="mk-chip">${esc(skill)}</span>`)
+                  .join("")}${extra ? `<span class="mk-chip mk-chip-more">+${extra}</span>` : ""}</div>`
+              : `<div class="ft-noskills">No skills listed yet</div>`
+          }
+
+          <div class="ft-stats">
+            <div class="ft-stat">
+              <span class="ft-stat-label">Experience</span>
+              <span class="ft-stat-value">${person.yearsExperience ? `${person.yearsExperience} yr` : "—"}</span>
+            </div>
+            <div class="ft-stat">
+              <span class="ft-stat-label">Rate</span>
+              <span class="ft-stat-value">${rate ? esc(rate) : "Open"}</span>
+            </div>
+            <div class="ft-stat">
+              <span class="ft-stat-label">Equity</span>
+              <span class="ft-stat-value">${person.equityOk || person.esopOk ? "Open" : "Cash only"}</span>
+            </div>
+          </div>
         </div>
       </article>`;
     })
@@ -173,36 +216,46 @@ async function openProfile(username) {
   const socials = Object.entries(person.socialLinks || {}).filter(([, v]) => v);
   const experience = Array.isArray(person.experience) ? person.experience : [];
   const portfolio = Array.isArray(person.portfolio) ? person.portfolio : [];
+  const skills = person.skills || [];
+  const available = String(person.availability || "").toLowerCase() === "available";
 
   modal.body.innerHTML = `
     <div class="ft-profile">
       <div class="ft-profile-head">
-        ${avatar(person.name, null, "lg")}
-        <div>
-          <div class="ft-profile-name">${esc(person.name)}</div>
-          <div class="mk-note">@${esc(person.username || username)}${person.isSelf ? " · that's you" : ""}</div>
-          <div class="mk-note">${esc(person.accountType === "agent" ? "Agent" : "Business owner")}${person.location ? ` · ${esc(person.location)}` : ""}${person.remoteOk ? " · remote" : ""}</div>
+        ${personAvatar(person, "lg")}
+        <div class="ft-profile-ident">
+          <!-- The modal header already carries the name; repeating it here made
+               the sheet look like two stacked titles. -->
+          <div class="ft-profile-handle">@${esc(person.username || username)}${person.isSelf ? " · that's you" : ""}</div>
+          <div class="ft-profile-tags">
+            ${pill(person.accountType === "agent" ? "Freelancer" : "Business owner")}
+            ${person.location ? pill(person.location) : ""}
+            ${person.remoteOk ? pill("Remote") : ""}
+            ${person.availability ? pill(person.availability, available ? "is-available" : "") : ""}
+          </div>
         </div>
       </div>
 
-      ${person.bio ? `<p class="mk-desc">${esc(person.bio)}</p>` : ""}
+      ${person.bio ? `<p class="ft-bio">${esc(person.bio)}</p>` : ""}
 
-      <dl class="mk-facts mk-facts-wide">
-        <div><dt>Experience</dt><dd>${person.yearsExperience ? `${person.yearsExperience} years` : "Not stated"}</dd></div>
-        <div><dt>Expected rate</dt><dd>${rate ? esc(rate) : "Open"}</dd></div>
-        <div><dt>Hours / week</dt><dd>${person.hoursPerWeek || "Flexible"}</dd></div>
-        <div><dt>Completed projects</dt><dd>${person.completedContracts}</dd></div>
-        <div><dt>Ongoing projects</dt><dd>${person.ongoingContracts}</dd></div>
-        <div><dt>Rating</dt><dd>${person.ratingAvg ? `${person.ratingAvg} (${person.ratingCount})` : "No reviews yet"}</dd></div>
-        <div><dt>Equity</dt><dd>${person.equityOk ? "Open to equity" : "Not open"}</dd></div>
-        <div><dt>ESOP</dt><dd>${person.esopOk ? "Open to ESOP" : "Not open"}</dd></div>
-      </dl>
+      <div class="ft-stat-grid">
+        <div class="ft-stat-cell"><span>Experience</span><strong>${person.yearsExperience ? years(person.yearsExperience) : "Not stated"}</strong></div>
+        <div class="ft-stat-cell"><span>Expected rate</span><strong>${rate ? esc(rate) : "Open"}</strong></div>
+        <div class="ft-stat-cell"><span>Hours / week</span><strong>${person.hoursPerWeek || "Flexible"}</strong></div>
+        <div class="ft-stat-cell"><span>Completed</span><strong>${person.completedContracts ?? 0}</strong></div>
+        <div class="ft-stat-cell"><span>Ongoing</span><strong>${person.ongoingContracts ?? 0}</strong></div>
+        <div class="ft-stat-cell"><span>Rating</span><strong>${person.ratingAvg ? `${person.ratingAvg} (${person.ratingCount})` : "No reviews yet"}</strong></div>
+        <div class="ft-stat-cell"><span>Equity</span><strong>${person.equityOk ? "Open to equity" : "Not open"}</strong></div>
+        <div class="ft-stat-cell"><span>ESOP</span><strong>${person.esopOk ? "Open to ESOP" : "Not open"}</strong></div>
+      </div>
 
       ${person.seeking ? `<section class="ft-section"><h4>Looking for</h4><p>${esc(person.seeking)}</p></section>` : ""}
 
       ${
-        (person.skills || []).length
-          ? `<section class="ft-section"><h4>Skills</h4><div class="mk-chips">${person.skills.map((s) => `<span class="mk-chip">${esc(s)}</span>`).join("")}</div></section>`
+        skills.length
+          ? `<section class="ft-section"><h4>Skills</h4><div class="mk-chips">${skills
+              .map((skill) => `<span class="mk-chip">${esc(skill)}</span>`)
+              .join("")}</div></section>`
           : ""
       }
 
@@ -212,7 +265,9 @@ async function openProfile(username) {
               .map(
                 (job) => `<li>
                   <div class="ft-timeline-role">${esc(job.role || "Role")}</div>
-                  <div class="ft-timeline-meta">${esc(job.company || "")}${job.from || job.to ? ` · ${esc(job.from || "")}–${esc(job.to || "")}` : ""}</div>
+                  <div class="ft-timeline-meta">${esc(job.company || "")}${
+                    job.from || job.to ? ` · ${esc(job.from || "")}–${esc(job.to || "")}` : ""
+                  }</div>
                   ${job.summary ? `<p class="mk-desc">${esc(job.summary)}</p>` : ""}
                 </li>`
               )
@@ -227,7 +282,7 @@ async function openProfile(username) {
                 (item) => `<div class="ft-portfolio-item">
                   <div class="ft-portfolio-title">${esc(item.title)}</div>
                   ${item.summary ? `<p class="mk-desc">${esc(item.summary)}</p>` : ""}
-                  ${item.url ? `<a class="mk-link" href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Open</a>` : ""}
+                  ${item.url ? `<a class="mk-link" href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Open project</a>` : ""}
                 </div>`
               )
               .join("")}</div></section>`
@@ -236,9 +291,22 @@ async function openProfile(username) {
 
       <section class="ft-section"><h4>Documents &amp; links</h4>
         <div class="ft-links">
-          ${person.resumeUrl ? `<a class="mk-link" href="${esc(person.resumeUrl)}" target="_blank" rel="noopener noreferrer">${icon("file-text", { size: 13 })} Résumé / CV</a>` : `<span class="muted">No CV uploaded</span>`}
-          ${person.portfolioUrl ? `<a class="mk-link" href="${esc(person.portfolioUrl)}" target="_blank" rel="noopener noreferrer">${icon("link", { size: 13 })} Portfolio site</a>` : ""}
-          ${socials.map(([key, value]) => `<a class="mk-link" href="${esc(value)}" target="_blank" rel="noopener noreferrer">${icon("link", { size: 13 })} ${esc(key)}</a>`).join("")}
+          ${
+            person.resumeUrl
+              ? `<a class="ft-link" href="${esc(person.resumeUrl)}" target="_blank" rel="noopener noreferrer">${icon("file-text", { size: 13 })} Résumé / CV</a>`
+              : `<span class="ft-link is-empty">No CV uploaded</span>`
+          }
+          ${
+            person.portfolioUrl
+              ? `<a class="ft-link" href="${esc(person.portfolioUrl)}" target="_blank" rel="noopener noreferrer">${icon("link", { size: 13 })} Portfolio site</a>`
+              : ""
+          }
+          ${socials
+            .map(
+              ([key, value]) =>
+                `<a class="ft-link" href="${esc(value)}" target="_blank" rel="noopener noreferrer">${icon("link", { size: 13 })} ${esc(key)}</a>`
+            )
+            .join("")}
         </div>
       </section>
     </div>`;

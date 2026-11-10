@@ -744,6 +744,69 @@ export async function run(db, api, { fixtures }) {
       : fail("0009", `stock movement not recorded: ${JSON.stringify(movement)}`);
   }
 
+  /* ================================================== 7. the directory population
+     0028 exists because Find Team was listing business owners who had never
+     built an agent profile — eight of nine live rows were the wrong kind of
+     account. These three accounts make each branch of the filter observable:
+     a plain owner (excluded), an agent (included), and an owner who did build
+     an agent profile (included). */
+  const directoryUsers = {};
+  const directoryHandles = { plainOwner: "dir.plain", agentOnly: "dir.agent", ownerWithProfile: "dir.owneragent" };
+  for (const [key, type] of Object.entries({ plainOwner: "owner", agentOnly: "agent", ownerWithProfile: "owner" })) {
+    const created = await one(
+      db,
+      `insert into auth.users (email, raw_user_meta_data) values ($1, '{}'::jsonb) returning id`,
+      [`directory.${key}@example.test`]
+    );
+    directoryUsers[key] = created.id;
+    await db.query(
+      `update public.profiles set full_name = $2, username = $3, account_type = $4 where id = $1`,
+      [created.id, `Directory ${key}`, directoryHandles[key], type]
+    );
+  }
+  for (const key of ["agentOnly", "ownerWithProfile"]) {
+    await db.query(
+      `insert into public.freelancer_profiles (user_id, headline, skills, is_published)
+       values ($1, 'Directory test', array['tests'], $2)
+       on conflict (user_id) do nothing`,
+      [directoryUsers[key], key === "agentOnly"]
+    );
+  }
+
+  const listed = await asUser(ownerId, () =>
+    rows(db, `select jsonb_array_elements(public.find_team_search(null, 100)) as person`)
+  );
+  const listedNames = listed.map((r) => r.person?.name || "").filter((n) => n.startsWith("Directory "));
+  const listedIds = listed.map((r) => r.person?.userId);
+  !listedIds.includes(directoryUsers.plainOwner)
+    ? pass("0028", "a business owner with no agent profile stays out of Find Team")
+    : fail("0028", "an owner-only account was listed as a freelancer");
+  listedIds.includes(directoryUsers.agentOnly) && listedIds.includes(directoryUsers.ownerWithProfile)
+    ? pass("0028", "an agent, and an owner who built an agent profile, both appear")
+    : fail("0028", `expected both freelancers in the directory, saw ${JSON.stringify(listedNames)}`);
+  listedNames.length === 2
+    ? pass("0028", "exactly the two freelancer accounts are listed, nothing else")
+    : fail("0028", `expected 2 freelancer rows, saw ${listedNames.length}: ${JSON.stringify(listedNames)}`);
+
+  const selfOut = await asUser(directoryUsers.agentOnly, () =>
+    rows(db, `select jsonb_array_elements(public.find_team_search(null, 100)) as person`)
+  );
+  !selfOut.map((r) => r.person?.userId).includes(directoryUsers.agentOnly)
+    ? pass("0028", "nobody sees their own card in the directory")
+    : fail("0028", "a person was listed in their own directory results");
+
+  /* The real boundary for a signed-out visitor is the uid guard inside the
+     function: Postgres leaves EXECUTE on PUBLIC for every new function, so the
+     grant alone never stops an unauthenticated call. */
+  await db.exec(`select set_config('request.jwt.claim.sub', '', false); set role anon;`);
+  const anonSearch = await db
+    .query(`select public.find_team_search(null, 10)`)
+    .then(() => null, (error) => error.message);
+  await db.exec(`reset role;`);
+  anonSearch && /Sign in to browse people/i.test(anonSearch)
+    ? pass("0028", "a signed-out visitor gets an error from the directory, not a list of people")
+    : fail("0028", `anonymous directory call returned ${anonSearch ?? "rows"}`);
+
   /* ---- archiving a ticket hides it without destroying it ---- */
   const ticket = await one(db, `select id, owner_id from public.support_tickets limit 1`);
   if (ticket) {

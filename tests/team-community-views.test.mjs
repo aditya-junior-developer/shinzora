@@ -430,8 +430,12 @@ test("opening a card fetches the full profile, including CV and portfolio", asyn
   assert.ok(resume, "the résumé is linked");
   assert.match(resume.textContent, /Résumé/, "and labelled as the CV");
   assert.match(text, /linkedin/, "social links are shown");
-  assert.match(text, /Completed projects[\s\S]*3/, "completed project count is shown");
-  assert.match(text, /Ongoing projects[\s\S]*1/, "ongoing project count is shown");
+  const cells = [...modal.querySelectorAll(".ft-stat-cell")];
+  const cellText = cells.map((c) => c.textContent.replace(/\s+/g, " ").trim());
+  assert.ok(cells.length >= 8, "the profile shows a labelled stat grid, not a bare list");
+  assert.ok(cellText.some((t) => /^Completed\s*3$/.test(t)), "completed project count is shown");
+  assert.ok(cellText.some((t) => /^Ongoing\s*1$/.test(t)), "ongoing project count is shown");
+  assert.ok(cellText.some((t) => /^Experience\s*5 years$/.test(t)), "experience reads as prose, not a number alone");
 });
 
 test("Community renders channels and messages, and sends text", async () => {
@@ -443,7 +447,12 @@ test("Community renders channels and messages, and sends text", async () => {
   assert.equal(root.querySelectorAll("[data-channel]").length, 2, "every channel is listed");
   assert.equal(count(calls, "community_messages_list"), 1, "the open channel loads its messages");
   assert.match(root.textContent, /Hello everyone/, "messages render");
-  assert.match(root.textContent, /@asha/, "the author handle renders");
+  assert.equal(root.querySelectorAll(".cm-msg-author").length, 1, "each message has an author line");
+  assert.match(root.querySelector(".cm-msg-author").textContent, /Asha/, "the author name renders bold beside the body");
+  assert.ok(root.querySelector(".cm-msg-time"), "and a timestamp sits beside the name");
+  assert.ok(root.querySelector(".cm-day"), "the day is announced once, as a pill");
+  assert.match(root.querySelector(".cm-day").textContent, /Today/, "today's messages sit under a Today pill");
+  assert.ok(root.querySelector(".cm-rail-item.is-active"), "the open channel is marked in the rail");
 
   /* Text only: there must be no upload control anywhere in the room. */
   assert.equal(root.querySelectorAll("input[type=file]").length, 0, "no file input in the community");
@@ -535,4 +544,44 @@ test("every icon the phase-3 views ask for exists", async () => {
     }
   }
   assert.deepEqual(missing, [], `unknown icons render as a question mark: ${missing.join(", ")}`);
+});
+
+test("a one-year profile is written in the singular", async () => {
+  const { window, root, document } = makeWorld();
+  const single = { ...PROFILE, yearsExperience: 1, completedContracts: 0, ongoingContracts: 0, ratingAvg: null };
+  globalThis.__rpc = (name, args) => {
+    if (name === "find_team_search") return [DIRECTORY[0]];
+    if (name === "agent_public_profile") return single;
+    return null;
+  };
+  const view = await bundle(path.join(viewsDir, "find-team.js"));
+  await view.default(root);
+
+  click(window, root.querySelector("[data-person]"));
+  await settle();
+
+  const text = document.querySelector(".modal")?.textContent || "";
+  assert.match(text, /1 year(?!s)/, "one year is not written as \"1 years\"");
+  assert.doesNotMatch(text, /1 years/, "the plural bug does not come back");
+});
+
+test("consecutive messages from one person group under a single author line", async () => {
+  const { root } = makeWorld();
+  const now = Date.now();
+  globalThis.__rpc = (name) => {
+    if (name !== "community_messages_list") return null;
+    return [
+      { id: "m1", body: "Hello everyone", createdAt: new Date(now - 90_000).toISOString(), authorId: "agent-1", authorName: "Asha", username: "asha" },
+      { id: "m2", body: "Second thought", createdAt: new Date(now - 80_000).toISOString(), authorId: "agent-1", authorName: "Asha", username: "asha" },
+      { id: "m3", body: "Different voice", createdAt: new Date(now - 70_000).toISOString(), authorId: "owner-1", authorName: "Aditya", username: "aditya" }
+    ];
+  };
+  const view = await bundle(path.join(viewsDir, "community.js"));
+  await view.default(root);
+  await settle();
+
+  assert.equal(root.querySelectorAll(".cm-msg").length, 3, "all three messages render");
+  assert.equal(root.querySelectorAll(".cm-msg-author").length, 2, "the repeated author line is dropped");
+  assert.equal(root.querySelectorAll(".cm-msg.is-continuation").length, 1, "only the repeat is compacted");
+  assert.match(root.textContent, /Second thought/, "the grouped message still shows its body");
 });

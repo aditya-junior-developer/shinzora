@@ -14,7 +14,7 @@
 
 import { qs, delegate, esc, on, debounce } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { timeAgo } from "../../../lib/format.js";
+import { date } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { pageHead, emptyState, skeletonView, avatar } from "../components.js";
 import { toast, toastError } from "../../../ui/toast.js";
@@ -71,30 +71,42 @@ function paint(root) {
       badge: `<span class="badge badge-neutral">${icon("message-circle", { size: 12 })}Text only</span>`
     })}
     <div class="cm-shell">
-      <aside class="cm-channels" role="tablist" aria-label="Community channels">
-        ${channels
-          .map(
-            (c) => `<button class="cm-channel ${c.slug === active ? "is-active" : ""}" role="tab"
-              aria-selected="${c.slug === active}" data-channel="${esc(c.slug)}">
-              <span class="cm-channel-hash">#</span>
-              <span>${esc(c.name)}</span>
-            </button>`
-          )
-          .join("")}
+      <aside class="cm-rail" aria-label="Community channels">
+        <label class="cm-rail-search">
+          ${icon("search", { size: 14 })}
+          <input id="cm-filter" type="search" autocomplete="off" placeholder="Find a channel" aria-label="Find a channel" />
+        </label>
+        <div class="cm-rail-label">Channels</div>
+        <div class="cm-rail-list" role="tablist">
+          ${channels
+            .map(
+              (c) => `<button class="cm-rail-item ${c.slug === active ? "is-active" : ""}" role="tab"
+                aria-selected="${c.slug === active}" data-channel="${esc(c.slug)}" data-name="${esc((c.name || "").toLowerCase())}">
+                <span class="cm-rail-hash" aria-hidden="true">#</span>
+                <span class="cm-rail-text">
+                  <span class="cm-rail-name">${esc(c.name)}</span>
+                  <span class="cm-rail-snippet">${esc(c.description || `Channel #${c.slug}`)}</span>
+                </span>
+              </button>`
+            )
+            .join("")}
+        </div>
       </aside>
       <section class="cm-room">
         <header class="cm-room-head">
-          <div>
+          ${avatar(current.name || current.slug, null, "sm")}
+          <div class="cm-room-id">
             <div class="cm-room-title">#${esc(current.slug)}</div>
-            <div class="cm-room-desc">${esc(current.description || "")}</div>
+            <div class="cm-room-desc">${esc(current.description || "Everyone on Shinzora")}</div>
           </div>
+          <span class="cm-room-tag">${icon("message-circle", { size: 12 })}Text only</span>
         </header>
         <div class="cm-stream" id="cm-stream" aria-live="polite"></div>
         <form class="cm-composer" id="cm-form">
-          <textarea id="cm-body" rows="1" maxlength="4000" placeholder="Message #${esc(current.slug)} — Enter to send, Shift+Enter for a new line" aria-label="Message"></textarea>
-          <button class="btn btn-primary btn-sm" id="cm-send" type="submit">${icon("send", { size: 14 })}Send</button>
+          <textarea id="cm-body" rows="1" maxlength="4000" placeholder="Message #${esc(current.slug)}" aria-label="Message"></textarea>
+          <button class="cm-send" id="cm-send" type="submit" aria-label="Send message">${icon("send", { size: 16 })}</button>
         </form>
-        <div class="cm-hint">Plain text only. Images and files are not accepted here.</div>
+        <div class="cm-hint">Plain text only. Enter sends, Shift+Enter starts a new line — images and files are not accepted here.</div>
       </section>
     </div>`;
 
@@ -105,6 +117,13 @@ function paint(root) {
     paint(root);
     await loadMessages(root);
     subscribe(root);
+  });
+
+  on(qs("#cm-filter", root), "input", (event) => {
+    const term = event.target.value.trim().toLowerCase();
+    root.querySelectorAll(".cm-rail-item").forEach((item) => {
+      item.hidden = Boolean(term) && !(item.dataset.name || "").includes(term);
+    });
   });
 
   const form = qs("#cm-form", root);
@@ -160,26 +179,69 @@ async function loadMessages(root, { scroll = true } = {}) {
   paintStream(stream, scroll);
 }
 
+/* "Today" / "Yesterday" / a date, the way a chat app separates days. */
+const dayKey = (value) => {
+  const d = new Date(value || Date.now());
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+};
+
+const dayLabel = (value) => {
+  const key = dayKey(value);
+  if (!key) return "";
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (key === today) return "Today";
+  if (key === yesterday) return "Yesterday";
+  return date(value);
+};
+
+const clock = (value) => {
+  const d = new Date(value || Date.now());
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+};
+
+/* Same author within five minutes reads as one block: full header on the first
+   line, then the body lines grouped underneath. */
+const grouped = (message, previous) => {
+  if (!previous || previous.authorId !== message.authorId) return false;
+  const gap = new Date(message.createdAt).getTime() - new Date(previous.createdAt).getTime();
+  return Number.isFinite(gap) && gap >= 0 && gap < 5 * 60 * 1000;
+};
+
 function paintStream(stream, scroll) {
   if (!messages.length) {
-    stream.innerHTML = `<div class="cm-empty">${icon("message-circle", { size: 18 })}<div>No messages yet. Say hello.</div></div>`;
+    stream.innerHTML = `<div class="cm-empty">${icon("message-circle", { size: 20 })}<div>No messages yet. Say hello.</div></div>`;
     return;
   }
-  stream.innerHTML = messages
-    .map(
-      (m) => `<div class="cm-msg ${m.authorId === selfId ? "is-self" : ""}">
-        ${avatar(m.authorName, null, "sm")}
+  let lastDay = null;
+  let previous = null;
+  const rows = messages
+    .map((m) => {
+      const day = dayKey(m.createdAt);
+      const separator = day && day !== lastDay ? `<div class="cm-day"><span>${esc(dayLabel(m.createdAt))}</span></div>` : "";
+      lastDay = day || lastDay;
+      const same = grouped(m, previous);
+      previous = m;
+      return `${separator}
+      <div class="cm-msg ${m.authorId === selfId ? "is-self" : ""} ${same ? "is-continuation" : ""}">
+        ${same ? `<span class="cm-msg-gutter" aria-hidden="true"></span>` : avatar(m.authorName, null, "sm")}
         <div class="cm-msg-main">
-          <div class="cm-msg-head">
+          ${
+            same
+              ? ""
+              : `<div class="cm-msg-head">
             <span class="cm-msg-author">${esc(m.authorName || "Member")}</span>
-            ${m.username ? `<span class="cm-msg-handle">@${esc(m.username)}</span>` : ""}
-            <span class="cm-msg-time" title="${esc(m.createdAt || "")}">${esc(timeAgo(m.createdAt))}</span>
-          </div>
+            <span class="cm-msg-time" title="${esc(m.createdAt || "")}">${esc(clock(m.createdAt))}</span>
+          </div>`
+          }
           <div class="cm-msg-body">${esc(m.body)}</div>
         </div>
-      </div>`
-    )
+      </div>`;
+    })
     .join("");
+  stream.innerHTML = rows;
   if (scroll) stream.scrollTop = stream.scrollHeight;
 }
 
