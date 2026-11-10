@@ -269,6 +269,21 @@ test("an incomplete profile lists what is missing, and nothing that is done", as
   assert.ok(!/Add at least three skills/.test(root.textContent) === false, "missing skills listed");
 });
 
+test("an agent can reach their applications from the dashboard", async () => {
+  const { root } = makeWorld();
+  const view = await bundle(path.join(viewsDir, "freelancer.js"));
+  await view.default(root);
+
+  /* The applications list is a tab inside Marketplace. Without a link the only
+     way to find it is to guess that the tab exists, which is how a shipped
+     feature becomes invisible. */
+  const links = [...root.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+  assert.ok(links.some((href) => href === "#/app/?view=marketplace&tab=work"),
+    "the dashboard links to the applications tab");
+  assert.ok(root.querySelector(".stat-link"), "the work figures are themselves links");
+  assert.equal(root.querySelectorAll(".stat-link").length, 2, "pitches and contracts only");
+});
+
 test("the dashboard tolerates a failed board without losing the page", async () => {
   const { root } = makeWorld({ props: { board: [] } });
   const view = await bundle(path.join(viewsDir, "freelancer.js"));

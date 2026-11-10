@@ -2240,3 +2240,7 @@ html {
   .pf-row { flex-direction:column; }
   .pf-narrow { flex:1 1 auto !important; }
 }
+
+/* A stat card that opens the screen it counts. */
+.stat-link { color:inherit; text-decoration:none; display:block; transition:border-color .16s ease, transform .16s ease; }
+.stat-link:hover, .stat-link:focus-visible { border-color:var(--purple-500, #8b5cf6); transform:translateY(-1px); outline:none; }

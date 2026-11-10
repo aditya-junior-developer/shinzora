@@ -57,14 +57,18 @@ export function emptyState({ icon: iconName = "sparkles", title, desc, action = 
 }
 
 /* -------------------------------------------------------------- stat cards */
-export function statCard({ label, value, foot = "", iconName = "chart-line", tone = "" }) {
-  return `<div class="stat">
+/* `href` is optional: most stat cards are just numbers, but a card that
+   corresponds to a screen ("Pitches sent") should be able to open it. When
+   present the same markup becomes a link, so the layout does not shift. */
+export function statCard({ label, value, foot = "", iconName = "chart-line", tone = "", href = "" }) {
+  const inner = `
       <div class="stat-head">
         <span class="stat-label">${icon(iconName, { size: 13 })}${esc(label)}</span>
       </div>
       <div class="stat-value">${value}</div>
-      ${foot ? `<div class="stat-foot ${tone}">${foot}</div>` : ""}
-    </div>`;
+      ${foot ? `<div class="stat-foot ${tone}">${foot}</div>` : ""}`;
+  if (!href) return `<div class="stat">${inner}</div>`;
+  return `<a class="stat stat-link" href="${esc(href)}">${inner}</a>`;
 }
 
 /* ----------------------------------------------------------------- badges */

@@ -99,8 +99,8 @@ function paint(root) {
 
     <div class="stat-grid">
       ${statCard({ label: "Open projects", value: String(board.length), foot: "live on the board", iconName: "package" })}
-      ${statCard({ label: "Pitches sent", value: String(openPitches.length), foot: `${pitches.length} total`, iconName: "send" })}
-      ${statCard({ label: "Active contracts", value: String(active.length), foot: `${completed.length} completed`, iconName: "briefcase" })}
+      ${statCard({ label: "Pitches sent", value: String(openPitches.length), foot: `${pitches.length} total`, iconName: "send", href: "#/app/?view=marketplace&tab=work" })}
+      ${statCard({ label: "Active contracts", value: String(active.length), foot: `${completed.length} completed`, iconName: "briefcase", href: "#/app/?view=marketplace&tab=work" })}
       ${statCard({ label: "Invitations", value: String(invitations.length), foot: invitations.length ? "waiting for an answer" : "none waiting", iconName: "inbox" })}
     </div>
 
@@ -162,6 +162,7 @@ function paint(root) {
           <div class="fl-quick">
             <a class="btn btn-ghost btn-sm" href="#/app/?view=portfolio">${icon("id-card", { size: 14 })}Edit profile</a>
             <a class="btn btn-ghost btn-sm" href="#/app/?view=invitations">${icon("inbox", { size: 14 })}Invitations</a>
+            <a class="btn btn-ghost btn-sm" href="#/app/?view=marketplace&tab=work">${icon("send", { size: 14 })}My applications</a>
             <a class="btn btn-ghost btn-sm" href="#/app/?view=find-team">${icon("users-round", { size: 14 })}Find team</a>
           </div>
         </div>
