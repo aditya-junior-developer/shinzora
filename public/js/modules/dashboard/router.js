@@ -26,6 +26,7 @@ const LOADERS = {
   support: () => import("./views/support.js"),
   messages: () => import("./views/messages.js"),
   requests: () => import("./views/requests.js"),
+  marketplace: () => import("./views/marketplace.js"),
   analytics: () => import("./views/analytics.js"),
   notifications: () => import("./views/notifications.js"),
   billing: () => import("./views/billing.js"),

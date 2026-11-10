@@ -43,6 +43,7 @@ export const NAV = [
   {
     label: "Growth",
     items: [
+      { id: "marketplace", label: "Marketplace", icon: "package" },
       { id: "marketing", label: "Request for Extra Service", icon: "megaphone" },
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
