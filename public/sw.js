@@ -9,7 +9,7 @@
    Bump VERSION when shipping breaking asset changes.
    ========================================================================== */
 
-const VERSION = "shinzora-v33";
+const VERSION = "shinzora-v34";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 

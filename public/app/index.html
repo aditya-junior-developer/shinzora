@@ -10,11 +10,23 @@
 <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="stylesheet" href="/css/tokens.css?v=20261104b" />
-<link rel="stylesheet" href="/css/components.css?v=20261104b" />
-<link rel="stylesheet" href="/css/app.css?v=20261104b" />
-<link rel="stylesheet" href="/css/views.css?v=20261104b" />
-<link rel="stylesheet" href="/css/theme-light.css?v=20261104b" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261104c" />
+<link rel="stylesheet" href="/css/components.css?v=20261104c" />
+<link rel="stylesheet" href="/css/app.css?v=20261104c" />
+<link rel="stylesheet" href="/css/views.css?v=20261104c" />
+<link rel="stylesheet" href="/css/theme-light.css?v=20261104c" />
+<script>
+/* The sidebar keeps its width between visits. Set here, before the first frame,
+   so a remembered icon-rail does not flash a full-width column and then snap. */
+(function () {
+  try {
+    document.documentElement.setAttribute(
+      "data-sidebar",
+      localStorage.getItem("shinzora:sidebar") === "rail" ? "rail" : "expanded"
+    );
+  } catch (error) { document.documentElement.setAttribute("data-sidebar", "expanded"); }
+})();
+</script>
 <script>
 /* The saved theme is applied before the first paint. A stylesheet swap after
    load would flash the dark theme at somebody who chose the light one, so this
@@ -67,6 +79,22 @@
 
     <div class="sidebar-scroll">
       <nav id="sidebar-nav"><!-- rendered by shell.js --></nav>
+
+      <!-- Recent conversations. Rendered by shell.js from ai_conversations,
+           so a chat opened here is the same conversation the assistant view
+           knows about. -->
+      <div class="sidebar-chats" id="sidebar-chats">
+        <div class="sidebar-chats-head">
+          <span class="sidebar-group-label">Chats</span>
+          <a class="sidebar-chat-new" href="/app/?view=assistant&amp;new=1" data-sidebar-new-chat
+             aria-label="Start a new chat" data-label="New chat">
+            <i data-icon="plus" data-size="13"></i>
+          </a>
+        </div>
+        <div class="sidebar-recent" id="sidebar-recent">
+          <p class="sidebar-chat-empty">Loading conversations…</p>
+        </div>
+      </div>
     </div>
 
     <div class="sidebar-foot">
@@ -75,9 +103,10 @@
         <div class="progress progress-thin"><span id="ai-usage-bar" style="width:0%"></span></div>
         <div class="sfi-value"><span>Resets monthly</span><a href="/app/?view=billing" style="color:var(--lavender)">Upgrade</a></div>
       </div>
-      <button class="btn btn-ghost btn-sm btn-block" id="sidebar-signout" style="justify-content:flex-start">
+      <button class="btn btn-ghost btn-sm btn-block" id="sidebar-signout" style="justify-content:flex-start"
+              data-label="Sign out" title="Sign out">
         <i data-icon="log-out" data-size="14"></i>
-        Sign out
+        <span class="link-text">Sign out</span>
       </button>
     </div>
   </aside>
@@ -86,11 +115,10 @@
   <!-- ================================ MAIN ================================ -->
   <div class="app-main">
     <header class="app-topbar">
-      <button class="topbar-toggle" data-sidebar-open aria-label="Open navigation">
-        <i data-icon="menu" data-size="17"></i>
-      </button>
-      <button class="topbar-toggle" id="sidebar-collapse" aria-label="Collapse navigation">
-        <i data-icon="panel-left" data-size="17"></i>
+      <button class="topbar-toggle" id="sidebar-toggle" data-sidebar-toggle
+              aria-label="Collapse navigation" aria-controls="app-sidebar" aria-expanded="true"
+              title="Collapse navigation">
+        <span class="hamburger" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
 
       <div class="topbar-search" id="global-search-wrap">
@@ -165,6 +193,6 @@
 </div>
 
 <script src="/js/vendor/supabase-js.js"></script>
-<script type="module" src="/js/boot/dashboard.js?v=20261104b"></script>
+<script type="module" src="/js/boot/dashboard.js?v=20261104c"></script>
 </body>
 </html>

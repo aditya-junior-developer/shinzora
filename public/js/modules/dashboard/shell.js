@@ -10,10 +10,10 @@ import { state, aiCredits, plan, hasCompletedOnboarding } from "../../lib/store.
 import { initials, timeAgo } from "../../lib/format.js";
 import { logoutEverywhere } from "../../lib/guard.js";
 import { toast, toastError } from "../../ui/toast.js";
-import { sb, normalizeError } from "../../lib/supabase.js";
+import { sb, normalizeError, getSession } from "../../lib/supabase.js";
 import { markAllNotificationsRead, markNotificationRead, notifications as fetchNotifications, uid } from "./data.js";
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
-import { createDrawer } from "../../ui/drawer.js";
+import { createSidebar } from "../../ui/sidebar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 
 export const NAV = [
@@ -102,10 +102,12 @@ export const AGENT_NAV = [
 export const navFor = () => (state.profile?.account_type === "agent" ? AGENT_NAV : NAV);
 
 let realtimeChannel = null;
-/* The navigation drawer, created by bindChrome(). */
-let navDrawer = null;
+/* The navigation sidebar, created by bindChrome(). */
+let navSidebar = null;
 
-export const closeNavDrawer = () => navDrawer?.close();
+/* Only meaningful below 1024px, where the sidebar is an overlay; on a desktop
+   the navigation is a column and there is nothing to dismiss. */
+export const closeNavDrawer = () => navSidebar?.close();
 
 /* ------------------------------------------------------------------ chrome */
 export function renderSidebar(activeView) {
@@ -118,9 +120,11 @@ export function renderSidebar(activeView) {
         ${group.items
           .map(
             (item) => `<a class="sidebar-link ${item.id === activeView ? "is-active" : ""}"
-                href="/app/?view=${item.id}" data-nav="${item.id}">
+                href="/app/?view=${item.id}" data-nav="${item.id}"
+                data-label="${esc(item.label)}" title="${esc(item.label)}"
+                ${item.id === activeView ? 'aria-current="page"' : ""}>
                 ${icon(item.icon, { size: 16 })}
-                <span>${esc(item.label)}</span>
+                <span class="link-text">${esc(item.label)}</span>
                 ${item.id === "notifications" ? '<span class="link-badge hidden" data-notif-badge></span>' : ""}
               </a>`
           )
@@ -133,6 +137,74 @@ export function renderSidebar(activeView) {
   const bar = qs("#ai-usage-bar");
   if (count) count.textContent = `${credits.used}/${credits.limit}`;
   if (bar) bar.style.width = `${Math.min(100, Math.round((credits.used / Math.max(1, credits.limit)) * 100))}%`;
+}
+
+/* ------------------------------------------------------------------ chats */
+/*
+ * The last few assistant conversations, inside the sidebar.
+ *
+ * It reads the same rows the assistant view reads (`ai_conversations`, kind =
+ * "assistant"), so opening one here and opening it from the History panel are
+ * the same action. Nothing is cached between pages and nothing is invented when
+ * the list is empty — an account with no conversations gets one sentence that
+ * says so.
+ */
+let recentChatToken = 0;
+
+export async function renderRecentChats() {
+  const host = qs("#sidebar-recent");
+  if (!host) return;
+  const myToken = ++recentChatToken;
+
+  try {
+    const session = await getSession();
+    if (!session) {
+      host.innerHTML = `<p class="sidebar-chat-empty">Sign in to see your conversations.</p>`;
+      return;
+    }
+    const { data, error } = await sb
+      .from("ai_conversations")
+      .select("id, title, updated_at")
+      .eq("user_id", session.user.id)
+      .eq("kind", "assistant")
+      .order("updated_at", { ascending: false })
+      .limit(6);
+    if (error) throw error;
+    if (myToken !== recentChatToken) return;
+
+    const activeId = new URLSearchParams(location.search).get("conversation");
+    const rows = data || [];
+    host.innerHTML = rows.length
+      ? rows
+          .map(
+            (row) => `<a class="sidebar-chat ${row.id === activeId ? "is-active" : ""}"
+                href="/app/?view=assistant&conversation=${esc(row.id)}"
+                data-chat="${esc(row.id)}"
+                title="${esc(row.title || "Untitled conversation")}">
+                ${icon("message-square", { size: 13 })}
+                <span class="chat-title">${esc(row.title || "Untitled conversation")}</span>
+              </a>`
+          )
+          .join("") +
+        `<a class="sidebar-chat sidebar-chat-all" href="/app/?view=assistant&history=1">
+            ${icon("clock", { size: 13 })}
+            <span class="chat-title">All chats</span>
+          </a>`
+      : `<p class="sidebar-chat-empty">No conversations yet. Start one above.</p>`;
+  } catch (error) {
+    if (myToken !== recentChatToken) return;
+    /* A missing table or a blocked read is not worth an alarm in the sidebar —
+       the assistant view is where the real error is reported. */
+    if (normalizeError(error).code !== "schema_missing") console.warn("[shinzora] recent chats:", error);
+    host.innerHTML = `<p class="sidebar-chat-empty">Conversations could not be loaded.</p>`;
+  }
+}
+
+/** The sidebar highlights the chat that is open in the assistant. */
+export function markActiveChat(conversationId) {
+  qsa("#sidebar-recent .sidebar-chat").forEach((link) =>
+    link.classList.toggle("is-active", link.getAttribute("data-chat") === conversationId)
+  );
 }
 
 export function paintIdentity() {
@@ -177,16 +249,25 @@ function renderSetupBanner() {
 
 /* -------------------------------------------------------------- interactions */
 export function bindChrome({ navigate }) {
-  /* Navigation drawer. Same component the admin console uses, so the two
-     behave identically: modal while open, three ways out, closed on navigation
-     and on sign-out, and focus moved inside rather than left behind the scrim. */
-  navDrawer = createDrawer({
+  /* The navigation is a column on a desktop and a drawer on a phone, and one
+     controller owns both so the two can never disagree about which is showing.
+     Nothing here blurs, darkens or blocks the page above 1024px. */
+  navSidebar = createSidebar({
     panel: qs("#app-sidebar"),
-    scrim: qs("#sidebar-scrim"),
-    toggles: "[data-sidebar-open]"
+    scrim: qs("#sidebar-scrim")
   });
-  on(qs("#sidebar-signout"), "click", () => navDrawer?.close());
-  window.addEventListener("shinzora:view", () => navDrawer?.close());
+  on(qs("#sidebar-signout"), "click", () => navSidebar?.close());
+
+  /* Recent chats belong to the assistant, so the sidebar paints them where the
+     user is, and asks again whenever the view or the conversation list changes. */
+  void renderRecentChats();
+  window.addEventListener("shinzora:chats-changed", () => void renderRecentChats());
+  window.addEventListener("shinzora:view", (event) => {
+    markActiveChat(new URLSearchParams(location.search).get("conversation"));
+    /* Coming back to the assistant can mean a conversation was started in
+       another tab, so the list is refreshed there rather than on every view. */
+    if (event.detail?.view === "assistant") void renderRecentChats();
+  });
 
   /* Presence: one heartbeat a minute while the tab is visible, and once more on
      the way out so the last time is the time they left rather than a minute
@@ -197,6 +278,10 @@ export function bindChrome({ navigate }) {
   void runReferralTick();
 
   // Workspace + account menus
+  /* In the icon rail the switcher is an avatar with no room for its menu, so a
+     click opens the sidebar first — the rail is a summary, not a place to run
+     things from. */
+  on(qs("#workspace-switch"), "click", () => navSidebar?.expand());
   bindMenu("#workspace-switch", "#workspace-menu");
   bindMenu("#account-toggle", "#account-menu");
 

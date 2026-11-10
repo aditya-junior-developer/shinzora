@@ -4,15 +4,26 @@
    sidebar, topbar, page header, content grid and mobile navigation.
    ========================================================================== */
 
-/* The navigation is a drawer at every width, so the workspace gets the whole
-   window instead of paying 258px for links that are opened occasionally. The
-   desktop-only "collapse to icons" mode is gone with it — a drawer that opens
-   over the content does the same job without squeezing the content. */
+/* The shell is two columns: the navigation, and everything else. The navigation
+   is a real column above 1024px — it takes width from the page instead of
+   covering it — and collapses to an icon rail in place. Below 1024px there is
+   no room for a column, so the same panel becomes an overlay drawer.
+
+   Only the first track changes between expanded and rail, so the transition is
+   a width change on one column, not a layout pass over the whole page. */
 .app-shell {
-  display: grid;
-  grid-template-columns: 1fr;
+  /* One number decides the layout: the width of the navigation. The panel is
+     fixed to that width and the content is offset by it, so collapsing is a
+     width change on one element plus a margin on the other — both properties
+     every browser animates, unlike a grid track. */
+  --shell-nav: var(--sidebar-w);
+  position: relative;
   min-height: 100dvh;
   background: var(--void);
+}
+
+:root[data-sidebar="rail"] .app-shell {
+  --shell-nav: var(--sidebar-w-collapsed);
 }
 
 
@@ -23,32 +34,23 @@
   position: fixed;
   inset: 0 auto 0 0;
   z-index: var(--z-sidebar);
-  width: min(84vw, 300px);
+  width: var(--shell-nav);
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(186deg, #0d0a15 0%, #09070f 62%, #07060c 100%);
   border-right: 1px solid var(--line);
-  transform: translateX(-101%);
-  transition: transform 0.3s var(--ease);
   overflow: hidden;
-}
-.app-sidebar.is-open {
-  transform: none;
-  box-shadow: 0 0 80px rgba(0, 0, 0, 0.7);
-}
-/* Wider on a desktop screen where there is room for a comfortable drawer. */
-@media (min-width: 1024px) {
-  .app-sidebar {
-    width: min(92vw, var(--sidebar-w));
-  }
+  /* The width is the animation: the content beside it is offset by the same
+     number, so both move together and neither ever overlaps the other. */
+  transition: width 0.26s var(--ease);
 }
 
-/* The drawer is modal: the page behind it must not scroll underneath. */
-body.drawer-open {
-  overflow: hidden;
-}
-body.drawer-open .app-sidebar {
-  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.72);
+/* The content column keeps its distance from the navigation, so nothing is ever
+   covered while the sidebar is open. */
+.app-main {
+  margin-left: var(--shell-nav);
+  transition: margin-left 0.26s var(--ease);
 }
 
 .sidebar-head {
@@ -69,21 +71,24 @@ body.drawer-open .app-sidebar {
 }
 .sidebar-close {
   margin-left: auto;
-  display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
   border-radius: var(--r-sm);
   color: var(--text-3);
+  /* A column is dismissed with the hamburger, not with an ✕: the button only
+     exists while the panel is an overlay over the content. */
+  display: none;
 }
 .sidebar-close:hover {
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
 }
-/* The drawer is modal at every width now, so it always needs its own close
-   button — a scrim click is not an affordance for everybody. */
-.sidebar-close {
-  display: grid;
+@media (max-width: 1023px) {
+  /* Over the content, an ✕ is a target the scrim cannot replace for everyone. */
+  .sidebar-close {
+    display: grid;
+  }
 }
 
 .sidebar-workspace {
@@ -232,32 +237,144 @@ body.drawer-open .app-sidebar {
   color: #fde68a;
 }
 
-/* The old icon-collapse toggle has no job in a drawer. Its rules are kept
-   only so a stale local preference cannot change how anything looks. */
-#sidebar-collapse { display: none; }
-
+/* --------------------------------------------------------------------------
+   Icon rail (desktop)
+   --------------------------------------------------------------------------
+   Collapsed is not a different sidebar: it is the same one with its text taken
+   out of the flow. Labels stay in the accessibility tree via `.link-text` so the
+   icons keep their names, and each icon grows the label on hover/focus so the
+   rail is still learnable.
+   -------------------------------------------------------------------------- */
 @media (min-width: 1024px) {
-  body.sidebar-collapsed .app-shell { grid-template-columns: 1fr; }
-  body.sidebar-collapsed .sidebar-head .brand-word,
-  body.sidebar-collapsed .workspace-switch .ws-meta,
-  body.sidebar-collapsed .workspace-switch .ico,
-  body.sidebar-collapsed .sidebar-group-label,
-  body.sidebar-collapsed .sidebar-link span,
-  body.sidebar-collapsed .sidebar-link .link-badge,
-  body.sidebar-collapsed .sidebar-foot-info {
+  :root[data-sidebar="rail"] .sidebar-head {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  :root[data-sidebar="rail"] .brand-word,
+  :root[data-sidebar="rail"] .sidebar-group-label,
+  :root[data-sidebar="rail"] .link-text,
+  :root[data-sidebar="rail"] .ws-meta,
+  :root[data-sidebar="rail"] .workspace-switch .ico,
+  :root[data-sidebar="rail"] .sidebar-foot-info,
+  :root[data-sidebar="rail"] .sidebar-link .link-badge {
+    /* Hidden, still announced. `display:none` would take the name away from
+       the icon that is the whole point of the rail. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  /* The chat list is a list, not a set of icons: a rail hides it outright
+     rather than leaving invisible links in the tab order. */
+  :root[data-sidebar="rail"] .sidebar-chats {
     display: none;
   }
-  body.sidebar-collapsed .sidebar-link {
+  :root[data-sidebar="rail"] .sidebar-workspace {
+    padding-inline: 10px;
+  }
+  :root[data-sidebar="rail"] .workspace-switch {
     justify-content: center;
     padding-inline: 0;
   }
-  body.sidebar-collapsed .workspace-switch {
+  :root[data-sidebar="rail"] .workspace-switch .avatar {
+    margin: 0;
+  }
+  :root[data-sidebar="rail"] .sidebar-link {
+    justify-content: center;
+    padding-inline: 0;
+    gap: 0;
+  }
+  :root[data-sidebar="rail"] .sidebar-link .ico {
+    width: 18px;
+    height: 18px;
+  }
+  :root[data-sidebar="rail"] .sidebar-link.is-active::before {
+    top: 26%;
+    bottom: 26%;
+  }
+  :root[data-sidebar="rail"] .sidebar-foot {
+    padding-inline: 10px;
+  }
+  :root[data-sidebar="rail"] #sidebar-signout {
     justify-content: center;
     padding-inline: 0;
   }
-  body.sidebar-collapsed .sidebar-head {
-    justify-content: center;
-    padding-inline: 0;
+
+}
+
+/* Rail tooltip. Positioned by sidebar.js and fixed to the viewport, because the
+   navigation scrolls and a scrolling box clips both axes — a pseudo-element on
+   the link would be cut off at the edge of the rail. */
+.rail-tip {
+  position: fixed;
+  z-index: calc(var(--z-sidebar) + 5);
+  transform: translateY(-50%) translateX(-4px);
+  padding: 5px 9px;
+  border-radius: var(--r-sm);
+  background: #1a1426;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: var(--white);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.rail-tip.is-visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* --------------------------------------------------------------------------
+   Overlay mode (below 1024px)
+   --------------------------------------------------------------------------
+   A phone has no room for a column, so the panel slides over the content with a
+   scrim. It is the only width where the sidebar is modal, and the only width
+   where the page behind it stops scrolling.
+   -------------------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .app-main {
+    margin-left: 0;
+  }
+  .app-sidebar {
+    inset: 0 auto 0 0;
+    width: min(86vw, 300px);
+    transform: translateX(-101%);
+    transition: transform 0.28s var(--ease);
+    will-change: transform;
+  }
+  body.sidebar-open .app-sidebar {
+    transform: none;
+    box-shadow: 0 24px 90px rgba(0, 0, 0, 0.72);
+  }
+  body.sidebar-open {
+    overflow: hidden;
+  }
+  /* The rail is a desktop idea; a phone drawer always shows its labels. */
+  :root[data-sidebar="rail"] .link-text,
+  :root[data-sidebar="rail"] .brand-word,
+  :root[data-sidebar="rail"] .ws-meta,
+  :root[data-sidebar="rail"] .sidebar-group-label,
+  :root[data-sidebar="rail"] .sidebar-foot-info,
+  :root[data-sidebar="rail"] .sidebar-chats,
+  :root[data-sidebar="rail"] .workspace-switch .ico {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
   }
 }
 
@@ -327,8 +444,9 @@ body.drawer-open .app-sidebar {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
-/* The drawer needs its opener on every screen size. */
-.topbar-toggle[data-sidebar-open] {
+/* The hamburger is the one control that opens and closes the navigation, so it
+   is present at every width — in the rail it is the only way back out. */
+.topbar-toggle[data-sidebar-toggle] {
   display: inline-grid;
 }
 
@@ -687,22 +805,32 @@ body.drawer-open .app-sidebar {
 }
 
 /* Mobile scrim for the sidebar */
+/* A scrim under an open column would darken and blur the page the user is
+   still meant to work on, so it only exists while the panel is an overlay. */
 .sidebar-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-sidebar) - 1);
-  background: rgba(4, 3, 8, 0.62);
-  backdrop-filter: blur(3px);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--t-base) var(--ease), visibility var(--t-base);
+  display: none;
 }
-.sidebar-scrim.is-visible {
-  opacity: 1;
-  visibility: visible;
+@media (max-width: 1023px) {
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-sidebar) - 1);
+    background: rgba(4, 3, 8, 0.55);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--t-base) var(--ease), visibility var(--t-base);
+  }
+  .sidebar-scrim.is-visible {
+    opacity: 1;
+    visibility: visible;
+  }
 }
-/* Scrim is used at every width: the drawer is modal wherever it is opened. */
-.sidebar-scrim { display: block; }
+
+/* The notification drawer and the admin console still lock the page while open. */
+body.drawer-open {
+  overflow: hidden;
+}
 
 /* Setup banner: shown whenever a dependency is not configured */
 .setup-banner {
@@ -879,4 +1007,122 @@ body.drawer-open .app-sidebar {
   -webkit-backdrop-filter: none;
   border-color: rgba(168, 85, 247, 0.18);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   Hamburger
+   --------------------------------------------------------------------------
+   Three lines drawn from elements rather than an icon font, so the middle bar
+   can shorten on hover without shipping a second glyph.
+   -------------------------------------------------------------------------- */
+.hamburger {
+  display: grid;
+  gap: 4px;
+  width: 17px;
+}
+.hamburger i {
+  display: block;
+  height: 1.6px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: width var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+}
+.hamburger i:nth-child(2) {
+  width: 72%;
+}
+.topbar-toggle:hover .hamburger i:nth-child(2),
+.topbar-toggle[aria-expanded="false"] .hamburger i:nth-child(2) {
+  width: 100%;
+}
+.topbar-toggle[aria-expanded="true"] .hamburger i:nth-child(2) {
+  width: 48%;
+}
+
+/* --------------------------------------------------------------------------
+   Recent chats in the sidebar
+   -------------------------------------------------------------------------- */
+.sidebar-chats {
+  margin-top: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.sidebar-chats-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.sidebar-chats-head .sidebar-group-label {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-chat-new {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  transition: all var(--t-fast) var(--ease);
+}
+.sidebar-chat-new:hover {
+  border-color: var(--line-violet);
+  background: rgba(124, 58, 237, 0.14);
+  color: #fff;
+}
+.sidebar-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+.sidebar-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.sidebar-chat .ico {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--text-4);
+}
+.sidebar-chat .chat-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-chat:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.05);
+}
+.sidebar-chat.is-active {
+  color: #fff;
+  background: rgba(124, 58, 237, 0.16);
+}
+.sidebar-chat.is-active .ico {
+  color: var(--lavender);
+}
+.sidebar-chat-empty {
+  margin: 6px 10px 0;
+  font-size: var(--fs-2xs);
+  line-height: 1.6;
+  color: var(--text-4);
+}
+
+/* Nothing here is decoration: no animation for anyone who asked for none. */
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .app-sidebar,
+  .sidebar-scrim,
+  .hamburger i {
+    transition-duration: 0.01ms !important;
+  }
 }

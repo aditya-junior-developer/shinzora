@@ -256,6 +256,55 @@ export default async function render(root, ctx) {
     }
   }
 
+  /* Opening a conversation is one operation, whether it came from the History
+     panel, the sidebar's recent list, or a ?conversation= link that survived a
+     reload. It keeps the URL in step so the sidebar can mark the right chat and
+     so a refresh lands back where the user was. */
+  async function openConversation(id, { updateUrl = true } = {}) {
+    conversationId = id;
+    if (log.querySelector(".empty") || log.querySelector(".msg")) log.innerHTML = "";
+    log.innerHTML = `<p class="muted" style="font-size:var(--fs-xs)">Loading conversation…</p>`;
+    try {
+      const { data, error } = await sb
+        .from("ai_messages")
+        .select("role, content, created_at")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      log.innerHTML = "";
+      (data || []).forEach((row) => bubble(row.role === "user" ? "user" : "ai", row.content, timeAgo(row.created_at)));
+      if (!data?.length) {
+        log.innerHTML = emptyState({ icon: "message-square", title: "This conversation is empty", desc: "Send a message to start it." });
+      }
+      scrollDown();
+      if (updateUrl) {
+        const url = `/app/?view=assistant&conversation=${encodeURIComponent(id)}`;
+        history.replaceState({ view: "assistant" }, "", url);
+      }
+      window.dispatchEvent(new CustomEvent("shinzora:chats-changed", { detail: { conversationId: id } }));
+      return true;
+    } catch (error) {
+      log.innerHTML = emptyState({ icon: "circle-alert", title: "That conversation could not be opened", desc: normalizeError(error).message });
+      toastError(normalizeError(error));
+      return false;
+    }
+  }
+
+  /** A fresh conversation: nothing saved until the first message is sent. */
+  function startNewConversation({ updateUrl = true } = {}) {
+    conversationId = null;
+    log.innerHTML = emptyState({
+      icon: "sparkles",
+      title: "New conversation",
+      desc: "Ask anything about the business. Context is carried automatically."
+    });
+    safeSet("#chat-suggestions", SUGGESTIONS.slice(0, 3)
+      .map((text) => `<button class="chip" data-suggest="${esc(text)}">${esc(text)}</button>`)
+      .join(""));
+    if (updateUrl) history.replaceState({ view: "assistant" }, "", "/app/?view=assistant&new=1");
+    input.focus();
+  }
+
   async function sendMessage(text) {
     const message = String(text || "").trim();
     if (!message || !aiReady) return;
@@ -279,8 +328,15 @@ export default async function render(root, ctx) {
         }
       });
       pending.remove();
+      const wasNew = !conversationId;
       conversationId = result.conversationId || conversationId;
       bubble("ai", result.reply || "No response was returned.", `${result.model || "gemini"} · saved`);
+      /* The first message creates the row, so that is when the URL and the
+         sidebar's recent list can finally point at a real conversation. */
+      if (conversationId && (wasNew || location.search.includes("new=1"))) {
+        history.replaceState({ view: "assistant" }, "", `/app/?view=assistant&conversation=${encodeURIComponent(conversationId)}`);
+        window.dispatchEvent(new CustomEvent("shinzora:chats-changed", { detail: { conversationId } }));
+      }
       if (result.usage) {
         state.subscription = { ...(state.subscription || {}), ai_credits_used: result.usage.used };
         const badge = qs(".page-actions .badge");
@@ -332,18 +388,7 @@ export default async function render(root, ctx) {
     const chip = event.target.closest("[data-suggest]");
     if (chip) sendMessage(chip.getAttribute("data-suggest"));
   });
-  on(qs("#new-chat"), "click", () => {
-    conversationId = null;
-    log.innerHTML = emptyState({
-      icon: "sparkles",
-      title: "New conversation",
-      desc: "Ask anything about the business. Context is carried automatically."
-    });
-    safeSet("#chat-suggestions", SUGGESTIONS.slice(0, 3)
-      .map((text) => `<button class="chip" data-suggest="${esc(text)}">${esc(text)}</button>`)
-      .join(""));
-    input.focus();
-  });
+  on(qs("#new-chat"), "click", () => startNewConversation());
 
   /* ------------------------------------------------------------- history */
   /* Conversations are the user's own record of what the assistant told them.
@@ -435,6 +480,7 @@ export default async function render(root, ctx) {
         if (error) throw error;
         historyRows = historyRows.map((entry) => (entry.id === id ? { ...entry, title: next.trim().slice(0, 90) } : entry));
         paintHistory();
+        window.dispatchEvent(new CustomEvent("shinzora:chats-changed"));
         toast({ title: "Renamed" }, { tone: "success" });
       } catch (error) {
         toastError(normalizeError(error));
@@ -465,6 +511,7 @@ export default async function render(root, ctx) {
           });
         }
         paintHistory();
+        window.dispatchEvent(new CustomEvent("shinzora:chats-changed"));
         toast({ title: "Conversation deleted" }, { tone: "success" });
       } catch (error) {
         toastError(normalizeError(error));
@@ -474,30 +521,32 @@ export default async function render(root, ctx) {
 
     const openButton = event.target.closest("[data-conv]");
     if (!openButton) return;
-    const id = openButton.getAttribute("data-conv");
-    conversationId = id;
-    log.innerHTML = `<p class="muted" style="font-size:var(--fs-xs)">Loading conversation…</p>`;
-    try {
-      const { data, error } = await sb
-        .from("ai_messages")
-        .select("role, content, created_at")
-        .eq("conversation_id", id)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      log.innerHTML = "";
-      (data || []).forEach((row) => bubble(row.role === "user" ? "user" : "ai", row.content, timeAgo(row.created_at)));
-      if (!data?.length) {
-        log.innerHTML = emptyState({ icon: "message-square", title: "This conversation is empty", desc: "Send a message to start it." });
-      }
-      paintHistory();
-    } catch (error) {
-      log.innerHTML = `<p class="muted" style="font-size:var(--fs-xs)">${esc(normalizeError(error).message)}</p>`;
-      toastError(normalizeError(error));
-    }
+    await openConversation(openButton.getAttribute("data-conv"));
+    paintHistory();
   });
 
-  await loadLatestConversation();
-  void ctx;
+  /* A link from the sidebar arrives here. ?conversation= wins over the "resume
+     the last conversation" default, and ?new=1 means exactly that — an empty
+     composer rather than somebody else's thread. */
+  const params = ctx?.params instanceof URLSearchParams ? ctx.params : new URLSearchParams(location.search);
+  const wanted = params.get("conversation");
+  if (wanted) {
+    const opened = await openConversation(wanted, { updateUrl: false });
+    if (!opened) await loadLatestConversation();
+  } else if (params.get("new") === "1") {
+    startNewConversation({ updateUrl: false });
+  } else {
+    await loadLatestConversation();
+  }
+
+  /* "All chats" from the sidebar opens the same panel the History button does,
+     rather than a second, parallel list of conversations. */
+  if (params.get("history") === "1") {
+    const panel = qs("#history-panel");
+    panel.hidden = false;
+    await loadHistory();
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 }
 
 /** Minimal markdown-ish formatting: code fences, inline code, bold, bullets. */
