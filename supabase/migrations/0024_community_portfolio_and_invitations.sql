@@ -121,10 +121,18 @@ alter table public.notifications
 
 create or replace function public.notify_user(p_user uuid, p_type text, p_title text, p_message text, p_link text default null, p_meta jsonb default '{}'::jsonb)
 returns void language plpgsql security definer set search_path to 'public' as $fn$
+declare
+  target text := p_link;
 begin
   if p_user is null then return; end if;
+  -- Callers name the destination as '#view'; the notification centre does a
+  -- location.assign(), so store a real route. Without this, '#invitations'
+  -- reloads the current page instead of opening the invitations screen.
+  if target like '#%' then
+    target := '/app/?view=' || substr(target, 2);
+  end if;
   insert into public.notifications (user_id, title, message, body, type, link, meta, is_read)
-  values (p_user, left(coalesce(p_title,'Notification'),200), left(coalesce(p_message,''),1000), left(coalesce(p_message,''),1000), coalesce(p_type,'general'), p_link, coalesce(p_meta,'{}'::jsonb), false);
+  values (p_user, left(coalesce(p_title,'Notification'),200), left(coalesce(p_message,''),1000), left(coalesce(p_message,''),1000), coalesce(p_type,'general'), target, coalesce(p_meta,'{}'::jsonb), false);
 end;
 $fn$;
 
