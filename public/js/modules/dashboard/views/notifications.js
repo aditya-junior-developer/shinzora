@@ -23,6 +23,12 @@ const TYPE_META = {
   admin: { icon: "megaphone", label: "Shinzora" },
   support: { icon: "life-buoy", label: "Support" },
   order: { icon: "package", label: "Order" },
+  team_invite: { icon: "inbox", label: "Invitation" },
+  invite_accepted: { icon: "user-plus", label: "Team" },
+  team_removed: { icon: "users", label: "Team" },
+  proposal_received: { icon: "inbox", label: "Pitch" },
+  proposal_accepted: { icon: "check", label: "Hired" },
+  proposal_rejected: { icon: "x", label: "Pitch" },
   system: { icon: "server", label: "System" }
 };
 
