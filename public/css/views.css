@@ -1932,6 +1932,7 @@ html {
   border-radius:var(--radius-lg, 14px); padding:18px;
 }
 .mk-panel-wide { max-width:760px; }
+.mk-card > .btn { margin-top:auto; }
 .mk-card, .mk-job {
   background:var(--surface, rgba(255,255,255,.02)); border:1px solid var(--border);
   border-radius:var(--radius-lg, 14px); padding:16px; display:flex; flex-direction:column; gap:10px;
@@ -1974,10 +1975,12 @@ html {
 .mk-link { font-size:var(--fs-sm); color:var(--accent, #7C3AED); text-decoration:none; }
 .mk-link:hover { text-decoration:underline; }
 .mk-dialog-backdrop {
-  position:fixed; inset:0; background:rgba(0,0,0,.6); display:grid; place-items:center; z-index:120; padding:20px;
+  position:fixed; inset:0; background:rgba(2,1,6,.74); display:grid; place-items:center;
+  z-index:120; padding:20px; backdrop-filter:blur(3px);
 }
 .mk-dialog {
-  background:var(--surface, #14161c); border:1px solid var(--border);
+  background:var(--panel-2, #151221); border:1px solid var(--border);
+  box-shadow:0 24px 60px rgba(0,0,0,.55);
   border-radius:var(--radius-lg, 14px); padding:20px; width:min(520px, 100%); display:flex; flex-direction:column; gap:14px;
 }
 .hidden { display:none !important; }

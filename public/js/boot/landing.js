@@ -19,7 +19,7 @@ import { qs, qsa, delegate } from "../lib/dom.js";
 import { readForm, validateForm, paintErrors, rules } from "../lib/validate.js";
 import { toast, toastError } from "../ui/toast.js";
 import { initInstallPrompt } from "../ui/pwa.js";
-import { initInstallPanel } from "../ui/install-panel.js?v=20261108a";
+import { initInstallPanel } from "../ui/install-panel.js?v=20261110a";
 import { initHeroFx } from "../ui/hero-fx.js";
 import { initMotionToggle } from "../ui/motion-toggle.js";
 import { sb, normalizeError } from "../lib/supabase.js";

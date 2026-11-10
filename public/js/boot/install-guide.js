@@ -11,7 +11,7 @@
    ========================================================================== */
 
 import "../ui/aurora.js";
-import { platformMark, PLATFORM_MARKS } from "../lib/platform-icons.js?v=20261108a";
+import { platformMark, PLATFORM_MARKS } from "../lib/platform-icons.js?v=20261110a";
 import { icon } from "../lib/icons.js";
 
 const MARKS = {
