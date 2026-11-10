@@ -20,10 +20,15 @@ body.admin {
    screen until someone asks for the menu. */
 .admin-sidebar {
   position: fixed;
-  inset: 0 auto 0 0;
+  /* Below the topbar, not under it. The ☰ lives at the far left of the bar, in
+     exactly the strip a full-height panel would cover — so a panel starting at
+     y=0 hides the one control that is supposed to close it, and a click there
+     lands on the panel and does nothing. */
+  inset: var(--nav-h) auto 0 0;
   width: 280px;
   z-index: 60;
-  height: 100vh;
+  height: calc(100vh - var(--nav-h));
+  height: calc(100dvh - var(--nav-h));
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
@@ -42,7 +47,7 @@ body.admin {
 
 .admin-scrim {
   position: fixed;
-  inset: 0;
+  inset: var(--nav-h) 0 0 0;
   z-index: 55;
   background: rgba(6, 4, 12, 0.66);
   backdrop-filter: blur(2px);
@@ -170,7 +175,10 @@ body.drawer-open {
 .admin-topbar {
   position: sticky;
   top: 0;
-  z-index: 20;
+  /* Above the scrim (55) and the panel (60). The bar is a stacking context, so a
+     z-index on the ☰ alone would never have lifted it out from under the drawer:
+     every child of this bar is painted at this layer. */
+  z-index: 70;
   display: flex;
   align-items: center;
   gap: var(--s-3);
@@ -645,12 +653,6 @@ body.drawer-open {
 /* ------------------------------------------------------------------ mobile */
 .admin-menu-toggle {
   display: inline-flex;
-  /* Above the scrim (55) so the button that opened the drawer can close it. The
-     scrim covers the topbar, so without this the click lands on the scrim: the
-     drawer does close, but the control the user aimed at never answers, which
-     reads as "it will not close". */
-  position: relative;
-  z-index: 65;
 }
 
 @media (max-width: 1024px) {

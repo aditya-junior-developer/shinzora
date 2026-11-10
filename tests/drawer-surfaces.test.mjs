@@ -170,6 +170,21 @@ test("dashboard: the icon rail keeps the labels for screen readers", () => {
   assert.match(read("public/js/ui/sidebar.js"), /className = "rail-tip"/);
 });
 
+test("dashboard: the phone drawer never covers the button that closes it", () => {
+  /* The ☰ sits at the far left of the topbar. A full-height panel starting at
+     y=0 covers that strip, so the click lands on the panel and the drawer looks
+     stuck open even though every close path in the controller works. */
+  const css = read("public/css/app.css");
+  const phone = css.slice(css.indexOf("@media (max-width: 1023px) {\n  .app-main"));
+  assert.match(phone, /\.app-sidebar\s*\{[^}]*inset:\s*var\(--nav-h\) auto 0 0/, "the drawer still starts at y=0");
+  assert.match(phone, /\.app-topbar\s*\{[^}]*z-index:\s*calc\(var\(--z-sidebar\) \+ 5\)/, "the topbar is not above the drawer");
+  assert.match(css, /\.sidebar-scrim\s*\{[^}]*inset:\s*var\(--nav-h\) 0 0 0/, "the scrim still covers the topbar");
+  /* The hamburger is in the topbar, so lifting the bar lifts the button with it;
+     a z-index on the button alone could never leave its parent's layer. */
+  const toggle = css.slice(css.indexOf(".topbar-toggle[data-sidebar-toggle]"), css.indexOf("}", css.indexOf(".topbar-toggle[data-sidebar-toggle]")));
+  assert.equal(/z-index/.test(toggle), false, "the toggle is trying to out-stack its own topbar again");
+});
+
 test("dashboard: a phone drawer always shows its labels", () => {
   const css = read("public/css/app.css");
   const phone = css.slice(css.indexOf("@media (max-width: 1023px) {\n  .app-main"));

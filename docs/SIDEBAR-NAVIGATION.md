@@ -72,7 +72,7 @@ first, since a 76px column has no room for a menu). The chats section reads
 | Width | Behaviour |
 |-------|-----------|
 | ≥ 1024px | Fixed column, content offset by its width, **no scrim, no blur, no scroll lock, no overlay** |
-| < 1024px | Off-canvas panel, subtle scrim, page scroll locked while open; closes on a link, a view change, Escape, the ✕, or the scrim |
+| < 1024px | Off-canvas panel **below the topbar**, subtle scrim, page scroll locked while open; closes on a link, a view change, Escape, the ✕, the scrim, or the ☰ — which stays clickable because the bar is the topmost layer |
 
 Crossing the breakpoint clears the other mode's state, so an overlay left open
 cannot keep a scrim over a desktop layout.
@@ -97,11 +97,16 @@ Escape, and the menu button) and all four are now covered by
 `tests/admin-drawer.test.mjs`, which drives the real controller against the real
 `public/admin/index.html`.
 
-Two changes were needed there:
+Three changes were needed there:
 
-* the menu button now sits **above** the scrim (`z-index: 65`, scrim is 55). It
-  used to sit under it, so a second click on the button that opened the drawer
-  landed on the scrim: the drawer closed, but not because the control answered.
+* **the panel now starts below the topbar** (`inset: var(--nav-h) auto 0 0`) and
+  the topbar is the topmost layer (70 > panel 60 > scrim 55). This was the actual
+  complaint: the ☰ sits at the far left of the bar, which is exactly the strip a
+  full-height panel covers, so the click landed on the panel and nothing
+  happened. A `z-index` on the button could never fix it — the bar is its own
+  stacking context, so every child is painted at the bar's level.
+* the scrim also starts below the bar, so the bar is neither dimmed nor blocked
+  while the drawer is open.
 * the console **registers the service worker itself** (`registerServiceWorker()`
   in `public/js/boot/admin.js`). Before, only the marketing site and the dashboard
   registered one, so a browser that went straight to `/admin/` kept running

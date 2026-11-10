@@ -345,12 +345,21 @@
   .app-main {
     margin-left: 0;
   }
+  /* The drawer starts below the topbar, and the bar stays on top of it. The ☰
+     lives at the far left of the bar; a panel starting at y=0 covers exactly
+     that strip, so the control that opened the drawer cannot be clicked to
+     close it. A z-index on the button alone cannot fix that — the bar is its own
+     stacking context. */
   .app-sidebar {
-    inset: 0 auto 0 0;
+    inset: var(--nav-h) auto 0 0;
     width: min(86vw, 300px);
+    height: calc(100dvh - var(--nav-h));
     transform: translateX(-101%);
     transition: transform 0.28s var(--ease);
     will-change: transform;
+  }
+  .app-topbar {
+    z-index: calc(var(--z-sidebar) + 5);
   }
   body.sidebar-open .app-sidebar {
     transform: none;
@@ -448,10 +457,6 @@
    is present at every width — in the rail it is the only way back out. */
 .topbar-toggle[data-sidebar-toggle] {
   display: inline-grid;
-  /* Below 1024px the scrim covers the topbar. Keeping the button above it means
-     the same control closes what it opened instead of swallowing the click. */
-  position: relative;
-  z-index: calc(var(--z-sidebar) + 1);
 }
 
 .topbar-search {
@@ -818,7 +823,8 @@
   .sidebar-scrim {
     display: block;
     position: fixed;
-    inset: 0;
+    /* Below the topbar, so the bar is neither dimmed nor blocked while open. */
+    inset: var(--nav-h) 0 0 0;
     z-index: calc(var(--z-sidebar) - 1);
     background: rgba(4, 3, 8, 0.55);
     opacity: 0;

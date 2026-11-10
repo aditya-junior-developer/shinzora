@@ -131,23 +131,42 @@ test("admin: navigating inside the drawer closes it", async () => {
   assert.deepEqual(state(), CLOSED);
 });
 
+test("admin: the button that opens the drawer can still be clicked while it is open", () => {
+  /* The ☰ sits at the far left of the topbar. A full-height panel starting at
+     y=0 covers exactly that strip, so the click landed on the panel and did
+     nothing — the drawer "would not close" even though every close path worked.
+     The fix is stacking, in this order: topbar above panel above scrim, with the
+     panel and the scrim starting below the bar. */
+  const css = read("public/css/admin.css");
+  const rule = (selector) => {
+    const start = css.indexOf(`${selector} {`);
+    assert.ok(start > 0, `${selector} is missing`);
+    return css.slice(start, css.indexOf("}", start));
+  };
+  const zOf = (block) => Number(/z-index:\s*(\d+)/.exec(block)?.[1]);
+
+  const scrim = rule(".admin-scrim");
+  const panel = rule(".admin-sidebar");
+  const topbar = rule(".admin-topbar");
+
+  assert.ok(zOf(topbar) > zOf(panel), "the topbar is not above the drawer");
+  assert.ok(zOf(panel) > zOf(scrim), "the drawer is not above its own scrim");
+
+  /* Both stop below the bar, so nothing is ever painted over the ☰. */
+  assert.match(panel, /inset:\s*var\(--nav-h\)/, "the drawer still starts at y=0 and covers the menu button");
+  assert.match(scrim, /inset:\s*var\(--nav-h\)/, "the scrim still covers the topbar");
+  assert.match(panel, /height:\s*calc\(100dvh - var\(--nav-h\)\)/, "the drawer's height ignores the topbar");
+});
+
 test("admin: a stale cached stylesheet cannot leave the panel permanently open", () => {
   /* The panel is only on screen while `.is-open` is present, and it is off canvas
      otherwise. If a browser runs an older admin.css, the drawer really does stay
-     put — no click can fix that, which is why the console now registers the
-     service worker (see below) and every page versions its asset URLs. */
+     put — which is why the console registers the service worker and every page
+     versions its asset URLs. */
   const css = read("public/css/admin.css");
   assert.match(css, /\.admin-sidebar\s*\{[^}]*transform:\s*translateX\(-102%\)/);
   assert.match(css, /\.admin-sidebar\.is-open\s*\{[^}]*transform:\s*none/);
 
-  /* The button that opens the drawer stays clickable while the scrim is up. */
-  const toggleRule = css.slice(css.indexOf(".admin-menu-toggle"), css.indexOf("}", css.indexOf(".admin-menu-toggle")));
-  assert.match(toggleRule, /z-index:\s*65/, "the menu button sits under the scrim, so it cannot close the drawer");
-  const scrimRule = css.slice(css.indexOf(".admin-scrim {"), css.indexOf("}", css.indexOf(".admin-scrim {")));
-  assert.match(scrimRule, /z-index:\s*55/);
-
-  /* And the console keeps its own worker registration, so a stale cache is
-     replaced on the next visit instead of lasting forever. */
   const boot = read("public/js/boot/admin.js");
   assert.match(boot, /registerServiceWorker\(\)/);
   assert.match(read("public/js/ui/pwa.js"), /controllerchange[\s\S]{0,200}location\.reload\(\)/);
