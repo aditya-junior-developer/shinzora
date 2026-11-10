@@ -471,14 +471,36 @@ test("accepting a proposal asks for confirmation first", async () => {
   root.querySelector("[data-mk-accept='prop-1']")
     .dispatchEvent(new window.Event("click", { bubbles: true }));
   await settle();
-  assert.equal(count(calls, "marketplace_accept_proposal"), 0, "declined prompt sends nothing");
+  assert.equal(count(calls, "marketplace_decide_proposal"), 0, "declined prompt sends nothing");
 
   globalThis.confirm = () => true;
   root.querySelector("[data-mk-accept='prop-1']")
     .dispatchEvent(new window.Event("click", { bubbles: true }));
   await settle();
-  assert.equal(count(calls, "marketplace_accept_proposal"), 1, "accepted prompt sends one RPC");
+  assert.equal(count(calls, "marketplace_decide_proposal"), 1, "accepted prompt sends one RPC");
+  const acceptCall = calls.filter((c) => c.name === "marketplace_decide_proposal").at(-1);
+  assert.deepEqual(acceptCall.args, { p_proposal: "prop-1", p_decision: "accept" },
+    "hiring is a decision, not a silent status flip");
   assert.equal(root.querySelectorAll(".mk-dialog").length, 0, "no dialog left open");
+});
+
+test("a pitch can be turned down, and that is a real outcome", async () => {
+  const { root, view, calls, window } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="hire"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
+
+  const reject = root.querySelector("[data-mk-reject='prop-1']");
+  assert.ok(reject, "the reject control is rendered beside Hire");
+
+  globalThis.confirm = () => true;
+  reject.dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  assert.equal(count(calls, "marketplace_decide_proposal"), 1);
+  const last = calls.filter((c) => c.name === "marketplace_decide_proposal").at(-1);
+  assert.deepEqual(last.args, { p_proposal: "prop-1", p_decision: "reject" });
+  assert.equal(count(calls, "marketplace_accept_proposal"), 0, "rejecting never accepts");
 });
 
 test("completed contracts offer a review that posts once", async () => {

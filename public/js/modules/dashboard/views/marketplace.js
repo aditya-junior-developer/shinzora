@@ -357,7 +357,10 @@ function viewHire() {
                   ${renderAnswers(job, pitch)}
                   ${
                     pitch.status === "submitted" && job.status === "open"
-                      ? `<button class="btn btn-primary btn-sm" data-mk-accept="${esc(pitch.proposalId)}">Accept this pitch</button>`
+                      ? `<div class="mk-decide">
+                           <button class="btn btn-primary btn-sm" data-mk-accept="${esc(pitch.proposalId)}">Hire</button>
+                           <button class="btn btn-ghost btn-sm" data-mk-reject="${esc(pitch.proposalId)}">Not this time</button>
+                         </div>`
                       : ""
                   }
                 </li>`
@@ -544,10 +547,28 @@ function bind(root, body) {
   );
 
   delegate(body, "click", "[data-mk-accept]", async (event, button) => {
-    if (!confirm("Accept this pitch? The other pitches on this project are rejected and a contract starts.")) return;
+    if (!confirm("Hire this person? A contract starts, the project closes, and every other pitch is rejected.")) return;
     await act(async () => {
-      await rpc("marketplace_accept_proposal", { p_proposal: button.dataset.mkAccept });
-      toast("Contract started. The agent has been notified.");
+      const result = await rpc("marketplace_decide_proposal", {
+        p_proposal: button.dataset.mkAccept,
+        p_decision: "accept"
+      });
+      toast(result?.status === "accepted"
+        ? "Contract started. The agent has been notified."
+        : "That pitch has already been decided.");
+    }, root);
+  });
+
+  /* Rejecting is its own outcome. Before this, a pitch that was not chosen sat
+     at 'submitted' forever and the pitch list never changed. */
+  delegate(body, "click", "[data-mk-reject]", async (event, button) => {
+    if (!confirm("Turn this pitch down? The person is told, and can pitch on other projects.")) return;
+    await act(async () => {
+      await rpc("marketplace_decide_proposal", {
+        p_proposal: button.dataset.mkReject,
+        p_decision: "reject"
+      });
+      toast("Pitch declined. The person has been notified.");
     }, root);
   });
 

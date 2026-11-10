@@ -2156,3 +2156,5 @@ html {
   .inv-actions { width:100%; }
   .inv-actions .btn { flex:1 1 auto; }
 }
+
+.mk-decide { display:flex; gap:8px; flex-wrap:wrap; }
