@@ -30,6 +30,8 @@ const viewPath = path.join(repo, "public/js/modules/dashboard/views/marketplace.
 
 /* --------------------------------------------------------------- fixtures */
 const WORKSPACE = {
+  accountType: "owner",
+  username: "aditya",
   profile: {
     user_id: "me",
     headline: "Full-stack designer",
@@ -51,6 +53,11 @@ const WORKSPACE = {
       budgetMin: 20000,
       budgetMax: 40000,
       createdAt: new Date().toISOString(),
+      requirements: "Six pages and a case-study CMS.",
+      questions: [
+        { questionId: "jq-1", prompt: "Link the last site you shipped" },
+        { questionId: "jq-2", prompt: "How would you approach the CMS?" }
+      ],
       proposals: [
         {
           proposalId: "prop-1",
@@ -62,7 +69,9 @@ const WORKSPACE = {
           deliveryDays: 14,
           status: "submitted",
           ratingAvg: 4.5,
-          completedContracts: 3
+          completedContracts: 3,
+          skills: ["web design"],
+          answers: { "jq-1": "https://asha.example.com/bakery" }
         }
       ]
     }
@@ -98,6 +107,20 @@ const WORKSPACE = {
   ]
 };
 
+const BUSINESSES = [
+  {
+    businessId: "biz-1",
+    name: "Klyro",
+    category: "Finance",
+    description: "A B2B agency building sites.",
+    location: "New Delhi",
+    websiteUrl: "https://klyro.example.com",
+    ownerName: "Aditya",
+    ownerUsername: "aditya",
+    openProjects: 2
+  }
+];
+
 const BOARD = [
   {
     jobId: "job-open",
@@ -113,7 +136,13 @@ const BOARD = [
     ownerId: "someone-else",
     businessName: "Roast Co",
     proposals: 1,
-    mine: false
+    mine: false,
+    requirements: "Six pages, a CMS for case studies, and analytics.",
+    questions: [
+      { questionId: "q-1", prompt: "Link the last site you shipped" },
+      { questionId: "q-2", prompt: "How would you approach the CMS?" }
+    ],
+    myProposal: null
   }
 ];
 
@@ -229,7 +258,13 @@ async function world() {
   const answers = {
     marketplace_my_workspace: WORKSPACE,
     marketplace_browse_jobs: BOARD,
-    marketplace_list_freelancers: PEOPLE
+    marketplace_list_freelancers: PEOPLE,
+    marketplace_list_businesses: BUSINESSES,
+    marketplace_find_user: {
+      userId: "freelancer", username: "asha", name: "Asha",
+      accountType: "agent", headline: "Designer for local businesses",
+      skills: ["web design"], isPublished: true, isSelf: false
+    }
   };
   globalThis.__rpc = (name, args) => {
     calls.push({ name, args });
@@ -242,6 +277,8 @@ async function world() {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+const answersFor = (name) =>
+  ({ marketplace_browse_jobs: BOARD, marketplace_list_freelancers: PEOPLE, marketplace_list_businesses: BUSINESSES })[name] ?? null;
 const count = (calls, name) => calls.filter((call) => call.name === name).length;
 
 /* ---------------------------------------------------------------- tests */
@@ -251,28 +288,51 @@ test("marketplace view renders the board from the RPC payload", async () => {
   await view.default(root);
 
   assert.match(root.textContent, /Marketplace/, "page heading renders");
-  assert.equal(root.querySelectorAll("[data-mk-tab]").length, 4, "four tabs");
+  root.querySelector('[data-mk-tab="browse"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  assert.equal(root.querySelectorAll("[data-mk-tab]").length, 5, "five tabs");
+  assert.match(root.textContent, /@aditya/, "the handle is shown in the header");
 
-  const cards = root.querySelectorAll(".mk-card");
-  assert.ok(cards.length >= 2, "one job card and one freelancer card");
+  assert.equal(root.querySelectorAll(".mk-job-card").length, 1, "each open project renders as a card");
   assert.match(root.textContent, /Landing page for a coffee brand/);
-  assert.match(root.textContent, /Asha/);
+
+  /* The agent directory lives on the Businesses tab, next to the businesses. */
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  assert.match(root.textContent, /Asha/, "agents are listed");
+  root.querySelector('[data-mk-tab="browse"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  assert.match(root.textContent, /Landing page for a coffee brand/);
 
   /* Amounts are major units: ₹15,000 must not be printed as ₹150. */
   assert.match(root.textContent, /15,000/, "budget formatted in major units");
   assert.ok(!/₹150\b/.test(root.textContent), "no 100x understatement");
 });
 
-test("a tab click reaches its handler and repaints once", async () => {
+test("an owner lands on their projects; a tab click reaches its handler", async () => {
   const { root, view } = await world();
   await view.default(root);
 
-  const hireTab = root.querySelector('[data-mk-tab="hire"]');
-  hireTab.dispatchEvent(new window.Event("click", { bubbles: true }));
+  /* The tab an account type opens on is the whole point of the fork. */
+  assert.equal(root.querySelector(".mk-tab.is-active").dataset.mkTab, "hire", "an owner opens on My projects");
+  assert.ok(root.querySelector("[data-mk-form='job']"), "the project form is rendered");
 
-  const active = root.querySelector(".mk-tab.is-active");
-  assert.equal(active.dataset.mkTab, "hire", "hire tab became active");
-  assert.ok(root.querySelector("[data-mk-form='job']"), "post-job form is rendered");
+  root.querySelector('[data-mk-tab="browse"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
+  assert.equal(root.querySelector(".mk-tab.is-active").dataset.mkTab, "browse");
+  assert.ok(root.querySelectorAll(".mk-card").length > 0, "the board renders");
+});
+
+test("an agent lands on the project board instead", async () => {
+  const { root, document } = await world();
+  globalThis.__rpc = (name, args) => {
+    if (name === "marketplace_my_workspace") return { ...WORKSPACE, accountType: "agent", myJobs: [] };
+    return answersFor(name);
+  };
+  const agentView = await bundleView([], []);
+  const agentRoot = document.createElement("div");
+  document.body.append(agentRoot);
+  await agentView.default(agentRoot);
+
+  assert.equal(agentRoot.querySelector(".mk-tab.is-active").dataset.mkTab, "browse", "an agent opens on Projects");
+  assert.ok(agentRoot.querySelector("[data-mk-pitch]"), "a pitch button is offered");
 });
 
 test("root-level delegates do not stack across repaints", async () => {
@@ -296,9 +356,12 @@ test("root-level delegates do not stack across repaints", async () => {
   );
 });
 
-test("posting a job calls create_job once with cleaned arguments", async () => {
+test("posting a project calls create_project once with its requirements and questions", async () => {
   const { root, view, calls } = await world();
   await view.default(root);
+
+  root.querySelector('[data-mk-tab="hire"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
 
   root.querySelector('[data-mk-tab="hire"]')
     .dispatchEvent(new window.Event("click", { bubbles: true }));
@@ -306,15 +369,18 @@ test("posting a job calls create_job once with cleaned arguments", async () => {
   const form = root.querySelector("[data-mk-form='job']");
   form.querySelector("[name='title']").value = "Bakery site";
   form.querySelector("[name='description']").value = "A four page site with a menu and a contact form.";
+  form.querySelector("[name='requirements']").value = "Four pages, a menu, and a contact form that emails the shop.";
   form.querySelector("[name='skills']").value = " web design , copywriting , ";
   form.querySelector("[name='budgetMin']").value = "20000";
   form.querySelector("[name='budgetMax']").value = "40000";
   form.querySelector("[name='deliveryDays']").value = "14";
+  form.querySelector("[name='theme']").value = "Editorial";
+  form.querySelector("[name='questions']").value = "Link the last site you shipped\nHow would you approach the CMS?\n\n";
 
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
   await settle();
 
-  const creates = calls.filter((call) => call.name === "marketplace_create_job");
+  const creates = calls.filter((call) => call.name === "marketplace_create_project");
   assert.equal(creates.length, 1, "submitted exactly once");
   const args = creates[0].args;
   assert.equal(args.p_title, "Bakery site");
@@ -322,37 +388,76 @@ test("posting a job calls create_job once with cleaned arguments", async () => {
   assert.equal(args.p_budget_min, 20000);
   assert.equal(args.p_delivery_days, 14);
   assert.equal(args.p_currency, "INR");
+  assert.equal(args.p_theme, "Editorial");
+  assert.deepEqual(args.p_questions, ["Link the last site you shipped", "How would you approach the CMS?"], "questions split on lines, blanks dropped");
+  assert.ok(args.p_requirements.startsWith("Four pages"), "requirements are sent");
 });
 
-test("a proposal dialog sends one proposal, even after being reopened", async () => {
+test("a pitch dialog asks the client's questions and sends one pitch", async () => {
   const { root, view, calls } = await world();
   await view.default(root);
+  root.querySelector('[data-mk-tab="browse"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
 
-  const open = () => root.querySelector("[data-mk-propose='job-open']")
+  const open = () => root.querySelector("[data-mk-pitch='job-open']")
     .dispatchEvent(new window.Event("click", { bubbles: true }));
 
   open();
-  const firstForm = root.querySelector("[data-mk-proposal-form]");
+  const firstForm = root.querySelector("[data-mk-pitch-form]");
   assert.ok(firstForm, "dialog opened");
+  assert.ok(firstForm.querySelector("[name='q_q-1']"), "the client's first question is on the form");
+  assert.ok(firstForm.querySelector("[name='q_q-2']"), "and the second");
 
   /* Cancel, reopen, then submit the second dialog. */
   firstForm.querySelector("[data-mk-close-dialog]")
     .dispatchEvent(new window.Event("click", { bubbles: true }));
-  assert.equal(root.querySelector("[data-mk-proposal-form]"), null, "dialog closed cleanly");
+  assert.equal(root.querySelector("[data-mk-pitch-form]"), null, "dialog closed cleanly");
 
   open();
-  const form = root.querySelector("[data-mk-proposal-form]");
+  const form = root.querySelector("[data-mk-pitch-form]");
   form.querySelector("[name='coverNote']").value = "I can start Monday.";
   form.querySelector("[name='bidAmount']").value = "18000";
   form.querySelector("[name='deliveryDays']").value = "7";
+  form.querySelector("[name='q_q-1']").value = "https://example.com/work";
+  form.querySelector("[name='q_q-2']").value = "Sanity-backed case studies.";
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
   await settle();
 
-  const sends = calls.filter((call) => call.name === "marketplace_submit_proposal");
+  const sends = calls.filter((call) => call.name === "marketplace_pitch");
   assert.equal(sends.length, 1, "one submit, one RPC call");
   assert.equal(sends[0].args.p_job, "job-open");
   assert.equal(sends[0].args.p_bid_amount, 18000);
-  assert.equal(root.querySelector("[data-mk-proposal-form]"), null, "dialog dismissed after send");
+  assert.deepEqual(
+    sends[0].args.p_answers,
+    { "q-1": "https://example.com/work", "q-2": "Sanity-backed case studies." },
+    "answers are keyed by question id, which is what the database expects"
+  );
+  assert.equal(root.querySelector("[data-mk-pitch-form]"), null, "dialog dismissed after send");
+});
+
+test("a client can find somebody by handle", async () => {
+  const { root, view, calls } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
+
+  const form = root.querySelector("[data-mk-form='find']");
+  form.querySelector("[name='username']").value = "@asha";
+  form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await settle();
+
+  const searches = calls.filter((call) => call.name === "marketplace_find_user");
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0].args.p_username, "asha", "the @ is stripped before searching");
+});
+
+test("the businesses tab lists businesses an agent can approach", async () => {
+  const { root, view } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
+  assert.match(root.textContent, /Klyro/);
+  assert.match(root.textContent, /@aditya/);
 });
 
 test("accepting a proposal asks for confirmation first", async () => {
@@ -398,6 +503,18 @@ test("completed contracts offer a review that posts once", async () => {
   assert.equal(reviews[0].args.p_rating, 5);
 });
 
+test("the client sees each pitch with its answers paired to the questions", async () => {
+  const { root, view } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="hire"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
+
+  /* Give the fixture pitch answers for the questions its project asked. */
+  assert.match(root.textContent, /Link the last site you shipped/, "the question is shown");
+  assert.match(root.textContent, /asha\.example\.com\/bakery/, "the answer sits under it");
+  assert.match(root.textContent, /— no answer —/, "an unanswered question is called out rather than hidden");
+});
+
 test("an empty board shows the empty state, not a blank panel", async () => {
   const { document, calls } = await world();
   /* No fixtures: a brand-new account has no jobs, no proposals, no profile. */
@@ -413,12 +530,15 @@ test("an empty board shows the empty state, not a blank panel", async () => {
   document.body.append(emptyRoot);
 
   await emptyView.default(emptyRoot);
-  assert.match(emptyRoot.textContent, /No open jobs yet/, "empty board explained");
+  assert.match(emptyRoot.textContent, /Nothing posted yet/, "empty projects explained");
+  emptyRoot.querySelector('[data-mk-tab="browse"]')
+    .dispatchEvent(new window.Event("click", { bubbles: true }));
+  assert.match(emptyRoot.textContent, /No open projects yet/, "empty board explained");
   assert.ok(!emptyRoot.querySelector(".mk-card"), "no phantom cards");
 
   emptyRoot.querySelector('[data-mk-tab="work"]')
     .dispatchEvent(new window.Event("click", { bubbles: true }));
-  assert.match(emptyRoot.textContent, /No proposals yet/, "empty proposals explained");
+  assert.match(emptyRoot.textContent, /No pitches yet/, "empty pitches explained");
   assert.match(emptyRoot.textContent, /No contracts yet/, "empty contracts explained");
 });
 

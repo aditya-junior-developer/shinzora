@@ -14,7 +14,7 @@
    single background treatment now, and nothing tracks the pointer over it.
    ========================================================================== */
 
-import { autoMountAurora } from "./aurora.js?v=20261110a";
+import { autoMountAurora } from "./aurora.js?v=20261110b";
 
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;

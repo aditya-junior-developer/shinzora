@@ -624,3 +624,57 @@
   }
   .progress-thin > span::after { display: none; }
 }
+
+/* ---------------------------------------------------------------- account fork
+   The first question in onboarding decides what every later step asks, so the
+   two options are full-width cards rather than a toggle: a toggle reads like a
+   preference, and this is a choice about what the product is for. */
+.ob-choice-row {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+}
+@media (min-width: 720px) {
+  .ob-choice-row { grid-template-columns: 1fr 1fr; }
+}
+.ob-choice-row .choice {
+  align-items: flex-start;
+  text-align: left;
+  line-height: 1.45;
+}
+.ob-choice-row .choice strong { display: block; margin-bottom: 3px; }
+.ob-choice-row .choice span { color: var(--text-dim); font-size: var(--fs-sm, 13px); }
+.ob-choice-row .choice.is-selected {
+  border-color: var(--accent, #7c3aed);
+  box-shadow: 0 0 0 1px var(--accent, #7c3aed) inset;
+}
+
+/* The handle field: an @ sits inside the input's left edge. */
+.ob-handle { position: relative; display: flex; align-items: center; }
+.ob-handle-prefix {
+  position: absolute;
+  left: 13px;
+  color: var(--text-dim);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.ob-handle .input { padding-left: 30px; }
+
+.field-hint.is-ok { color: #34d399; }
+.field-hint.is-warn { color: #fbbf24; }
+.field-hint.is-muted { color: var(--text-dim); }
+
+.ob-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-sm, 13px);
+  color: var(--text);
+  cursor: pointer;
+}
+.ob-check input { flex: 0 0 auto; }
+
+.ob-grid-3 { display: grid; gap: var(--s-4); }
+@media (min-width: 720px) {
+  .ob-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+}

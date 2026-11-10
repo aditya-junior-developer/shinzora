@@ -246,7 +246,9 @@ await as(FREELANCER, "freelancer@example.com");
 const workspace = (await rpc("select public.marketplace_my_workspace() as result")).result;
 assert.equal(workspace.myProposals.length, 1);
 assert.equal(workspace.contracts.length, 1);
-assert.equal(workspace.contracts[0].role, "freelancer");
+/* 0023 renamed the contract role from "freelancer" to "agent" so one word is
+   used for one thing across the product. */
+assert.equal(workspace.contracts[0].role, "agent");
 assert.equal(workspace.contracts[0].canReview, true);
 ok("the freelancer workspace contains only their own rows");
 

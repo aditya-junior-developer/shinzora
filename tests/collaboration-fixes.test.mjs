@@ -30,7 +30,10 @@ assert.match(teamUi, /https:\/\/mail\.google\.com\/mail\//, "email invitations o
 assert.match(teamUi, /ALLOWED_FILES = new Set\(\["image\/jpeg"[\s\S]*?"application\/pdf"\]/, "team chat supports image and PDF attachments");
 assert.match(teamUi, /rpc\("team_chat_send"/, "messages are sent through the secure team-chat RPC");
 assert.match(teamUi, /QUICK_EMOJI[\s\S]*?linkify\(/, "team chat supports emoji and safe clickable links");
-assert.match(settings, /name="member_type"[\s\S]*?Freelancer[\s\S]*?Agent/, "users can edit their profile role");
+/* 0023 replaced the old member_type wording with the two account types the
+   product actually forks on, plus the handle that identifies the account. */
+assert.match(settings, /name="account_type"[\s\S]*?I run a business[\s\S]*?I work as an agent/, "users can change how they use Shinzora");
+assert.match(settings, /name="username"[\s\S]*?set_username/, "users can edit their handle through the RPC that enforces uniqueness");
 assert.match(messagesView, /Team chat[\s\S]*?Shinzora support/, "team chat keeps the existing support channel available");
 assert.match(messagesView, /!params\.has\("channel"\) && params\.has\("c"\)/, "legacy support links with only a conversation ID still open support");
 assert.match(messagesView, /url\.searchParams\.delete\("c"\)[\s\S]*?params\.delete\("c"\)/, "switching message tabs clears stale conversation IDs");

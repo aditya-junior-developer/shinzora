@@ -29,6 +29,12 @@ const skipBtn = qs("#ob-skip");
 
 /** Local draft model, mirrored into onboarding_progress.data */
 const draft = {
+  account: { type: "owner", username: "" },
+  agent: {
+    headline: "", bio: "", skills: "", avatarUrl: "", years: "", rate: "", currency: "INR",
+    hours: "", availability: "available", seeking: "", portfolio: "", location: "",
+    remoteOk: true, equityOk: false, equityMin: "", equityMax: "", esopOk: false
+  },
   profile: { fullName: "", phone: "", avatarUrl: "" },
   business: { name: "", category: "", description: "", logoUrl: "", location: "", website: "", stage: "" },
   goals: [],
@@ -60,6 +66,12 @@ function hydrateFromState() {
   draft.profile.phone = state.profile?.phone || "";
   qs("#ob-name").value = draft.profile.fullName;
   qs("#ob-phone").value = draft.profile.phone;
+
+  /* The signup trigger already reserved a handle from the email, so the field
+     opens with something valid in it rather than empty. */
+  draft.account.username = state.profile?.username || state.user?.user_metadata?.username || "";
+  qs("#ob-username").value = draft.account.username;
+  draft.account.type = state.user?.user_metadata?.account_type === "agent" ? "agent" : (state.profile?.account_type || "owner");
 
   const metaPlan = state.user?.user_metadata?.plan;
   if (PLANS.some((p) => p.id === metaPlan)) draft.plan = metaPlan;
@@ -98,6 +110,8 @@ async function loadSavedProgress() {
 }
 
 function applyDraft(data = {}) {
+  Object.assign(draft.account, data.account || {});
+  Object.assign(draft.agent, data.agent || {});
   Object.assign(draft.profile, data.profile || {});
   Object.assign(draft.business, data.business || {});
   if (Array.isArray(data.goals)) draft.goals = data.goals;
@@ -114,6 +128,9 @@ function applyDraft(data = {}) {
   qs("#ob-location").value = draft.business.location || "";
   qs("#ob-website").value = draft.business.website || "";
   qs("#ob-goal-note").value = draft.goalNote || "";
+  qs("#ob-username").value = draft.account.username || "";
+  paintAccountType();
+  paintAgentFields();
   qs("#ob-style").value = draft.preferences.style || "";
   qs("#ob-audience").value = draft.preferences.audience || "";
   updateDescCount();
@@ -129,6 +146,159 @@ function applyDraft(data = {}) {
 }
 
 /* --------------------------------------------------------------- events -- */
+
+/* ==========================================================================
+   Account type — the fork the whole wizard hangs on
+   --------------------------------------------------------------------------
+   An owner is asked about a business; an agent is asked about their own work.
+   The two variants share step 1, the plan step and the finish button, and
+   nothing else.
+   ========================================================================== */
+const isAgent = () => draft.account.type === "agent";
+
+function paintAccountType() {
+  qsa("#ob-account-type [data-account-type]").forEach((button) => {
+    const active = button.dataset.accountType === draft.account.type;
+    button.classList.toggle("is-selected", active);
+    button.setAttribute("aria-checked", active ? "true" : "false");
+  });
+
+  qs("#ob-business-block").hidden = isAgent();
+  qs("#ob-agent-block").hidden = !isAgent();
+  qs("#ob-step2-title").textContent = isAgent() ? "Tell us about your work" : "Tell us about the business";
+  qs("#ob-step2-sub").textContent = isAgent()
+    ? "Clients read this before they pitch. It becomes your public agent profile."
+    : "Everything the AI generates — copy, structure, categories, even domain ideas — is derived from this.";
+
+  /* Brand direction is about a business's colours and audience. An agent has no
+     use for it, so the step disappears rather than being filled with noise. */
+  const brandLink = qs('[data-step-link="4"]');
+  if (brandLink) brandLink.hidden = isAgent();
+  if (isAgent() && step === 4) step = 5;
+}
+
+function bindAccountType() {
+  qsa("#ob-account-type [data-account-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      draft.account.type = button.dataset.accountType;
+      paintAccountType();
+      queueSave();
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ handle */
+let handleTimer = null;
+let handleVerdict = { ok: true, checked: "" };
+
+function paintHandle(note, tone) {
+  const node = qs("#ob-username-note");
+  if (!node) return;
+  node.textContent = note;
+  node.className = `field-hint${tone ? ` is-${tone}` : ""}`;
+}
+
+function bindUsername() {
+  const input = qs("#ob-username");
+  input.addEventListener("input", () => {
+    /* Typing "@riya" should just work rather than be rejected for a character
+       people naturally type in front of a handle. */
+    const cleaned = input.value.toLowerCase().replace(/[^a-z0-9._]/g, "").replace(/^\.+/, "").slice(0, 30);
+    if (cleaned !== input.value) input.value = cleaned;
+    draft.account.username = cleaned;
+    handleVerdict = { ok: false, checked: cleaned };
+    paintHandle("Checking availability…", "muted");
+    clearTimeout(handleTimer);
+    handleTimer = setTimeout(checkHandle, 350);
+    queueSave();
+  });
+  input.addEventListener("blur", checkHandle);
+}
+
+async function checkHandle() {
+  const wanted = (qs("#ob-username").value || "").trim().toLowerCase();
+  draft.account.username = wanted;
+  if (!wanted) {
+    handleVerdict = { ok: false, checked: "" };
+    paintHandle("Pick a handle — people use it to find you.", "warn");
+    return false;
+  }
+  try {
+    const { data, error } = await sb.rpc("username_available", { p_username: wanted });
+    if (error) throw normalizeError(error);
+    handleVerdict = { ok: Boolean(data?.available), checked: wanted, message: data?.message };
+    paintHandle(data?.available ? "Available." : (data?.message || "That handle is not available."), data?.available ? "ok" : "warn");
+    return handleVerdict.ok;
+  } catch (error) {
+    /* The check is a convenience, not the guard: set_username re-checks against
+       the unique index when the account is saved. Do not block anyone on a
+       network blip. */
+    handleVerdict = { ok: true, checked: wanted, unchecked: true };
+    paintHandle("We could not check that handle yet — it is verified when you finish.", "muted");
+    return true;
+  }
+}
+
+/* ------------------------------------------------------------------- agent */
+function readAgentFields() {
+  draft.agent.headline = qs("#ob-a-headline").value.trim();
+  draft.agent.skills = qs("#ob-a-skills").value.trim();
+  draft.agent.bio = qs("#ob-a-bio").value.trim();
+  draft.agent.years = qs("#ob-a-years").value;
+  draft.agent.rate = qs("#ob-a-rate").value;
+  draft.agent.currency = (qs("#ob-a-currency").value || "INR").toUpperCase();
+  draft.agent.hours = qs("#ob-a-hours").value;
+  draft.agent.availability = qs("#ob-a-availability").value;
+  draft.agent.seeking = qs("#ob-a-seek").value.trim();
+  draft.agent.portfolio = qs("#ob-a-portfolio").value.trim();
+  draft.agent.location = qs("#ob-a-location").value.trim();
+  draft.agent.remoteOk = qs("#ob-a-remote").checked;
+  draft.agent.equityOk = qs("#ob-a-equity").checked;
+  draft.agent.equityMin = qs("#ob-a-equity-min").value;
+  draft.agent.equityMax = qs("#ob-a-equity-max").value;
+  draft.agent.esopOk = qs("#ob-a-esop").checked;
+  qs("#ob-a-equity-range").hidden = !draft.agent.equityOk;
+}
+
+function paintAgentFields() {
+  const a = draft.agent;
+  qs("#ob-a-headline").value = a.headline || "";
+  qs("#ob-a-skills").value = a.skills || "";
+  qs("#ob-a-bio").value = a.bio || "";
+  qs("#ob-a-years").value = a.years || "";
+  qs("#ob-a-rate").value = a.rate || "";
+  qs("#ob-a-currency").value = a.currency || "INR";
+  qs("#ob-a-hours").value = a.hours || "";
+  qs("#ob-a-availability").value = a.availability || "available";
+  qs("#ob-a-seek").value = a.seeking || "";
+  qs("#ob-a-portfolio").value = a.portfolio || "";
+  qs("#ob-a-location").value = a.location || "";
+  qs("#ob-a-remote").checked = a.remoteOk !== false;
+  qs("#ob-a-equity").checked = Boolean(a.equityOk);
+  qs("#ob-a-equity-min").value = a.equityMin || "";
+  qs("#ob-a-equity-max").value = a.equityMax || "";
+  qs("#ob-a-esop").checked = Boolean(a.esopOk);
+  qs("#ob-a-equity-range").hidden = !a.equityOk;
+}
+
+function bindAgentFields() {
+  const watch = [
+    "#ob-a-headline", "#ob-a-skills", "#ob-a-bio", "#ob-a-years", "#ob-a-rate", "#ob-a-currency",
+    "#ob-a-hours", "#ob-a-availability", "#ob-a-seek", "#ob-a-portfolio", "#ob-a-location",
+    "#ob-a-remote", "#ob-a-equity", "#ob-a-equity-min", "#ob-a-equity-max", "#ob-a-esop"
+  ];
+  watch.forEach((selector) => {
+    qs(selector)?.addEventListener("input", () => {
+      readAgentFields();
+      queueSave();
+    });
+    qs(selector)?.addEventListener("change", () => {
+      readAgentFields();
+      queueSave();
+    });
+  });
+}
+
 function bindEvents() {
   qs("#ob-name").addEventListener("input", (e) => {
     draft.profile.fullName = e.target.value;
@@ -247,7 +417,11 @@ function bindEvents() {
     renderStep(1);
   });
 
+  bindAccountType();
+  bindUsername();
+  bindAgentFields();
   bindUpload("#avatar-input", "#avatar-pick", "#avatar-clear", "#avatar-preview", "avatars", "avatar", true);
+  bindUpload("#agent-avatar-input", "#agent-avatar-pick", "#agent-avatar-clear", "#agent-avatar-preview", "avatars", "agent", true);
   bindUpload("#logo-input", "#logo-pick", "#logo-clear", "#logo-preview", "brand-assets", "logo", false);
 
   // Keyboard: Enter advances on non-textarea focus
@@ -293,6 +467,7 @@ function bindUpload(inputSel, pickSel, clearSel, previewSel, bucket, prefix, rou
     try {
       const url = await uploadPublic(bucket, state.user.id, file, prefix);
       if (prefix === "avatar") draft.profile.avatarUrl = url;
+      else if (prefix === "agent") draft.agent.avatarUrl = url;
       else draft.business.logoUrl = url;
       paintPreview(previewSel, url, round);
       clearBtn.classList.remove("hidden");
@@ -420,6 +595,8 @@ function renderStep(target) {
     else button.removeAttribute("aria-current");
   });
 
+  paintAccountType();
+
   const percent = Math.round((step / TOTAL_STEPS) * 100);
   progressBar.style.width = `${percent}%`;
   progressLabel.textContent = `${step} of ${TOTAL_STEPS}`;
@@ -445,6 +622,38 @@ function validateStep() {
       { fullName: qs("#ob-name").value, phone: qs("#ob-phone").value },
       { fullName: [rules.required, rules.min(2), rules.max(80)], phone: [rules.phone] }
     );
+    paintFields(errors);
+    const handleOk = handleVerdict.ok && handleVerdict.checked === draft.account.username;
+    if (!handleOk) {
+      errors.username = handleVerdict.message || "Choose a handle that is available.";
+      if (!handleVerdict.checked) errors.username = "Pick a handle — people use it to find you.";
+    }
+    paintFields(errors);
+    return Object.keys(errors).length === 0;
+  }
+  if (step === 2 && isAgent()) {
+    readAgentFields();
+    const errors = {};
+    if (draft.agent.headline.length < 4) errors.agentHeadline = "Say what you do in one line.";
+    const skills = draft.agent.skills.split(",").map((s) => s.trim()).filter(Boolean);
+    if (skills.length === 0) errors.agentSkills = "List at least one skill — clients search on these.";
+    if (draft.agent.seeking.length < 20) errors.agentSeeking = "Write at least 20 characters about what you want.";
+    if (draft.agent.portfolio && !/^https?:\/\//i.test(draft.agent.portfolio)) {
+      setAlert(alertBox, "warning", "Check the portfolio link", "Portfolio links must start with http:// or https://.");
+      return false;
+    }
+    if (draft.agent.equityOk) {
+      const min = Number(draft.agent.equityMin || 0);
+      const max = Number(draft.agent.equityMax || 0);
+      if (!draft.agent.equityMin && !draft.agent.equityMax) {
+        setAlert(alertBox, "warning", "Say how much equity", "Give a range, or untick equity if you would rather not take any.");
+        return false;
+      }
+      if (max < min) {
+        setAlert(alertBox, "warning", "Check the equity range", "The upper figure cannot be below the lower one.");
+        return false;
+      }
+    }
     paintFields(errors);
     return Object.keys(errors).length === 0;
   }
@@ -571,7 +780,39 @@ async function finish() {
       );
     if (profileError) throw normalizeError(profileError);
 
-    // 2. Business (update the existing row when there is one, else insert)
+    // 2a. An agent saves a public profile instead of a business.
+    let businessId = null;
+    if (isAgent()) {
+      const { error: handleError } = await sb.rpc("set_username", {
+        p_username: (draft.account.username || "").trim().toLowerCase()
+      });
+      if (handleError) throw normalizeError(handleError);
+
+      const skills = draft.agent.skills.split(",").map((item) => item.trim()).filter(Boolean);
+      const { error: agentError } = await sb.rpc("marketplace_save_agent", {
+        p_headline: draft.agent.headline,
+        p_bio: draft.agent.bio,
+        p_skills: skills,
+        p_expected_rate: draft.agent.rate ? Number(draft.agent.rate) : null,
+        p_currency: draft.agent.currency || "INR",
+        p_availability: draft.agent.availability || "available",
+        p_portfolio_url: draft.agent.portfolio || null,
+        p_years_experience: draft.agent.years ? Number(draft.agent.years) : null,
+        p_seeking: draft.agent.seeking,
+        p_hours_per_week: draft.agent.hours ? Number(draft.agent.hours) : null,
+        p_notice_period_days: null,
+        p_location: draft.agent.location || null,
+        p_remote_ok: draft.agent.remoteOk !== false,
+        p_equity_ok: Boolean(draft.agent.equityOk),
+        p_equity_min_pct: draft.agent.equityOk && draft.agent.equityMin !== "" ? Number(draft.agent.equityMin) : null,
+        p_equity_max_pct: draft.agent.equityOk && draft.agent.equityMax !== "" ? Number(draft.agent.equityMax) : null,
+        p_esop_ok: Boolean(draft.agent.esopOk),
+        p_publish: true
+      });
+      if (agentError) throw normalizeError(agentError);
+    }
+
+    // 2b. Business (update the existing row when there is one, else insert)
     const businessPayload = {
       owner_id: userId,
       name: draft.business.name,
@@ -590,14 +831,16 @@ async function finish() {
       updated_at: new Date().toISOString()
     };
 
-    let businessId = state.business?.id;
-    if (businessId) {
-      const { error } = await sb.from("businesses").update(businessPayload).eq("id", businessId);
-      if (error) throw normalizeError(error);
-    } else {
-      const { data, error } = await sb.from("businesses").insert(businessPayload).select("id").single();
-      if (error) throw normalizeError(error);
-      businessId = data.id;
+    if (!isAgent()) {
+      businessId = state.business?.id;
+      if (businessId) {
+        const { error } = await sb.from("businesses").update(businessPayload).eq("id", businessId);
+        if (error) throw normalizeError(error);
+      } else {
+        const { data, error } = await sb.from("businesses").insert(businessPayload).select("id").single();
+        if (error) throw normalizeError(error);
+        businessId = data.id;
+      }
     }
 
     /* 3. Subscription — the plan row already exists (the signup trigger creates
@@ -609,6 +852,7 @@ async function finish() {
        Finish Setup bug. The only field onboarding owns is which business the
        subscription points at, so that is done through the scoped function from
        migration 0010. It can only ever touch the caller's own row. */
+    if (!isAgent()) {
     try {
       const { error: subError } = await sb.rpc("attach_business_to_subscription", {
         p_business: businessId
@@ -625,6 +869,7 @@ async function finish() {
       if (!missingFunction) throw normalized;
       console.warn("[shinzora] attach_business_to_subscription is missing — apply migration 0010.");
     }
+    }
 
     // 4. Paid plan chosen → service request for the admin queue
     if (draft.plan !== "free") {
@@ -636,7 +881,7 @@ async function finish() {
           requested_plan: draft.plan,
           listed_price: planById(draft.plan).priceMonthly,
           currency: "INR",
-          business_name: draft.business.name
+          business_name: isAgent() ? draft.agent.headline : draft.business.name
         },
         /* 'pending' is not a valid service_requests status — the CHECK allows
            requested/approved/in_progress/completed/rejected/cancelled and the
@@ -667,11 +912,24 @@ async function finish() {
       sb.from("businesses").select("id, name").eq("owner_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle()
     ]);
     if (verifyError) throw normalizeError(verifyError);
-    if (!savedBusiness?.id) {
+    if (!isAgent() && !savedBusiness?.id) {
       throw new AppError("The business profile was not saved.", {
         code: "verify_failed",
         hint: "Nothing was lost — press Finish again. If this repeats, check that migrations 0001–0010 are applied."
       });
+    }
+    if (isAgent()) {
+      const { data: savedProfile } = await sb
+        .from("profiles")
+        .select("username, account_type")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!savedProfile?.username) {
+        throw new AppError("Your handle was not saved.", {
+          code: "verify_failed",
+          hint: "Nothing was lost — press Finish again to claim it."
+        });
+      }
     }
     if (!savedOnboarding?.completed_at && !savedOnboarding?.is_completed) {
       throw new AppError("Setup was saved but could not be marked complete.", {
@@ -682,15 +940,17 @@ async function finish() {
 
     /* Audit trail: useful, never fatal. Losing an activity row must not strand a
        customer who has already been saved on the final screen. */
-    sb.rpc("log_activity", {
-      p_action: "onboarding_completed",
-      p_entity_type: "business",
-      p_entity_id: businessId,
-      p_meta: { goals: draft.goals, plan: draft.plan }
-    }).then(
+    if (businessId) {
+      sb.rpc("log_activity", {
+        p_action: "onboarding_completed",
+        p_entity_type: "business",
+        p_entity_id: businessId,
+        p_meta: { goals: draft.goals, plan: draft.plan }
+      }).then(
       () => undefined,
-      () => undefined
-    );
+        () => undefined
+      );
+    }
 
     /* Refresh the cached identity so the dashboard opens with the real business
        and plan. A failure here is not a reason to keep the customer on the

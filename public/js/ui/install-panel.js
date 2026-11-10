@@ -26,9 +26,9 @@
    this modal.
    ========================================================================== */
 
-import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261110a";
+import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261110b";
 import { icon } from "../lib/icons.js";
-import { platformMark } from "../lib/platform-icons.js?v=20261110a";
+import { platformMark } from "../lib/platform-icons.js?v=20261110b";
 
 const GUIDE_URL = "/install-guide/";
 const MANIFEST_URL = "/downloads/manifest.json";

@@ -9,10 +9,10 @@
 <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="stylesheet" href="/css/tokens.css?v=20261110a" />
-<link rel="stylesheet" href="/css/components.css?v=20261110a" />
-<link rel="stylesheet" href="/css/app.css?v=20261110a" />
-<link rel="stylesheet" href="/css/onboarding.css?v=20261110a" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261110b" />
+<link rel="stylesheet" href="/css/components.css?v=20261110b" />
+<link rel="stylesheet" href="/css/app.css?v=20261110b" />
+<link rel="stylesheet" href="/css/onboarding.css?v=20261110b" />
 <script src="/js/config/runtime.js"></script>
 </head>
 <body>
@@ -95,6 +95,30 @@
           <p>This is how your name appears on invoices, notifications and anything Shinzora sends on your behalf.</p>
         </div>
         <div class="ob-card" style="margin-top:var(--s-5)">
+          <div class="field" style="margin-bottom:var(--s-5)">
+            <span class="field-label">What brings you to Shinzora?</span>
+            <div class="ob-choice-row" id="ob-account-type">
+              <button class="choice" type="button" data-account-type="owner" aria-checked="true">
+                <strong>I run a business</strong>
+                <span>Hire agents, post projects, grow the company.</span>
+              </button>
+              <button class="choice" type="button" data-account-type="agent" aria-checked="false">
+                <strong>I want to work as an agent</strong>
+                <span>Offer your skills to businesses that need them.</span>
+              </button>
+            </div>
+            <div class="field-hint">You can change this later in Settings.</div>
+          </div>
+          <div class="field" data-field="username">
+            <label class="field-label" for="ob-username">Your handle</label>
+            <div class="ob-handle">
+              <span class="ob-handle-prefix">@</span>
+              <input class="input" id="ob-username" name="username" maxlength="30"
+                     autocomplete="off" spellcheck="false" placeholder="riya.sharma" />
+            </div>
+            <div class="field-hint" id="ob-username-note">This is how people find and connect with you. Lowercase letters, numbers, dots and underscores.</div>
+            <div class="field-error"></div>
+          </div>
           <div class="uploader">
             <div class="uploader-preview round" id="avatar-preview"><i data-icon="user-round" data-size="22"></i></div>
             <div class="uploader-body">
@@ -132,9 +156,11 @@
       <section data-step="2" hidden>
         <div class="ob-head">
           <span class="ob-kicker">Step 2 of 5</span>
-          <h1>Tell us about the business</h1>
-          <p>Everything the AI generates — copy, structure, categories, even domain ideas — is derived from this.</p>
+          <h1 id="ob-step2-title">Tell us about the business</h1>
+          <p id="ob-step2-sub">Everything the AI generates — copy, structure, categories, even domain ideas — is derived from this.</p>
         </div>
+
+        <div id="ob-business-block">
         <div class="ob-card" style="margin-top:var(--s-5)">
           <div class="uploader">
             <div class="uploader-preview" id="logo-preview"><i data-icon="image" data-size="20"></i></div>
@@ -221,6 +247,118 @@
               </button>
             </div>
             <div class="field-error"></div>
+          </div>
+        </div>
+
+        </div>
+
+        <!-- the agent variant of step 2: everything a client needs to judge a pitch -->
+        <div id="ob-agent-block" hidden>
+          <div class="ob-card" style="margin-top:var(--s-5)">
+            <div class="uploader">
+              <div class="uploader-preview round" id="agent-avatar-preview"><i data-icon="user-round" data-size="22"></i></div>
+              <div class="uploader-body">
+                <span class="up-title">Photo</span>
+                <span class="up-hint">Optional. Accounts without a photo are listed just the same.</span>
+                <div class="uploader-actions">
+                  <button class="btn btn-secondary btn-sm" type="button" id="agent-avatar-pick">Upload</button>
+                  <button class="btn btn-ghost btn-sm hidden" type="button" id="agent-avatar-clear">Remove</button>
+                </div>
+                <input type="file" id="agent-avatar-input" accept="image/png,image/jpeg,image/webp" class="hidden" />
+              </div>
+            </div>
+            <div class="ob-grid-2">
+              <div class="field" data-field="agentHeadline">
+                <label class="field-label" for="ob-a-headline">What you do, in one line</label>
+                <input class="input" id="ob-a-headline" maxlength="120" placeholder="Full-stack designer for small businesses" />
+                <div class="field-error"></div>
+              </div>
+              <div class="field" data-field="agentSkills">
+                <label class="field-label" for="ob-a-skills">Skills</label>
+                <input class="input" id="ob-a-skills" placeholder="web design, react, copywriting" />
+                <div class="field-hint">Comma separated. These are what clients search on.</div>
+                <div class="field-error"></div>
+              </div>
+            </div>
+            <div class="field" data-field="agentBio">
+              <label class="field-label" for="ob-a-bio">About you <span class="optional">optional</span></label>
+              <textarea class="textarea" id="ob-a-bio" rows="4" maxlength="2000"
+                placeholder="What you have worked on, who you work well with, how you like to run a project."></textarea>
+            </div>
+            <div class="ob-grid-3">
+              <div class="field">
+                <label class="field-label" for="ob-a-years">Years of experience</label>
+                <input class="input" id="ob-a-years" type="number" min="0" max="70" placeholder="5" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="ob-a-rate">Expected pay</label>
+                <input class="input" id="ob-a-rate" type="number" min="0" placeholder="25000" />
+                <div class="field-hint">Per project, or per month for ongoing work.</div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="ob-a-currency">Currency</label>
+                <input class="input" id="ob-a-currency" maxlength="3" value="INR" />
+              </div>
+            </div>
+            <div class="ob-grid-2">
+              <div class="field">
+                <label class="field-label" for="ob-a-hours">Hours per week <span class="optional">optional</span></label>
+                <input class="input" id="ob-a-hours" type="number" min="1" max="100" placeholder="30" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="ob-a-availability">Availability</label>
+                <select class="input" id="ob-a-availability">
+                  <option value="available">Available now</option>
+                  <option value="busy">Busy — free soon</option>
+                  <option value="unavailable">Not taking work</option>
+                </select>
+              </div>
+            </div>
+            <div class="field" data-field="agentSeeking">
+              <label class="field-label" for="ob-a-seek">What are you looking for?</label>
+              <textarea class="textarea" id="ob-a-seek" rows="3" maxlength="500"
+                placeholder="Long-term product work with a founding team, or short fixed-scope builds."></textarea>
+              <div class="field-error"></div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="ob-a-portfolio">Portfolio link <span class="optional">optional</span></label>
+              <input class="input" id="ob-a-portfolio" placeholder="https://" inputmode="url" />
+            </div>
+            <div class="ob-grid-2">
+              <div class="field">
+                <label class="field-label" for="ob-a-location">Where you are <span class="optional">optional</span></label>
+                <input class="input" id="ob-a-location" placeholder="Faridabad, Haryana" />
+              </div>
+              <div class="field" style="justify-content:flex-end">
+                <label class="ob-check">
+                  <input type="checkbox" id="ob-a-remote" checked />
+                  <span>I can work remotely</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="ob-card" style="margin-top:var(--s-4)">
+            <div class="card-title" style="margin-bottom:var(--s-3)">Equity and stakes</div>
+            <p class="up-hint" style="margin:0 0 var(--s-4)">Answer honestly — clients filter on this, and saying no is a normal answer.</p>
+            <label class="ob-check">
+              <input type="checkbox" id="ob-a-equity" />
+              <span>I would take part of the fee as equity or stake in the business</span>
+            </label>
+            <div class="ob-grid-2" id="ob-a-equity-range" hidden style="margin-top:var(--s-3)">
+              <div class="field">
+                <label class="field-label" for="ob-a-equity-min">From (%)</label>
+                <input class="input" id="ob-a-equity-min" type="number" min="0" max="100" step="0.1" placeholder="0.5" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="ob-a-equity-max">Up to (%)</label>
+                <input class="input" id="ob-a-equity-max" type="number" min="0" max="100" step="0.1" placeholder="2.5" />
+              </div>
+            </div>
+            <label class="ob-check" style="margin-top:var(--s-3)">
+              <input type="checkbox" id="ob-a-esop" />
+              <span>I am open to ESOPs / stock options instead of cash</span>
+            </label>
           </div>
         </div>
       </section>
@@ -375,6 +513,6 @@
 </div>
 
 <script src="/js/vendor/supabase-js.js"></script>
-<script type="module" src="/js/boot/onboarding.js?v=20261110a"></script>
+<script type="module" src="/js/boot/onboarding.js?v=20261110b"></script>
 </body>
 </html>

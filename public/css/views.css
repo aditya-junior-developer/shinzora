@@ -1984,3 +1984,39 @@ html {
   border-radius:var(--radius-lg, 14px); padding:20px; width:min(520px, 100%); display:flex; flex-direction:column; gap:14px;
 }
 .hidden { display:none !important; }
+
+/* Marketplace — project requirements, screening answers, pitch dialog */
+.mk-details { border-top:1px solid var(--border); padding-top:8px; }
+.mk-details summary {
+  cursor:pointer; font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.05em;
+  color:var(--text-dim); list-style:none;
+}
+.mk-details summary::-webkit-details-marker { display:none; }
+.mk-details summary::before { content:"▸ "; }
+.mk-details[open] summary::before { content:"▾ "; }
+.mk-details p { margin:8px 0 0; }
+
+.mk-answers { margin:10px 0 0; display:flex; flex-direction:column; gap:8px; }
+.mk-answers dt {
+  font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim);
+}
+.mk-answers dd {
+  margin:3px 0 0; font-size:var(--fs-sm); line-height:1.5; white-space:pre-wrap;
+  border-left:2px solid var(--border); padding-left:9px;
+}
+.mk-subhead {
+  font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim);
+  border-top:1px solid var(--border); padding-top:12px;
+}
+.mk-job-card .mk-meta { grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+/* Settings — the handle field (mirrors the onboarding one, which lives in
+   onboarding.css and is not loaded on the dashboard). */
+.handle-wrap { position: relative; display: flex; align-items: center; }
+.handle-prefix {
+  position: absolute; left: 13px; color: var(--text-dim); pointer-events: none;
+}
+.handle-wrap .input { padding-left: 30px; }
+
+/* The handle search is one field; it should not stretch the width of the panel. */
+.mk-find { align-items: flex-end; }
