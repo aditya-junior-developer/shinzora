@@ -874,6 +874,365 @@ export async function run(db, api, { fixtures }) {
     ? pass("0029", "a business that opted out of the directory cannot be opened by id either")
     : fail("0029", `hidden business panel returned ${hiddenPanel ?? "data"}`);
 
+
+  /* ================================================== 0035. store operations
+     0035 is the round that added order tracking, catalogue import, low-stock
+     alerts, category analytics and the assistant's command set. Each check
+     below calls the function the browser calls, as the user who would call it,
+     and then looks at what the database now holds. */
+  const storeOwner = fixtures.users.a;
+  const storeOutsider = fixtures.users.b;
+
+  /* ---- a catalogue import validates rows instead of trusting them ---- */
+  const importResult = await asUser(storeOwner, () =>
+    one(
+      db,
+      `select public.store_import_products($1::jsonb) as result`,
+      [
+        JSON.stringify([
+          { name: "Amber candle", sku: "AMBER-1", price: "450", stock: "12", category: "Home" },
+          { name: "Amber candle", sku: "AMBER-1", price: "450", stock: "9", category: "Home" },
+          { name: "", sku: "BAD-1", price: "10", stock: "1" },
+          { name: "Broken price", sku: "BAD-2", price: "not a number", stock: "1" },
+          { name: "Negative", sku: "BAD-3", price: "-5", stock: "1" }
+        ])
+      ]
+    )
+  );
+  importResult?.result?.imported === 1 &&
+  importResult?.result?.updated === 1 &&
+  importResult?.result?.skipped === 3 &&
+  importResult?.result?.problems?.length === 3
+    ? pass("0035", "catalogue import adds the good rows, updates the duplicate SKU, and reports each bad row")
+    : fail("0035", `import returned ${JSON.stringify(importResult?.result)}`);
+
+  const importedCount = await one(
+    db,
+    `select count(*)::int as n from public.store_products where owner_id = $1 and sku like 'AMBER%'`,
+    [storeOwner]
+  );
+  importedCount.n === 1
+    ? pass("0035", "the duplicate SKU did not create a second product")
+    : fail("0035", `duplicate SKU created ${importedCount.n} rows`);
+
+  const emptyImport = await asUser(storeOutsider, () =>
+    one(db, `select public.store_import_products('[]'::jsonb) as result`)
+  );
+  emptyImport?.result?.imported === 0
+    ? pass("0035", "an import with no rows is a no-op, not an error")
+    : fail("0035", `empty import returned ${JSON.stringify(emptyImport)}`);
+
+  /* ---- low stock raises one alert, and clears itself ---- */
+  const stockProduct = await one(
+    db,
+    `select id, name, owner_id from public.store_products where owner_id = $1 order by created_at limit 1`,
+    [storeOwner]
+  );
+  await db.query(`update public.store_products set stock = 3 where id = $1`, [stockProduct.id]);
+  const lowAlert = await one(
+    db,
+    `select state, stock, seen_at from public.product_alerts where product_id = $1`,
+    [stockProduct.id]
+  );
+  lowAlert?.state === "low" && lowAlert.stock === 3
+    ? pass("0035", "stock dropping to three raises one low-stock alert")
+    : fail("0035", `low stock alert: ${JSON.stringify(lowAlert)}`);
+
+  const lowNotice = await one(
+    db,
+    `select count(*)::int as n from public.notifications where user_id = $1 and type = 'inventory'`,
+    [storeOwner]
+  );
+  lowNotice.n >= 1
+    ? pass("0035", "the low-stock alert also reaches the owner's notification list")
+    : fail("0035", "no inventory notification was written");
+
+  await db.query(`update public.store_products set stock = 2 where id = $1`, [stockProduct.id]);
+  const alertRows = await one(
+    db,
+    `select count(*)::int as n from public.product_alerts where product_id = $1`,
+    [stockProduct.id]
+  );
+  alertRows.n === 1
+    ? pass("0035", "a second drop in the same state does not stack a second alert")
+    : fail("0035", `${alertRows.n} alerts for one product`);
+
+  await db.query(`update public.store_products set stock = 0 where id = $1`, [stockProduct.id]);
+  const outAlert = await one(
+    db,
+    `select state from public.product_alerts where product_id = $1`,
+    [stockProduct.id]
+  );
+  outAlert?.state === "out"
+    ? pass("0035", "stock reaching zero escalates the alert to out-of-stock")
+    : fail("0035", `out-of-stock state was ${JSON.stringify(outAlert)}`);
+
+  await db.query(`update public.store_products set stock = 40 where id = $1`, [stockProduct.id]);
+  const cleared = await one(
+    db,
+    `select count(*)::int as n from public.product_alerts where product_id = $1`,
+    [stockProduct.id]
+  );
+  cleared.n === 0
+    ? pass("0035", "restocking clears the alert instead of leaving a stale one")
+    : fail("0035", `${cleared.n} alerts survived a restock`);
+
+  /* ---- an order, its tracking link and the customer's view ---- */
+  const trackedOrder = await one(
+    db,
+    `insert into public.store_orders (owner_id, order_number, customer_name, customer_email, status, total_amount)
+     values ($1, 'SZ-TEST-1', 'Asha Verma', 'asha@example.test', 'pending', 1200)
+     returning id, order_number`,
+    [storeOwner]
+  );
+  await db.query(
+    `insert into public.store_order_items (order_id, product_id, product_name, quantity, unit_price)
+     values ($1, $2, 'Amber candle', 2, 600)`,
+    [trackedOrder.id, stockProduct.id]
+  );
+
+  const trackingLink = await asUser(storeOwner, () =>
+    one(db, `select public.order_tracking_link('${trackedOrder.id}') as result`)
+  );
+  const trackToken = trackingLink?.result?.token;
+  trackToken && trackToken.length >= 20
+    ? pass("0035", "the owner can mint a tracking token for an order")
+    : fail("0035", `tracking link returned ${JSON.stringify(trackingLink?.result)}`);
+
+  const secondLink = await asUser(storeOwner, () =>
+    one(db, `select public.order_tracking_link('${trackedOrder.id}') as result`)
+  );
+  secondLink?.result?.token === trackToken
+    ? pass("0035", "asking twice returns the same token, so a sent link keeps working")
+    : fail("0035", "a second request replaced the token that was already sent");
+
+  const strangerLink = await asUser(storeOutsider, () =>
+    throws(db, `select public.order_tracking_link('${trackedOrder.id}')`)
+  );
+  strangerLink && /another business/i.test(strangerLink)
+    ? pass("0035", "another business cannot mint a tracking link for this order")
+    : fail("0035", `a stranger minted a tracking link: ${strangerLink ?? "no error"}`);
+
+  await asUser(storeOwner, () =>
+    one(db, `select public.order_set_status('${trackedOrder.id}', 'shipped', 'Left the studio today') as result`)
+  );
+  const shipped = await one(db, `select status, shipped_at from public.store_orders where id = $1`, [trackedOrder.id]);
+  shipped.status === "shipped" && shipped.shipped_at
+    ? pass("0035", "changing an order's status stamps the shipping time")
+    : fail("0035", `order after status change: ${JSON.stringify(shipped)}`);
+
+  const orderEvents = await rows(db, `select status from public.store_order_events where order_id = $1`, [trackedOrder.id]);
+  orderEvents.some((row) => row.status === "shipped")
+    ? pass("0035", "the status change is written to the order's timeline")
+    : fail("0035", `timeline holds ${JSON.stringify(orderEvents)}`);
+
+  const trackedRead = await db.query(`select public.order_tracking($1) as result`, [trackToken]);
+  const trackedJson = trackedRead.rows[0].result;
+  trackedJson?.orderNumber === "SZ-TEST-1" &&
+  trackedJson?.status === "shipped" &&
+  trackedJson?.items?.length === 1 &&
+  trackedJson?.timeline?.length >= 1
+    ? pass("0035", "the customer's tracking page reads the order, its items and its timeline")
+    : fail("0035", `tracking payload: ${JSON.stringify(trackedJson)}`);
+
+  const trackedText = JSON.stringify(trackedJson || {});
+  !/asha@example\.test/.test(trackedText) && !trackedText.includes(stockProduct.owner_id)
+    ? pass("0035", "the public tracking payload carries no email address and no owner id")
+    : fail("0035", "the tracking payload leaked a contact detail or an owner id");
+
+  const badToken = await throws(db, `select public.order_tracking('not-a-real-token')`);
+  badToken
+    ? pass("0035", "a wrong token is refused rather than returning an empty order")
+    : fail("0035", "a wrong tracking token returned a row");
+
+  const linkRevoked = await asUser(storeOwner, () =>
+    one(db, `select public.order_tracking_revoke('${trackedOrder.id}') as result`)
+  );
+  const afterRevoke = await throws(db, `select public.order_tracking('${trackToken}')`);
+  linkRevoked?.result?.ok && afterRevoke
+    ? pass("0035", "revoking a link stops it working for the customer")
+    : fail("0035", `revoke: ${JSON.stringify(linkRevoked?.result)}, read: ${afterRevoke ?? "still works"}`);
+
+  const outsiderStatus = await asUser(storeOutsider, () =>
+    throws(db, `select public.order_set_status('${trackedOrder.id}', 'delivered', null)`)
+  );
+  outsiderStatus && /another business/i.test(outsiderStatus)
+    ? pass("0035", "another business cannot move this order's status")
+    : fail("0035", `a stranger changed the order: ${outsiderStatus ?? "no error"}`);
+
+  const badStatus = await asUser(storeOwner, () =>
+    throws(db, `select public.order_set_status('${trackedOrder.id}', 'teleported', null)`)
+  );
+  badStatus && /not an order status/i.test(badStatus)
+    ? pass("0035", "an invented order status is refused")
+    : fail("0035", `unknown status accepted: ${badStatus ?? "no error"}`);
+
+  /* ---- conversion needs a denominator, and says so when it has none ---- */
+  const noVisits = await asUser(storeOwner, () =>
+    one(db, `select public.store_analytics(30) as result`)
+  );
+  noVisits?.result?.conversionRate === null
+    ? pass("0035", "with no visits recorded, conversion is null rather than a made-up zero")
+    : fail("0035", `conversion without visits was ${JSON.stringify(noVisits?.result?.conversionRate)}`);
+
+  await db.query(`select public.store_track_visit($1, 'site')`, [storeOwner]);
+  await db.query(`select public.store_track_visit($1, 'site')`, [storeOwner]);
+  const withVisits = await asUser(storeOwner, () =>
+    one(db, `select public.store_analytics(30) as result`)
+  );
+  withVisits?.result?.visits >= 2 && withVisits?.result?.conversionRate !== null
+    ? pass("0035", "once visits exist, conversion is computed from them")
+    : fail("0035", `analytics after visits: ${JSON.stringify(withVisits?.result)}`);
+
+  const categoryRow = (withVisits?.result?.categories || [])[0];
+  categoryRow?.category === "Home"
+    ? pass("0035", "category totals line up with the products that were sold")
+    : fail("0035", `category breakdown: ${JSON.stringify(withVisits?.result?.categories)}`);
+
+  /* A visit for somebody with no business and no project writes nothing, so the
+     endpoint cannot be used to probe for owner ids. */
+  await db.query(`select public.store_track_visit('00000000-0000-4000-8000-000000000000', 'x')`);
+  const ghostRows = await one(
+    db,
+    `select count(*)::int as n from public.store_visits where owner_id = '00000000-0000-4000-8000-000000000000'`
+  );
+  ghostRows.n === 0
+    ? pass("0035", "a visit for an owner that does not exist writes nothing")
+    : fail("0035", `unknown owner recorded ${ghostRows.n} visits`);
+
+  /* ---- support: escalation, auto-reply, history ---- */
+  const supportTicket = await one(
+    db,
+    `insert into public.support_tickets (owner_id, subject, message, customer_email_used)
+     values ($1, 'Candle arrived cracked', 'It arrived in pieces.', 'asha@example.test')
+     returning id`,
+    [storeOwner]
+  );
+  const escalateResult = await asUser(storeOwner, () =>
+    one(db, `select public.support_escalate('${supportTicket.id}', 'The customer wants a refund') as result`)
+  );
+  const escalatedRow = await one(
+    db,
+    `select escalated_at, priority, status, escalation_reason from public.support_tickets where id = $1`,
+    [supportTicket.id]
+  );
+  escalateResult?.result?.ok && escalatedRow.escalated_at && escalatedRow.priority === "high"
+    ? pass("0035", "escalating a ticket timestamps it and raises its priority")
+    : fail("0035", `escalation: ${JSON.stringify(escalatedRow)}`);
+
+  const escalationNote = await one(
+    db,
+    `select body from public.support_replies where ticket_id = $1 and author_role = 'system'`,
+    [supportTicket.id]
+  );
+  escalationNote && /escalated to the shinzora team/i.test(escalationNote.body)
+    ? pass("0035", "the escalation leaves a visible note in the customer's thread")
+    : fail("0035", `escalation note: ${JSON.stringify(escalationNote)}`);
+
+  const outsiderEscalate = await asUser(storeOutsider, () =>
+    throws(db, `select public.support_escalate('${supportTicket.id}', null)`)
+  );
+  outsiderEscalate && /another business/i.test(outsiderEscalate)
+    ? pass("0035", "another business cannot escalate this ticket")
+    : fail("0035", `stranger escalated: ${outsiderEscalate ?? "no error"}`);
+
+  const autoOn = await asUser(storeOwner, () =>
+    one(db, `select public.support_set_auto_reply('${supportTicket.id}', true) as result`)
+  );
+  const autoRow = await one(db, `select auto_reply from public.support_tickets where id = $1`, [supportTicket.id]);
+  autoOn?.result?.autoReply && autoRow.auto_reply
+    ? pass("0035", "automatic replies are opt-in per ticket")
+    : fail("0035", `auto reply flag: ${JSON.stringify(autoRow)}`);
+
+  const supportHistory = await asUser(storeOwner, () =>
+    one(db, `select public.support_customer_history('asha@example.test', null) as result`)
+  );
+  Array.isArray(supportHistory?.result) && supportHistory.result.length >= 1
+    ? pass("0035", "support history returns every ticket for one customer email")
+    : fail("0035", `history: ${JSON.stringify(supportHistory?.result)}`);
+
+  const outsiderHistory = await asUser(storeOutsider, () =>
+    one(db, `select public.support_customer_history('asha@example.test', null) as result`)
+  );
+  Array.isArray(outsiderHistory?.result) && outsiderHistory.result.length === 0
+    ? pass("0035", "another business gets an empty history for a customer that is not theirs")
+    : fail("0035", `stranger history: ${JSON.stringify(outsiderHistory?.result)}`);
+
+  /* ---- the assistant's command set is closed ---- */
+  const madeProduct = await asUser(storeOwner, () =>
+    one(db, `select public.assistant_command_apply('create_product', '{"name":"Tea light","price":120,"stock":8,"category":"Home"}'::jsonb, null) as result`)
+  );
+  madeProduct?.result?.productId
+    ? pass("0035", "the assistant can create a product through a validated command")
+    : fail("0035", `create_product returned ${JSON.stringify(madeProduct?.result)}`);
+
+  const invented = await asUser(storeOwner, () =>
+    throws(db, `select public.assistant_command_apply('delete_everything', '{}'::jsonb, null)`)
+  );
+  invented && /may do/i.test(invented)
+    ? pass("0035", "an action outside the four allowed commands is refused")
+    : fail("0035", `invented action: ${invented ?? "was executed"}`);
+
+  const noName = await asUser(storeOwner, () =>
+    throws(db, `select public.assistant_command_apply('create_product', '{"price":10}'::jsonb, null)`)
+  );
+  noName && /needs a name/i.test(noName)
+    ? pass("0035", "a command with an incomplete payload is refused with the reason")
+    : fail("0035", `nameless product: ${noName ?? "was created"}`);
+
+  const strangerCommand = await asUser(storeOutsider, () =>
+    throws(db, `select public.assistant_command_apply('update_stock', jsonb_build_object('productId', '${stockProduct.id}', 'stock', 1), null)`)
+  );
+  strangerCommand && /not in your catalogue/i.test(strangerCommand)
+    ? pass("0035", "a command cannot touch another business's product")
+    : fail("0035", `stranger update_stock: ${strangerCommand ?? "was applied"}`);
+
+  /* ---- 0036: the thread can hold four voices, and only those four ---- */
+  const assistantReply = await asUser(storeOwner, () =>
+    one(
+      db,
+      `insert into public.support_replies (ticket_id, author_role, body)
+       values ($1, 'assistant', 'Automatic reply for the staging check.')
+       returning id, author_role`,
+      [supportTicket.id]
+    )
+  );
+  assistantReply?.author_role === "assistant"
+    ? pass("0036", "an automated reply can be stored in the thread")
+    : fail("0036", `assistant reply insert: ${JSON.stringify(assistantReply)}`);
+
+  const customerReply = await asUser(storeOwner, () =>
+    one(
+      db,
+      `insert into public.support_replies (ticket_id, author_role, body)
+       values ($1, 'customer', 'Inbound message from the buyer.')
+       returning id, author_role`,
+      [supportTicket.id]
+    )
+  );
+  customerReply?.author_role === "customer"
+    ? pass("0036", "an inbound customer message can be stored in the same thread")
+    : fail("0036", `customer reply insert: ${JSON.stringify(customerReply)}`);
+
+  const inventedRole = await asUser(storeOwner, () =>
+    throws(
+      db,
+      `insert into public.support_replies (ticket_id, author_role, body)
+       values ('${supportTicket.id}', 'robot', 'nope')`
+    )
+  );
+  inventedRole && /author_role|check constraint/i.test(inventedRole)
+    ? pass("0036", "a role outside the five known voices is rejected by the constraint")
+    : fail("0036", `invented author_role: ${inventedRole ?? "was accepted"}`);
+
+  const historyWithVoices = await asUser(storeOwner, () =>
+    one(db, `select public.support_customer_history('asha@example.test', null) as result`)
+  );
+  const firstThread = Array.isArray(historyWithVoices?.result) ? historyWithVoices.result[0] : null;
+  Array.isArray(firstThread?.replies) && firstThread.replies.length >= 2
+    ? pass("0036", "customer history carries every voice in the thread, oldest first")
+    : fail("0036", `history replies: ${JSON.stringify(firstThread?.replies)}`);
+
   /* ---- archiving a ticket hides it without destroying it ---- */
   const ticket = await one(db, `select id, owner_id from public.support_tickets limit 1`);
   if (ticket) {

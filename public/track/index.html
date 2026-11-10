@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Order tracking · Shinzora</title>
+  <meta name="description" content="Follow your order: where it is, what is in it, and what happens next." />
+  <meta name="theme-color" content="#08060d" />
+  <style>
+    :root{
+      --bg:#08060d; --surface:#100c18; --surface-2:#171224; --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
+      --text:#f5f3ff; --text-2:#c9c3da; --text-3:#928ba8;
+      --violet:#7c3aed; --violet-2:#a78bfa; --ok:#34d399; --warn:#fbbf24; --danger:#f87171; --info:#60a5fa;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;min-height:100vh;color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+      background:
+        radial-gradient(1100px 560px at 10% -12%, rgba(124,58,237,.26), transparent 60%),
+        radial-gradient(820px 460px at 92% 4%, rgba(167,139,250,.13), transparent 58%),
+        var(--bg);
+    }
+    .wrap{max-width:760px;margin:0 auto;padding:34px 20px 72px}
+    header.top{display:flex;align-items:center;gap:12px;padding-bottom:22px;border-bottom:1px solid var(--line);margin-bottom:26px}
+    .brand{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.26em;font-weight:600;text-transform:uppercase}
+    .brand svg{display:block}
+    .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--violet-2);border:1px solid rgba(167,139,250,.32);border-radius:999px;padding:3px 9px;margin-left:auto}
+    h1{font-size:clamp(1.4rem,1.1rem+1.4vw,1.95rem);letter-spacing:-.025em;margin:0 0 8px;font-weight:600}
+    .lede{color:var(--text-3);font-size:.9rem;line-height:1.7;margin:0 0 22px}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+    .card.tight{padding:16px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .between{justify-content:space-between}
+    .muted{color:var(--text-3)}
+    .label{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+    .status{
+      display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.02em;
+      border-radius:999px;padding:5px 12px;border:1px solid var(--line-strong);background:rgba(255,255,255,.05);text-transform:capitalize;
+    }
+    .status.pending{color:var(--warn);border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.1)}
+    .status.paid,.status.processing{color:var(--info);border-color:rgba(96,165,250,.35);background:rgba(96,165,250,.1)}
+    .status.shipped{color:var(--violet-2);border-color:rgba(167,139,250,.38);background:rgba(167,139,250,.12)}
+    .status.delivered,.status.fulfilled{color:var(--ok);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.1)}
+    .status.cancelled,.status.refunded{color:var(--danger);border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.1)}
+    .big{font-size:1.35rem;font-weight:600;letter-spacing:-.02em}
+    .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+    .kv span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px}
+    .kv b{font-weight:500;font-size:.94rem}
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th{text-align:left;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);font-weight:600;padding:0 0 8px;border-bottom:1px solid var(--line)}
+    td{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text-2)}
+    td.num,th.num{text-align:right}
+    tr:last-child td{border-bottom:0}
+    tfoot td{color:var(--text);font-weight:600;border-top:1px solid var(--line);border-bottom:0}
+    ol.timeline{list-style:none;margin:0;padding:0}
+    ol.timeline li{position:relative;padding:0 0 20px 26px;border-left:1px solid var(--line-strong);margin-left:6px}
+    ol.timeline li:last-child{border-left-color:transparent;padding-bottom:0}
+    ol.timeline li::before{
+      content:"";position:absolute;left:-5px;top:4px;width:9px;height:9px;border-radius:50%;
+      background:var(--surface);border:2px solid var(--line-strong);
+    }
+    ol.timeline li:first-child::before{background:var(--violet-2);border-color:var(--violet-2);box-shadow:0 0 0 4px rgba(167,139,250,.16)}
+    ol.timeline .when{font-size:11px;color:var(--text-3);margin-top:2px}
+    ol.timeline strong{font-size:.9rem;text-transform:capitalize}
+    .msg{padding:16px 18px;border-radius:14px;border:1px solid var(--line);font-size:.9rem;line-height:1.65}
+    .msg.danger{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3);color:#ffd9d9}
+    .msg.muted{color:var(--text-3)}
+    .skeleton{height:14px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(255,255,255,.12),rgba(255,255,255,.06));background-size:200% 100%;animation:sh 1.3s linear infinite}
+    @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    footer.foot{margin-top:26px;font-size:11px;color:var(--text-3);line-height:1.7;text-align:center}
+    footer.foot a{color:var(--violet-2);text-decoration:none}
+    @media (max-width:520px){ .wrap{padding:24px 16px 56px} .card{padding:16px} }
+    @media (prefers-reduced-motion:reduce){ .skeleton{animation:none} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <span class="brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 2 3.5 6.5v11L12 22l8.5-4.5v-11L12 2Z" stroke="#a78bfa" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M12 7v10M8 9.5l8 5M16 9.5l-8 5" stroke="#7c3aed" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        Shinzora
+      </span>
+      <span class="tag">Order tracking</span>
+    </header>
+
+    <main id="view" aria-live="polite">
+      <div class="card">
+        <div class="skeleton" style="width:38%;margin-bottom:14px"></div>
+        <div class="skeleton" style="width:72%;margin-bottom:10px"></div>
+        <div class="skeleton" style="width:56%"></div>
+      </div>
+      <div class="card"><div class="skeleton" style="width:80%;margin-bottom:10px"></div><div class="skeleton" style="width:64%"></div></div>
+    </main>
+
+    <footer class="foot">
+      This page shows one order. It cannot see your other orders, your email address, or your address.
+      If something looks wrong, contact the business you bought from.
+    </footer>
+  </div>
+
+  <script src="/js/vendor/supabase-js.js"></script>
+  <script type="module" src="/js/boot/track.js?v=20261104b"></script>
+</body>
+</html>

@@ -143,6 +143,17 @@ export function runtimeConfig({ force = false } = {}) {
 /* --------------------------------------------------------------------------
    Named endpoints — keeps call sites readable and greppable.
    -------------------------------------------------------------------------- */
+/**
+ * True when the request failed because the deployed Edge Function is older than
+ * the client. The message has to say that plainly — "Unknown action" reads like
+ * a bug, when what actually happened is that the server half is not live yet.
+ */
+export function actionPendingDeploy(error) {
+  const code = error?.code || error?.error_code || "";
+  const message = String(error?.message || error?.detail || "");
+  return code === "unknown_action" || /unknown action/i.test(message);
+}
+
 export const api = {
   ai: {
     /** Chat with the business assistant; persists conversation server-side. */
@@ -178,10 +189,29 @@ export const api = {
     /** Support reply drafting. */
     supportReply: (payload) => invoke("ai", "support_reply", payload),
     /**
+     * Automated reply. Unlike supportReply this one also writes: the server
+     * generates the answer and stores it in the thread, and refuses when the
+     * owner has not switched auto-reply on for that ticket.
+     */
+    supportAutoReply: (payload) => invoke("ai", "support_autoreply", payload, { timeout: 60000 }),
+    /**
      * Industry and competitor research. The server answers with the sources it
      * actually read; an answer without citations is treated as no research.
      */
-    research: (payload) => invoke("ai", "research", payload, { timeout: 180000 })
+    research: (payload) => invoke("ai", "research", payload, { timeout: 180000 }),
+
+    /**
+     * Read a set of aggregates and say what they mean. The server only ever
+     * receives totals, never customer rows, and it is asked to admit when the
+     * data is too thin to support a conclusion.
+     */
+    dataAnalysis: (payload) => invoke("ai", "data_analysis", payload, { timeout: 120000 }),
+
+    /**
+     * Turn one sentence into one proposed action. Nothing is written here: the
+     * proposal comes back, the owner confirms it, and the RPC does the write.
+     */
+    command: (payload) => invoke("ai", "command", payload, { timeout: 60000 })
   },
   domains: {
     search: (payload) => invoke("domains", "search", payload),

@@ -151,6 +151,31 @@ export default async function render(root) {
           }</tbody>
         </table></div>
         ${row.notes ? `<p class="muted" style="font-size:var(--fs-xs);margin-top:12px">${esc(row.notes)}</p>` : ""}
+
+        <div class="card" style="margin-top:var(--s-4)">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Customer tracking</div>
+              <div class="card-sub">A link the customer can open without an account. It shows this order and nothing else.</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row gap-2 wrap" id="tracking-body">
+              ${
+                row.tracking_token && !row.tracking_revoked_at
+                  ? `<code class="mono" style="font-size:var(--fs-2xs)">/track/?t=${esc(row.tracking_token)}</code>
+                     <button class="btn btn-secondary btn-sm" type="button" data-copy-track>${icon("copy", { size: 13 })}Copy link</button>
+                     <button class="btn btn-ghost btn-sm" type="button" data-revoke-track>Revoke</button>`
+                  : `<button class="btn btn-secondary btn-sm" type="button" data-make-track>${icon("link", { size: 13 })}Create tracking link</button>`
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:var(--s-3)">
+          <div class="card-head"><div><div class="card-title">Timeline</div><div class="card-sub">Every status change, newest first</div></div></div>
+          <div class="card-body" id="order-timeline"><span class="dim" style="font-size:var(--fs-xs)">Loading…</span></div>
+        </div>
       `,
       footer: `<button class="btn btn-ghost" data-modal-close>Close</button>
         ${
@@ -163,8 +188,96 @@ export default async function render(root) {
           api.close();
           await advance(row);
         });
+
+        void paintTimeline(dialog, row);
+
+        qs("[data-make-track]", dialog)?.addEventListener("click", async (event) => {
+          event.currentTarget.disabled = true;
+          try {
+            const { data, error } = await sb.rpc("order_tracking_link", { p_order: row.id });
+            if (error) throw normalizeError(error);
+            row.tracking_token = data?.token || null;
+            row.tracking_revoked_at = null;
+            const url = `${location.origin}/track/?t=${data?.token}`;
+            await copyText(url);
+            toast({ title: "Tracking link copied", message: "Send it to the customer. It opens without signing in." }, { tone: "success" });
+            api.close();
+            orderDetail(row);
+          } catch (error) {
+            event.currentTarget.disabled = false;
+            toastError(normalizeError(error));
+          }
+        });
+
+        qs("[data-copy-track]", dialog)?.addEventListener("click", async () => {
+          await copyText(`${location.origin}/track/?t=${row.tracking_token}`);
+          toast({ title: "Link copied" }, { tone: "success", duration: 1800 });
+        });
+
+        qs("[data-revoke-track]", dialog)?.addEventListener("click", async () => {
+          const ok = await confirmDialog({
+            title: "Revoke this link?",
+            desc: "The customer's current link stops working immediately. You can create a new one after.",
+            confirmLabel: "Revoke",
+            tone: "danger"
+          });
+          if (!ok) return;
+          try {
+            const { error } = await sb.rpc("order_tracking_revoke", { p_order: row.id });
+            if (error) throw normalizeError(error);
+            row.tracking_token = null;
+            row.tracking_revoked_at = new Date().toISOString();
+            api.close();
+            orderDetail(row);
+          } catch (error) {
+            toastError(normalizeError(error));
+          }
+        });
       }
     });
+  }
+
+  /** The order's timeline, read straight from the events table (RLS-scoped). */
+  async function paintTimeline(dialog, row) {
+    const box = qs("#order-timeline", dialog);
+    if (!box) return;
+    try {
+      const { data, error } = await sb
+        .from("store_order_events")
+        .select("status, note, created_at")
+        .eq("order_id", row.id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) throw normalizeError(error);
+      if (!data?.length) {
+        box.innerHTML = `<span class="dim" style="font-size:var(--fs-xs)">No changes recorded yet. Moving the status along records one.</span>`;
+        return;
+      }
+      box.innerHTML = `<ol class="order-timeline">${data
+        .map(
+          (event) => `<li>
+            <span class="order-timeline-dot" aria-hidden="true"></span>
+            <div>
+              <div style="font-size:var(--fs-sm)">${esc(statusLabel(event.status || "update"))}${
+                event.note ? ` — ${esc(event.note)}` : ""
+              }</div>
+              <div class="dim" style="font-size:var(--fs-2xs)">${esc(dateTime(event.created_at))}</div>
+            </div>
+          </li>`
+        )
+        .join("")}</ol>`;
+    } catch (error) {
+      box.innerHTML = `<span class="dim" style="font-size:var(--fs-xs)">${esc(error.message || "Could not load the timeline.")}</span>`;
+    }
+  }
+
+  async function copyText(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      /* Clipboard blocked: show it so it can be copied by hand. */
+      toast({ title: "Copy this link", message: value, tone: "warning", duration: 12000 });
+    }
   }
 
   async function advance(row) {
@@ -178,10 +291,14 @@ export default async function render(root) {
     });
     if (!ok) return;
     try {
-      const { error } = await sb
-        .from("store_orders")
-        .update({ status: next, updated_at: new Date().toISOString() })
-        .eq("id", row.id);
+      /* order_set_status() writes the row, appends the timeline entry and
+         notifies the customer in one transaction. Writing the column directly
+         used to leave the timeline empty and the customer uninformed. */
+      const { error } = await sb.rpc("order_set_status", {
+        p_order: row.id,
+        p_status: next,
+        p_note: null
+      });
       if (error) throw normalizeError(error);
       row.status = next;
       paintStats();

@@ -2113,3 +2113,148 @@ body.ip-open {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Order timeline — the same list in the order sheet and on the public tracking
+   page: a rail with a dot per event, newest first.
+   --------------------------------------------------------------------------- */
+.order-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.order-timeline li {
+  position: relative;
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding-left: var(--s-2);
+  border-left: 1px solid var(--line-strong);
+}
+
+.order-timeline li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.order-timeline-dot {
+  position: absolute;
+  left: -4px;
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--surface-2, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--line-strong);
+}
+
+.order-timeline li:first-child .order-timeline-dot {
+  background: var(--violet-2, #a78bfa);
+  border-color: var(--violet-2, #a78bfa);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.18);
+}
+
+/* ---------------------------------------------------------------------------
+   Switch row — a labelled toggle where the whole row is the target. Used for
+   "answer new messages automatically" in the support sheet.
+   --------------------------------------------------------------------------- */
+.switch-row {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 12px);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.switch-row:hover {
+  border-color: var(--line-strong);
+}
+
+.switch-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 19px;
+  margin: 1px 0 0;
+  appearance: none;
+  border-radius: var(--r-pill, 999px);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--t-base, 0.18s) var(--ease, ease);
+}
+
+.switch-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--t-base, 0.18s) var(--ease, ease);
+}
+
+.switch-row input[type="checkbox"]:checked {
+  background: var(--violet, #7c3aed);
+  border-color: var(--violet, #7c3aed);
+}
+
+.switch-row input[type="checkbox"]:checked::after {
+  transform: translateX(15px);
+}
+
+.switch-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--violet-2, #a78bfa);
+  outline-offset: 2px;
+}
+
+.switch-row input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.switch-row strong {
+  display: block;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+   Command proposal — what the assistant will do, shown before it does it.
+   --------------------------------------------------------------------------- */
+.command-proposal {
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md, 12px);
+  background: rgba(124, 58, 237, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.command-payload {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm, 8px);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--fs-2xs);
+  line-height: 1.6;
+  color: var(--text-2);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

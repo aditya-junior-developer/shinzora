@@ -9,7 +9,7 @@ import { icon } from "../../../lib/icons.js";
 import { timeAgo } from "../../../lib/format.js";
 import { state, aiCredits, plan } from "../../../lib/store.js";
 import { sb, normalizeError, getSession } from "../../../lib/supabase.js";
-import { api, runtimeConfig } from "../../../lib/api.js";
+import { actionPendingDeploy, api, runtimeConfig } from "../../../lib/api.js";
 import { pageHead, emptyState, setupNotice } from "../components.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { confirmDialog, formDialog } from "../../../ui/modal.js";
@@ -36,6 +36,7 @@ export default async function render(root, ctx) {
                 <span class="badge badge-violet">${icon("sparkles", { size: 11 })}${esc(plan().name)} · ${aiCredits().used}/${aiCredits().limit}</span>`
     })}
     ${!aiReady ? setupNotice({ code: "ai_unconfigured", message: "The AI service is not configured on this deployment.", hint: config?.ai?.key_env ? `Set ${config.ai.key_env} on the server — in .env for a local deployment, or in the project's environment variables — then reload this page. Nothing is simulated while it is missing.` : "Set the AI provider key on the server, then reload this page." }, "The assistant") : ""}
+    ${commandBar()}
     <div class="chat-shell">
       <div class="chat-head">
         <span class="avatar avatar-sm" style="background:linear-gradient(150deg,#a855f7,#4c1d95)">${icon("sparkles", { size: 13 })}</span>
@@ -91,6 +92,115 @@ export default async function render(root, ctx) {
   const scrollDown = () => {
     log.scrollTop = log.scrollHeight;
   };
+
+  /* ==========================================================================
+     Commands
+     --------------------------------------------------------------------------
+     The chat is a conversation; this is the part that changes something. The
+     model's only job is to turn one sentence into one action from a closed list;
+     the owner confirms, and the write happens in Postgres. A proposal that the
+     model gets wrong costs a click, never a wrong row.
+     ====================================================================== */
+  const commandState = { busy: false };
+
+  function commandBar() {
+    return `<div class="card" id="command-card" style="margin-bottom:var(--s-3)">
+      <div class="card-body" style="padding:var(--s-3)">
+        <div class="row gap-2 wrap" style="align-items:center">
+          <span class="badge badge-violet">${icon("zap", { size: 11 })}Do something</span>
+          <input class="input grow" id="command-input" placeholder="Add a Product: cotton tote, ₹450, 20 in stock" aria-label="Tell the assistant what to do" />
+          <button class="btn btn-primary btn-sm" id="command-run" ${aiReady ? "" : "disabled"}>Run</button>
+        </div>
+        <div class="dim" style="font-size:var(--fs-2xs);margin-top:6px">
+          It can create a product, change stock, move an order's status or add a customer. It shows you what it will do before it does it.
+        </div>
+        <div id="command-preview"></div>
+      </div>
+    </div>`;
+  }
+
+  async function runCommand(text) {
+    const request = String(text || "").trim();
+    if (!request || commandState.busy || !aiReady) return;
+    commandState.busy = true;
+    const preview = qs("#command-preview");
+    const button = qs("#command-run");
+    button.disabled = true;
+    preview.innerHTML = `<div class="dim" style="font-size:var(--fs-xs);margin-top:var(--s-3)">Working out what to do…</div>`;
+
+    try {
+      /* Only names and ids go to the model — never an email address or a
+         customer note. It needs enough to pick the right row, not more. */
+      const [{ data: products }, { data: openOrders }] = await Promise.all([
+        sb.from("store_products").select("id, name, stock, price").order("created_at", { ascending: false }).limit(40),
+        sb.from("store_orders").select("id, order_number, status, customer_name").order("created_at", { ascending: false }).limit(20)
+      ]);
+
+      const proposal = await api.ai.command({
+        request,
+        context: {
+          products: (products || []).map((row) => ({ id: row.id, name: row.name, stock: row.stock, price: row.price })),
+          orders: (openOrders || []).map((row) => ({ id: row.id, number: row.order_number, status: row.status, customer: row.customer_name })),
+          business: state.business?.name || null
+        }
+      });
+
+      if (!proposal?.understood) {
+        preview.innerHTML = `<div class="alert alert-warn" style="margin-top:var(--s-3);font-size:var(--fs-xs)">${icon("info", { size: 14 })}
+          <div>${esc(proposal?.summary || "I could not turn that into something I can run.")}${
+            (proposal?.missing || []).length ? `<br>Missing: ${proposal.missing.map((row) => esc(row)).join(", ")}` : ""
+          }</div></div>`;
+        return;
+      }
+
+      preview.innerHTML = `<div class="command-proposal">
+        <div class="row between gap-2" style="align-items:baseline">
+          <strong style="font-size:var(--fs-sm)">${esc(proposal.summary || proposal.action)}</strong>
+          <span class="badge badge-neutral">${esc(proposal.action)}</span>
+        </div>
+        <pre class="command-payload">${esc(JSON.stringify(proposal.payload || {}, null, 2))}</pre>
+        <div class="row gap-2">
+          <button class="btn btn-primary btn-sm" id="command-confirm">${icon("check", { size: 13 })}Confirm</button>
+          <button class="btn btn-ghost btn-sm" id="command-cancel">Cancel</button>
+        </div>
+      </div>`;
+
+      qs("#command-cancel").addEventListener("click", () => {
+        preview.innerHTML = "";
+        qs("#command-input").value = "";
+      });
+
+      qs("#command-confirm").addEventListener("click", async (event) => {
+        event.currentTarget.disabled = true;
+        try {
+          const { data, error } = await sb.rpc("assistant_command_apply", {
+            p_action: proposal.action,
+            p_payload: proposal.payload || {},
+            p_command: null
+          });
+          if (error) throw normalizeError(error);
+          preview.innerHTML = `<div class="alert alert-ok" style="margin-top:var(--s-3);font-size:var(--fs-xs)">${icon("check", { size: 14 })}
+            <div>Done — ${esc(proposal.summary || proposal.action)}.</div></div>`;
+          qs("#command-input").value = "";
+          bubble("ai", `Done: ${proposal.summary || proposal.action}.`, "command");
+          if (data?.productId) toast({ title: "Added to your catalogue" }, { tone: "success" });
+        } catch (error) {
+          preview.innerHTML = `<div class="alert alert-danger" style="margin-top:var(--s-3);font-size:var(--fs-xs)">${icon("triangle-alert", { size: 14 })}
+            <div>${esc(normalizeError(error).message)}</div></div>`;
+        }
+      });
+    } catch (error) {
+      preview.innerHTML = actionPendingDeploy(error)
+        ? `<div class="alert alert-warn" style="margin-top:var(--s-3);font-size:var(--fs-xs)">${icon("info", { size: 14 })}
+            <div>Running commands needs the updated <code>ai</code> Edge Function, which is not deployed on this instance yet.
+            The chat still works; nothing was changed in your store.</div></div>`
+        : `<div class="alert alert-danger" style="margin-top:var(--s-3);font-size:var(--fs-xs)">${icon("triangle-alert", { size: 14 })}
+            <div>${esc(normalizeError(error).message)}</div></div>`;
+    } finally {
+      commandState.busy = false;
+      button.disabled = false;
+    }
+  }
 
   const bubble = (role, content, meta = "") => {
     const wrap = document.createElement("div");
@@ -193,6 +303,21 @@ export default async function render(root, ctx) {
 
   /* ------------------------------------------------------------- listeners */
   on(send, "click", () => sendMessage(input.value));
+
+  /* The command bar: Enter runs, Escape clears. Kept separate from the chat
+     input so a question never accidentally becomes an action. */
+  const commandInput = qs("#command-input");
+  on(qs("#command-run"), "click", () => runCommand(commandInput.value));
+  on(commandInput, "keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void runCommand(commandInput.value);
+    }
+    if (event.key === "Escape") {
+      commandInput.value = "";
+      qs("#command-preview").innerHTML = "";
+    }
+  });
   on(input, "input", () => {
     input.style.height = "auto";
     input.style.height = `${Math.min(160, input.scrollHeight)}px`;

@@ -132,7 +132,10 @@ export const APPLICATION_TABLES = [
   "freelancer_profiles", "marketplace_jobs", "marketplace_proposals",
   "marketplace_contracts", "marketplace_reviews", "marketplace_job_questions",
   "freelancer_portfolio_items", "community_channels", "community_messages",
-  "referrals"
+  "referrals",
+  /* 0035 — store operations: visits for conversion, order timeline, low-stock
+     alerts and the assistant's command log. */
+  "store_visits", "store_order_events", "product_alerts", "assistant_commands"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

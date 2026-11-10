@@ -15,6 +15,9 @@
 //   action: domain_ideas    { business?, count? }
 //   action: copy            { kind: 'marketing_plan' | 'product', ... }
 //   action: support_reply   { ticket, thread[], business? }
+//   action: support_autoreply { ticketId }  → only for tickets the owner turned
+//                           auto-reply on; generates *and* stores the reply, so
+//                           the customer is answered while the dashboard is open
 //   action: research        { industry, business, audience, references?, type? }
 //                           → grounded web research; every claim carries a real
 //                             source URL, and no sources means no research
@@ -31,7 +34,7 @@
 // ============================================================================
 
 import { clean, cleanList, fail, json, preflight, readBody } from "../_shared/http.ts";
-import { admin, Caller, getCaller } from "../_shared/auth.ts";
+import { admin, Caller, getCaller, scoped } from "../_shared/auth.ts";
 import {
   defaultModel,
   estimateTokens,
@@ -124,8 +127,14 @@ Deno.serve(async (req) => {
         return await handleCopy(caller, body);
       case "support_reply":
         return await handleSupportReply(caller, body);
+      case "support_autoreply":
+        return await handleSupportAutoReply(caller, body);
       case "research":
         return await handleResearch(caller, body);
+      case "data_analysis":
+        return await handleDataAnalysis(caller, body);
+      case "command":
+        return await handleCommand(caller, body);
       default:
         return fail(400, "unknown_action", `Unknown action "${action}".`);
     }
@@ -775,6 +784,207 @@ async function handleSupportReply(caller: Caller, body: Record<string, unknown>)
 
   await logUsage(caller.user.id, "support_reply", JSON.stringify(ticket).slice(0, 400), reply);
   return json({ reply, needs_owner: Boolean(parsed.needs_owner) });
+}
+
+/*
+ * Automated customer replies.
+ * ----------------------------------------------------------------------------
+ * Deliberately narrow. It runs only when the owner has switched auto-reply on
+ * for that ticket, only when the last message in the thread is the customer's,
+ * and it is refused for tickets a human has already been asked to look at. The
+ * reply is stored as `author_role: 'assistant'` so it is visibly machine-written
+ * in the thread, the ticket moves to pending, and the owner can still edit or
+ * delete it. Nothing is emailed anywhere: it lands in the same thread the owner
+ * reads, which is the only channel Shinzora actually owns.
+ */
+async function handleSupportAutoReply(caller: Caller, body: Record<string, unknown>) {
+  const ticketId = clean(body.ticketId, 64);
+  if (!ticketId) return fail(400, "invalid_input", "Name a ticket.");
+
+  const db = scoped(caller);
+
+  const { data: ticket, error: ticketError } = await db
+    .from("support_tickets")
+    .select("id, owner_id, subject, message, status, auto_reply, escalated_at, ticket_type, customer_email_used, archived_at")
+    .eq("id", ticketId)
+    .maybeSingle();
+
+  if (ticketError) return fail(500, "lookup_failed", ticketError.message);
+  if (!ticket) return fail(404, "not_found", "That ticket does not exist.");
+  if (!ticket.auto_reply) return fail(409, "auto_reply_off", "Automatic replies are off for this ticket.");
+  if (ticket.escalated_at) return fail(409, "escalated", "A person owns this ticket; the assistant stays out of it.");
+  if (ticket.archived_at) return fail(409, "archived", "This ticket is archived.");
+
+  const { data: replies } = await db
+    .from("support_replies")
+    .select("author_role, body, created_at")
+    .eq("ticket_id", ticketId)
+    .order("created_at", { ascending: true })
+    .limit(40);
+
+  /* Only answer when the customer spoke last — otherwise this would pile a
+     second machine reply onto a conversation that is already answered. */
+  const last = (replies ?? []).filter((row) => row.author_role !== "system").at(-1);
+  if (last && last.author_role !== "customer" && last.author_role !== "owner") {
+    return json({ skipped: "already_answered", reply: null });
+  }
+
+  const business = await businessFor(caller.user.id, body.business);
+  const parsed = await geminiJson<{ reply?: string; needs_owner?: boolean }>(
+    `${SUPPORT_PROMPT}\n\nYou are answering automatically, with no human reading it first. Be brief, concrete and honest \
+— never promise a refund, a date or a discount you were not given. If the answer needs a decision only the owner \
+can make, reply with the most useful thing you can say now and set needs_owner to true.\n\nBUSINESS\n${JSON.stringify(
+      business
+    )}\n\nTICKET\nSubject: ${clean(ticket.subject, 200)}\nMessage: ${clean(ticket.message, 3000)}\n\nTHREAD\n${JSON.stringify(
+      (replies ?? []).slice(-10).map((row) => ({ role: row.author_role, body: row.body }))
+    )}`,
+    { temperature: 0.5, maxOutputTokens: 700 }
+  );
+
+  const reply = clean(parsed.reply, 1600);
+  if (!reply) throw new GeminiError("The AI returned an empty draft.", "ai_empty", 502);
+
+  const needsOwner = Boolean(parsed.needs_owner);
+
+  const { data: inserted, error: insertError } = await db
+    .from("support_replies")
+    .insert({ ticket_id: ticketId, author_id: caller.user.id, author_role: "assistant", body: reply })
+    .select("id, created_at")
+    .single();
+
+  if (insertError) return fail(500, "write_failed", insertError.message);
+
+  /* needs_owner is the assistant admitting it guessed. Those tickets get a
+     human flag rather than another machine reply. */
+  await db
+    .from("support_tickets")
+    .update(
+      needsOwner
+        ? { status: "pending", priority: "high", auto_reply: false, updated_at: new Date().toISOString() }
+        : { status: "pending", updated_at: new Date().toISOString() }
+    )
+    .eq("id", ticketId);
+
+  await logUsage(caller.user.id, "support_autoreply", ticketId, reply);
+  return json({ replyId: inserted?.id ?? null, reply, needsOwner, autoReplyDisabled: needsOwner });
+}
+
+/* ============================================================================
+   Data analysis
+   ----------------------------------------------------------------------------
+   The analytics screen sends the numbers it already computed and asks for the
+   reading of them. It sends aggregates, never rows: no customer email, no order
+   id. The model is asked for findings a shopkeeper can act on this week, and to
+   say plainly when there is too little data to conclude anything — an invented
+   insight about eleven orders is worse than no insight.
+   ========================================================================== */
+async function handleDataAnalysis(caller: Caller, body: Record<string, unknown>) {
+  const snapshot = (body.snapshot ?? {}) as Record<string, unknown>;
+  const question = clean(body.question, 600);
+
+  if (!snapshot || Object.keys(snapshot).length === 0) {
+    return fail(400, "invalid_input", "Send the numbers to analyse.");
+  }
+
+  const analysis = await geminiJson<{
+    headline?: string;
+    findings?: Array<{ title?: string; detail?: string; action?: string; confidence?: string }>;
+    caveats?: string[];
+  }>(
+    `You are a retail analyst for a small Indian business using Shinzora.
+
+You are given aggregate figures only. Write findings a shopkeeper can act on.
+
+Rules:
+- Use only the numbers given. Never invent a figure, a product name or a trend.
+- If the data is too thin to support a conclusion, say so in caveats instead of guessing.
+- "confidence" is "high", "medium" or "low" for each finding.
+- Between two and five findings. No preamble, no summary of what you were given.
+
+ANALYTICS
+${JSON.stringify(snapshot).slice(0, 6000)}
+
+${question ? `OWNER ASKS: ${question}` : ""}`,
+    { temperature: 0.4, maxOutputTokens: 900 }
+  );
+
+  const findings = Array.isArray(analysis.findings) ? analysis.findings.slice(0, 5) : [];
+  await logUsage(caller.user.id, "data_analysis", JSON.stringify(snapshot).slice(0, 400), JSON.stringify(findings).slice(0, 800));
+
+  return json({
+    headline: clean(analysis.headline, 200) || "Here is what the numbers say",
+    findings: findings.map((finding) => ({
+      title: clean(finding.title, 140),
+      detail: clean(finding.detail, 700),
+      action: clean(finding.action, 300),
+      confidence: ["high", "medium", "low"].includes(String(finding.confidence)) ? finding.confidence : "low"
+    })),
+    caveats: Array.isArray(analysis.caveats) ? analysis.caveats.slice(0, 4).map((row) => clean(row, 300)) : []
+  });
+}
+
+/* ============================================================================
+   Natural-language commands
+   ----------------------------------------------------------------------------
+   The model does not act. It returns a proposal in a closed schema, and the
+   browser shows it to the owner, who confirms; the write itself happens in
+   Postgres (`assistant_command_apply`), which re-validates everything. So the
+   worst a bad generation can do is propose something silly.
+   ========================================================================== */
+const COMMAND_ACTIONS = ["create_product", "update_stock", "set_order_status", "add_customer"] as const;
+
+async function handleCommand(caller: Caller, body: Record<string, unknown>) {
+  const request = clean(body.request, 800);
+  const context = (body.context ?? {}) as Record<string, unknown>;
+  if (request.length < 3) return fail(400, "invalid_input", "Say what you want done.");
+
+  const parsed = await geminiJson<{
+    understood?: boolean;
+    action?: string;
+    payload?: Record<string, unknown>;
+    summary?: string;
+    missing?: string[];
+  }>(
+    `You turn one sentence from a shopkeeper into ONE action from a fixed list.
+
+Allowed actions and their payloads:
+  create_product    { name, price, stock, category?, description? }
+  update_stock      { productId, stock }        (productId must come from CATALOGUE)
+  set_order_status  { orderId, status, note? }  (orderId must come from ORDERS; status is one of pending, paid, processing, shipped, delivered, cancelled, refunded, fulfilled)
+  add_customer      { name?, email?, phone?, city?, notes? }
+
+Rules:
+- Choose exactly one action. If the sentence asks for two things, do the first and say so in summary.
+- Use ids only from the context. Never invent an id or a product name.
+- If something required is missing, set understood false and list what is missing.
+- Never choose an action that is not on the list.
+
+CONTEXT
+${JSON.stringify(context).slice(0, 4000)}
+
+REQUEST
+${request}`,
+    { temperature: 0.2, maxOutputTokens: 500 }
+  );
+
+  const action = String(parsed.action || "");
+  if (!parsed.understood || !COMMAND_ACTIONS.includes(action as (typeof COMMAND_ACTIONS)[number])) {
+    return json({
+      understood: false,
+      summary: clean(parsed.summary, 300) || "I could not turn that into one of the actions I can run.",
+      missing: Array.isArray(parsed.missing) ? parsed.missing.slice(0, 4).map((row) => clean(row, 120)) : [],
+      allowed: COMMAND_ACTIONS
+    });
+  }
+
+  await logUsage(caller.user.id, "command", request.slice(0, 300), action);
+  return json({
+    understood: true,
+    action,
+    payload: parsed.payload ?? {},
+    summary: clean(parsed.summary, 300) || action,
+    allowed: COMMAND_ACTIONS
+  });
 }
 
 /* ============================================================================

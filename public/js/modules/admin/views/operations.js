@@ -212,7 +212,7 @@ async function renderSupport(root) {
       </div>
       <div class="admin-filters">
         <div class="admin-tabs" id="ticket-tabs">
-          ${["all", "open", "pending", "resolved", "closed"]
+          ${["all", "escalated", "open", "pending", "resolved", "closed"]
             .map((value) => `<button data-tab="${value}" class="${value === filter ? "is-active" : ""}">${esc(value)}</button>`)
             .join("")}
         </div>
@@ -253,8 +253,14 @@ async function renderSupport(root) {
             <tbody>${rows
               .map(
                 (row) => `<tr>
-                  <td><div class="cell-strong">${esc(row.subject)}</div><div class="cell-sub" style="max-width:340px">${esc((row.message || "").slice(0, 90))}</div></td>
-                  <td>${esc(row.customer?.email || "—")}</td>
+                  <td><div class="cell-strong">${esc(row.subject)}${
+                    row.escalated_at ? ` <span class="badge badge-warn">Escalated</span>` : ""
+                  }${row.auto_reply ? ` <span class="badge badge-neutral">Auto-reply</span>` : ""}</div><div class="cell-sub" style="max-width:340px">${esc((row.message || "").slice(0, 90))}</div>${
+                    row.escalation_reason
+                      ? `<div class="cell-sub" style="max-width:340px;color:var(--warn)">Escalated: ${esc(row.escalation_reason)}</div>`
+                      : ""
+                  }</td>
+                  <td>${esc(row.customer_email_used || row.customer?.email || "—")}</td>
                   <td>${esc(row.ticket_type === "platform" ? "Shinzora" : "Customer")}</td>
                   <td><span class="badge badge-${row.priority === "urgent" ? "danger" : row.priority === "high" ? "warn" : "neutral"}">${esc(row.priority)}</span></td>
                   <td><span class="badge badge-${row.status === "open" ? "warn" : row.status === "resolved" ? "ok" : "neutral"}">${esc(row.status)}</span></td>

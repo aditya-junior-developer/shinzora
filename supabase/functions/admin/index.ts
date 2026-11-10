@@ -275,7 +275,10 @@ async function customer(userId: string) {
 async function payments(body: Record<string, unknown>) {
   const status = clean(body.status, 30);
   let query = admin().from("payments").select("*").order("created_at", { ascending: false }).limit(200);
-  if (status && status !== "all") query = query.eq("status", status);
+  /* "escalated" is not a status — an escalated ticket can be open, pending or
+     resolved. It is its own filter so the queue has one obvious place to look. */
+  if (status === "escalated") query = query.not("escalated_at", "is", null);
+  else if (status && status !== "all") query = query.eq("status", status);
 
   const { data, error } = await query;
   if (error) return fail(500, "admin_error", error.message);

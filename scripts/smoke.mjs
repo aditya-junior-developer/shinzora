@@ -34,6 +34,7 @@ const ROUTES = [
   ["/install/", "Install Shinzora", "install page"],
   ["/install-guide/", "Install Shinzora on your device", "setup guide"],
   ["/system-check/", "Deployment verification", "system check"],
+  ["/track/", "Order tracking", "public order tracking"],
   ["/legal/terms/", "Terms of service", "terms"],
   ["/legal/privacy/", "Privacy policy", "privacy"],
   ["/legal/refunds/", "Refund and cancellation", "refunds"],

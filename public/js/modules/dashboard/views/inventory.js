@@ -13,6 +13,7 @@ import { products as fetchProducts } from "../data.js";
 import { pageHead, setupNotice, emptyState, skeletonView, statusBadge } from "../components.js";
 import { formDialog, confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
+import { parseCsv, toCsv, downloadCsv } from "../../../lib/csv.js";
 
 let rows = [];
 let search = "";
@@ -33,8 +34,10 @@ export default async function render(root) {
     ${pageHead({
       title: "Inventory",
       desc: "Products, prices and stock. Low-stock items are flagged the moment the level drops to five or fewer.",
-      actions: `<button class="btn btn-secondary btn-sm" id="export-products">${icon("download", { size: 14 })}Export CSV</button>
-                <button class="btn btn-primary btn-sm" id="add-product">${icon("plus", { size: 14 })}Add product</button>`
+      actions: `<button class="btn btn-secondary btn-sm" id="import-products">${icon("upload", { size: 14 })}Import CSV</button>
+                <button class="btn btn-secondary btn-sm" id="export-products">${icon("download", { size: 14 })}Export CSV</button>
+                <button class="btn btn-primary btn-sm" id="add-product">${icon("plus", { size: 14 })}Add product</button>
+                <input id="import-file" type="file" accept=".csv,text/csv" hidden />`
     })}
     <div class="grid-4" id="inventory-stats" style="margin-bottom:var(--s-4)"></div>
     <div class="toolbar">
@@ -46,10 +49,12 @@ export default async function render(root) {
       <div class="toolbar-spacer"></div>
       <span class="dim" style="font-size:var(--fs-xs)" id="product-count"></span>
     </div>
+    <div id="stock-alerts"></div>
     <div class="card"><div class="card-body" style="padding:0" id="product-table"></div></div>`;
 
   paintStats();
   paintTable();
+  void paintAlerts();
 
   on(qs("#product-search"), "input", (event) => {
     search = event.target.value.toLowerCase();
@@ -64,6 +69,17 @@ export default async function render(root) {
 
   on(qs("#add-product"), "click", () => productDialog());
   on(qs("#export-products"), "click", exportCsv);
+
+  /* Import: the file is read and parsed here, but every row is validated again
+     by store_import_products(), which also decides update-vs-insert by SKU. The
+     browser never writes the catalogue directly. */
+  on(qs("#import-products"), "click", () => qs("#import-file").click());
+  on(qs("#import-file"), "change", async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await importCsv(file);
+  });
 
   delegate(qs("#product-table"), "click", "[data-edit]", (_event, node) => {
     const row = rows.find((item) => item.id === node.getAttribute("data-edit"));
@@ -113,6 +129,93 @@ export default async function render(root) {
       toastError(normalizeError(error));
     }
   });
+
+  /* ---------------------------------------------------------------- alerts */
+  async function paintAlerts() {
+    const box = qs("#stock-alerts");
+    if (!box) return;
+    try {
+      const { data, error } = await sb
+        .from("product_alerts")
+        .select("id, product_name, stock, threshold, state, created_at")
+        .is("seen_at", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw normalizeError(error);
+      if (!data?.length) {
+        box.innerHTML = "";
+        return;
+      }
+      box.innerHTML = `<div class="alert alert-warn" style="align-items:flex-start">
+        ${icon("triangle-alert", { size: 15 })}
+        <div style="flex:1">
+          <strong>${data.length} ${data.length === 1 ? "product needs" : "products need"} restocking</strong>
+          <div style="margin-top:4px;font-size:var(--fs-2xs)">
+            ${data
+              .slice(0, 6)
+              .map((row) => `${esc(row.product_name || "A product")} — ${row.state === "out" ? "out of stock" : `${row.stock} left`}`)
+              .join(" · ")}
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" id="alerts-ack">Mark seen</button>
+      </div>`;
+      on(qs("#alerts-ack"), "click", async () => {
+        try {
+          await sb.rpc("product_alerts_ack", { p_ids: null });
+          box.innerHTML = "";
+        } catch (error) {
+          toastError(normalizeError(error));
+        }
+      });
+    } catch {
+      /* An alert list that cannot load must not take the catalogue down with it. */
+      box.innerHTML = "";
+    }
+  }
+
+  /* --------------------------------------------------------------- import */
+  async function importCsv(file) {
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "That file is too big", message: "Import at most 2 MB at a time." }, { tone: "warning" });
+      return;
+    }
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (error) {
+      toastError(normalizeError(error));
+      return;
+    }
+    const parsed = parseCsv(text, { required: ["name"] });
+    if (!parsed.rows.length) {
+      toast({ title: "Nothing to import", message: parsed.error || "No rows found in that file." }, { tone: "warning" });
+      return;
+    }
+    try {
+      const { data, error } = await sb.rpc("store_import_products", { p_rows: parsed.rows });
+      if (error) throw normalizeError(error);
+      const skipped = Number(data?.skipped || 0);
+      toast(
+        {
+          title: `${data?.imported || 0} added, ${data?.updated || 0} updated`,
+          message: skipped
+            ? `${skipped} row${skipped === 1 ? "" : "s"} skipped: ${(data.problems || [])
+                .slice(0, 3)
+                .map((problem) => `line ${problem.row} — ${problem.reason}`)
+                .join("; ")}`
+            : "Every row was accepted."
+        },
+        { tone: skipped ? "warning" : "success", duration: skipped ? 9000 : 4000 }
+      );
+      const { data: fresh } = await fetchProducts();
+      rows = Array.isArray(fresh) ? fresh : [];
+      paintStats();
+      paintTable();
+      void paintAlerts();
+    } catch (error) {
+      toastError(normalizeError(error));
+    }
+  }
 
   function paintStats() {
     const total = rows.length;
@@ -239,16 +342,21 @@ export default async function render(root) {
   }
 
   function exportCsv() {
-    const header = "name,sku,price,stock,status,currency\n";
-    const body = rows
-      .map((row) => [row.name, row.sku || "", row.price, row.stock, row.status || "active", row.currency || "INR"].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([header + body], { type: "text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `shinzora-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    /* The same columns the importer reads, so an exported file can be edited and
+       imported back without renaming anything. */
+    const csv = toCsv(
+      ["name", "sku", "price", "stock", "category", "status", "currency"],
+      rows.map((row) => [
+        row.name || "",
+        row.sku || "",
+        Number(row.price || 0),
+        Number(row.stock || 0),
+        row.category || "",
+        row.status || "active",
+        row.currency || "INR"
+      ])
+    );
+    downloadCsv(`shinzora-inventory-${new Date().toISOString().slice(0, 10)}.csv`, csv);
     toast({ title: "Export started", message: `${rows.length} products exported.` }, { tone: "success" });
   }
 
