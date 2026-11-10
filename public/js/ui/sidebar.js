@@ -53,7 +53,17 @@ const writeMode = (mode) => {
  * @param {Function}    [options.onChange]  called after every state change
  */
 export function createSidebar(options = {}) {
-  const { panel, scrim = null, toggles = "[data-sidebar-toggle]", onChange = null } = options;
+  const {
+    panel,
+    scrim = null,
+    /* The current attribute first, then the two the page used before this
+       controller existed. A cached module from an older deploy can leave an old
+       button on a new page or the other way round; binding both means the
+       hamburger still answers instead of doing nothing until the cache turns
+       over. */
+    toggles = "[data-sidebar-toggle], [data-sidebar-open], #sidebar-collapse",
+    onChange = null
+  } = options;
   if (!panel) return null;
 
   const root = document.documentElement;
@@ -71,7 +81,7 @@ export function createSidebar(options = {}) {
   let overlayOpen = false;
 
   const toggleButtons = () =>
-    (typeof toggles === "string" ? Array.from(document.querySelectorAll(toggles)) : toggles || []).filter(Boolean);
+    [...new Set((typeof toggles === "string" ? Array.from(document.querySelectorAll(toggles)) : toggles || []).filter(Boolean))];
 
   /* --------------------------------------------------------------- painting */
   function apply() {
@@ -194,7 +204,7 @@ export function createSidebar(options = {}) {
 
   if (scrim) scrim.addEventListener("click", () => setOverlay(false));
 
-  panel.querySelectorAll("[data-sidebar-close]").forEach((button) =>
+  panel.querySelectorAll("[data-sidebar-close], .sidebar-close").forEach((button) =>
     button.addEventListener("click", () => setOverlay(false))
   );
 

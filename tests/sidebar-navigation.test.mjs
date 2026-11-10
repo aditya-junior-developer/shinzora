@@ -99,6 +99,38 @@ const escape = (window) => {
 };
 
 async function loadSidebar(options = {}) {
+  /* `html` lets a test run the controller against markup cached from an older
+     deploy — the mixed-version case that a stale service worker produces. */
+  if (options.html) {
+    const { window, document } = parseHTML(`<!doctype html><html><body>${options.html}</body></html>`);
+    globalThis.window = window;
+    globalThis.document = document;
+    globalThis.Element = window.Element;
+    globalThis.HTMLElement = window.HTMLElement;
+    globalThis.Node = window.Node;
+    globalThis.Event = window.Event;
+    globalThis.CustomEvent = window.CustomEvent;
+    globalThis.location = { pathname: "/app/", search: "", href: "http://localhost/app/", origin: "http://localhost", reload() {} };
+    window.HTMLElement.prototype.focus = function focus() {
+      globalThis.__focused = this;
+    };
+    const media = { matches: options.desktop !== false, addEventListener() {}, removeEventListener() {} };
+    window.matchMedia = () => media;
+    globalThis.matchMedia = window.matchMedia;
+    const store = new Map();
+    globalThis.localStorage = {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => store.set(key, String(value)),
+      removeItem: (key) => store.delete(key)
+    };
+    const { createSidebar } = await import(
+      "data:text/javascript;base64," + Buffer.from(read("public/js/ui/sidebar.js")).toString("base64") + "#" + ++counter
+    );
+    const sidebar = createSidebar({ panel: document.getElementById("app-sidebar"), scrim: document.getElementById("sidebar-scrim") });
+    await settle();
+    return { window, document, store, sidebar, toggle: document.querySelector("[data-sidebar-open]") };
+  }
+
   const env = dom(options);
   const { createSidebar } = await import(
     "data:text/javascript;base64," +
@@ -383,6 +415,21 @@ test("an agent's sidebar is their own, not a shop they do not run", async () => 
   assert.equal(links.includes("orders"), false);
 });
 
+test("a cached copy of the old markup still gets a working hamburger", async () => {
+  /* What a stale service worker used to hand a returning visitor: yesterday's
+     buttons on today's page. The controller binds the old attribute too, so the
+     sidebar can still be collapsed instead of freezing open. */
+  const legacy = BODY.replace(/id="sidebar-toggle" data-sidebar-toggle/, 'id="sidebar-toggle" data-sidebar-open');
+  const { document, toggle, sidebar } = await loadSidebar({ html: legacy });
+
+  assert.ok(toggle, "the legacy toggle was not found");
+  assert.equal(sidebar.isExpanded(), true);
+  click(window, toggle);
+  assert.equal(document.documentElement.getAttribute("data-sidebar"), "rail", "the old button could not collapse the sidebar");
+  click(window, toggle);
+  assert.equal(document.documentElement.getAttribute("data-sidebar"), "expanded");
+});
+
 /* ------------------------------------------------------- the page itself ---- */
 
 test("the page ships one hamburger, and no leftover collapse button", () => {
@@ -390,6 +437,25 @@ test("the page ships one hamburger, and no leftover collapse button", () => {
   assert.match(BODY, /aria-controls="app-sidebar"/, "the button does not describe what it controls");
   assert.equal(/id="sidebar-collapse"/.test(BODY), false, "the old second toggle is still in the page");
   assert.equal(/data-sidebar-open/.test(BODY), false, "the old opener attribute is still in the page");
+});
+
+test("the service worker never serves code from an older deploy", () => {
+  const sw = read("public/sw.js");
+  /* Navigations are network-first, so HTML is always current. Code must match
+     it: cache-first JS is what made the hamburger dead on the first visit after
+     the sidebar shipped. */
+  const codeBlock = sw.slice(sw.indexOf("if (sameOrigin && isCode)"), sw.indexOf("if (sameOrigin && isAsset)"));
+  assert.match(codeBlock, /fetch\(request\)\s*\.then/, "code is not fetched from the network first");
+  assert.equal(
+    /return cached \|\| network/.test(codeBlock),
+    false,
+    "code is still served from the cache first"
+  );
+  assert.match(codeBlock, /catch\(async \(\) => \(await caches\.match\(request\)\)/, "there is no offline fallback for code");
+
+  /* Images may keep the cheap strategy. */
+  const assetBlock = sw.slice(sw.indexOf("if (sameOrigin && isAsset)"));
+  assert.match(assetBlock, /return cached \|\| network/);
 });
 
 test("no keyboard shortcut opens or closes the sidebar", () => {

@@ -89,6 +89,27 @@ cannot keep a scrim over a desktop layout.
   offset content, animated width, scrim and scroll lock scoped to the phone
   breakpoint, and the rail clipping (not deleting) its labels.
 
+## If the hamburger ever seems dead
+
+That is almost always a mixed-version page, not this controller. The service
+worker used to serve JavaScript cache-first while HTML came from the network, so
+the first visit after a deploy ran yesterday's `shell.js` against today's markup:
+the old module looked for `[data-sidebar-open]`, the new page shipped
+`[data-sidebar-toggle]`, and nothing answered a click.
+
+Two fixes are in place, in this order of importance:
+
+1. **The service worker now serves `/js/` and `/css/` network-first**, with the
+   cache kept only as the offline fallback (`shinzora-v35`). Images and fonts keep
+   the cheaper serve-cached-refresh-later strategy.
+2. **The controller binds the old toggle attributes too**, so even a browser
+   still holding a cached page or module can collapse the sidebar instead of
+   freezing it open.
+
+If a stale page is still in front of you, one hard reload (`Ctrl`/`Cmd` +
+`Shift` + `R`) clears it — after that the service worker activates and keeps
+code current on its own.
+
 ## Not verified here
 
 Chromium cannot run in this sandbox (the host is missing the browser's system
