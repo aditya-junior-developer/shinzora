@@ -27,6 +27,8 @@ const LOADERS = {
   messages: () => import("./views/messages.js"),
   requests: () => import("./views/requests.js"),
   marketplace: () => import("./views/marketplace.js"),
+  freelancer: () => import("./views/freelancer.js"),
+  portfolio: () => import("./views/portfolio.js"),
   "find-team": () => import("./views/find-team.js"),
   team: () => import("./views/team.js"),
   community: () => import("./views/community.js"),
@@ -39,6 +41,12 @@ const LOADERS = {
 
 export const DEFAULT_VIEW = "overview";
 
+/* An agent account has no business to overview, so its front door is the
+   freelancer dashboard. Explicit ?view= always wins. */
+export function landingView() {
+  return state.profile?.account_type === "agent" ? "freelancer" : DEFAULT_VIEW;
+}
+
 export const viewIds = () => Object.keys(LOADERS);
 
 let current = DEFAULT_VIEW;
@@ -47,7 +55,7 @@ let token = 0;
 function parseParams() {
   const params = new URLSearchParams(location.search);
   const view = params.get("view");
-  return { view: LOADERS[view] ? view : DEFAULT_VIEW, params };
+  return { view: LOADERS[view] ? view : landingView(), params };
 }
 
 /** Render a view into the root element. */

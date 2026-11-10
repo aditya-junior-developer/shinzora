@@ -64,6 +64,41 @@ export const NAV = [
   }
 ];
 
+/* An agent's sidebar is about people and work, not about running a shop.
+   Reusing the same view ids means an agent and an owner can both open
+   "marketplace" — they just arrive at a different tab. */
+export const AGENT_NAV = [
+  {
+    label: "Work",
+    items: [
+      { id: "freelancer", label: "Dashboard", icon: "house" },
+      { id: "marketplace", label: "Find projects", icon: "search" },
+      { id: "portfolio", label: "Portfolio & CV", icon: "id-card" }
+    ]
+  },
+  {
+    label: "Network",
+    items: [
+      { id: "find-team", label: "Find Team", icon: "users-round" },
+      { id: "team", label: "Team", icon: "users" },
+      { id: "community", label: "Community", icon: "messages-square" },
+      { id: "messages", label: "Messages", icon: "messages-square" }
+    ]
+  },
+  {
+    label: "Account",
+    items: [
+      { id: "invitations", label: "Invitations", icon: "inbox" },
+      { id: "notifications", label: "Notifications", icon: "bell" },
+      { id: "settings", label: "Settings", icon: "settings" },
+      { id: "billing", label: "Billing", icon: "credit-card" }
+    ]
+  }
+];
+
+/** Which navigation a signed-in account should see. */
+export const navFor = () => (state.profile?.account_type === "agent" ? AGENT_NAV : NAV);
+
 let realtimeChannel = null;
 
 /* ------------------------------------------------------------------ chrome */
@@ -71,7 +106,7 @@ export function renderSidebar(activeView) {
   const nav = qs("#sidebar-nav");
   if (!nav) return;
   const credits = aiCredits();
-  nav.innerHTML = NAV.map(
+  nav.innerHTML = navFor().map(
     (group) => `<div class="sidebar-group">
         <div class="sidebar-group-label">${esc(group.label)}</div>
         ${group.items
@@ -466,7 +501,7 @@ function bindSearch(navigate) {
     const term = input.value.trim();
     if (term.length < 2) return close();
 
-    const commands = NAV.flatMap((group) => group.items)
+    const commands = navFor().flatMap((group) => group.items)
       .filter((item) => item.label.toLowerCase().includes(term.toLowerCase()))
       .slice(0, 3)
       .map((item) => ({ kind: "Page", label: item.label, href: `/app/?view=${item.id}`, iconName: item.icon }));

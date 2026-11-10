@@ -8,7 +8,7 @@ import { qs, param } from "../lib/dom.js";
 import { requireSession, watchSession, logoutEverywhere } from "../lib/guard.js";
 import { loadIdentity, state } from "../lib/store.js";
 import { renderSidebar, paintIdentity, bindChrome, subscribeNotifications, refreshNotificationBadge } from "../modules/dashboard/shell.js";
-import { start as startRouter, currentView } from "../modules/dashboard/router.js";
+import { start as startRouter, currentView, landingView } from "../modules/dashboard/router.js";
 import { initInstallPrompt } from "../ui/pwa.js";
 import { toast } from "../ui/toast.js";
 
@@ -20,7 +20,7 @@ hydrateIcons();
 
   await loadIdentity({ force: true });
 
-  const initialView = new URLSearchParams(location.search).get("view") || "overview";
+  const initialView = new URLSearchParams(location.search).get("view") || landingView();
   renderSidebar(initialView);
   paintIdentity();
   hydrateIcons();

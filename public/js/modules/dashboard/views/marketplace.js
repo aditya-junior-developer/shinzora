@@ -70,9 +70,14 @@ const tone = (status) => {
 
 const isAgent = () => workspace?.accountType === "agent";
 
-export default async function render(root) {
+export default async function render(root, options = {}) {
   root.innerHTML = skeletonView(3);
   await load();
+  /* ?tab= lets the sidebar point "Find projects" and "My applications" at the
+     same screen with the right section already open. An explicit tab wins over
+     the account-type default, so a link always lands where it says. */
+  const requested = String(options?.params?.get?.("tab") || "").trim();
+  if (requested && TABS.some((entry) => entry.id === requested)) tab = requested;
   if (!tab) tab = isAgent() ? "browse" : "hire";
   paint(root);
 }

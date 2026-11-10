@@ -2158,3 +2158,85 @@ html {
 }
 
 .mk-decide { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* ==========================================================================
+   Freelancer dashboard + Portfolio & CV
+   ========================================================================== */
+
+/* --- Freelancer home --------------------------------------------------- */
+.fl-todo { margin-bottom:16px; }
+.fl-todo-list { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:9px; }
+.fl-todo-list li { display:flex; align-items:center; gap:10px; font-size:var(--fs-sm); }
+.fl-todo-mark { color:var(--text-dim); display:inline-flex; }
+.fl-todo-text.is-done { color:var(--text-dim); text-decoration:line-through; }
+.fl-todo-list .mk-link { margin-left:auto; white-space:nowrap; }
+
+.fl-project-list { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; }
+.fl-project {
+  display:flex; align-items:flex-start; gap:14px; justify-content:space-between;
+  padding:12px 0; border-bottom:1px solid var(--border);
+}
+.fl-project:last-child { border-bottom:0; }
+.fl-project-title { font-size:var(--fs-sm); font-weight:600; }
+.fl-project-side { display:flex; flex-direction:column; align-items:flex-end; gap:7px; flex:0 0 auto; }
+.fl-project-budget { font-size:var(--fs-sm); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fl-more { margin-top:12px; }
+
+.fl-activity { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:12px; }
+.fl-activity li { display:flex; gap:9px; align-items:flex-start; }
+.fl-activity-title { font-size:var(--fs-sm); font-weight:600; }
+.fl-dot { width:7px; height:7px; border-radius:50%; margin-top:6px; flex:0 0 auto; background:var(--text-dim); }
+.fl-dot-info { background:var(--info, #60a5fa); }
+.fl-dot-ok { background:var(--ok, #34d399); }
+.fl-quick {
+  display:flex; flex-wrap:wrap; gap:8px; margin-top:16px;
+  border-top:1px solid var(--border); padding-top:14px;
+}
+
+/* --- Portfolio editor -------------------------------------------------- */
+.pf-form { display:flex; flex-direction:column; gap:14px; margin-top:10px; }
+.pf-row { display:flex; gap:12px; flex-wrap:wrap; }
+.pf-row > .pf-field { flex:1 1 180px; min-width:0; }
+.pf-field { display:flex; flex-direction:column; gap:6px; }
+.pf-field > span {
+  font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim);
+}
+.pf-field > span em { text-transform:none; letter-spacing:0; font-style:normal; opacity:.7; }
+.pf-field input, .pf-field textarea, .pf-field select {
+  width:100%; padding:9px 11px; border-radius:10px; border:1px solid var(--border);
+  background:var(--surface-2, rgba(255,255,255,.03)); color:inherit;
+  font:inherit; font-size:var(--fs-sm); outline:none;
+}
+.pf-field input:focus, .pf-field textarea:focus, .pf-field select:focus {
+  border-color:var(--purple-500, #8b5cf6);
+}
+.pf-field textarea { resize:vertical; min-height:56px; }
+.pf-narrow { flex:0 0 130px !important; }
+.pf-checks {
+  border:1px solid var(--border); border-radius:var(--r-lg, 12px);
+  padding:13px 14px; display:flex; flex-direction:column; gap:11px; margin:0;
+}
+.pf-checks legend {
+  font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-dim); padding:0 6px;
+}
+.pf-check { display:flex; align-items:center; gap:9px; font-size:var(--fs-sm); cursor:pointer; }
+.pf-check input { width:auto; accent-color:var(--purple-500, #8b5cf6); }
+.pf-actions { display:flex; gap:9px; }
+.pf-inline-form {
+  margin-top:16px; border-top:1px solid var(--border); padding-top:16px;
+}
+.pf-list { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; }
+.pf-list-row {
+  display:flex; align-items:flex-start; gap:14px; justify-content:space-between;
+  padding:12px 0; border-bottom:1px solid var(--border);
+}
+.pf-list-row:last-child { border-bottom:0; }
+.pf-list-title { font-size:var(--fs-sm); font-weight:600; }
+
+@media (max-width: 720px) {
+  .fl-project { flex-direction:column; gap:8px; }
+  .fl-project-side { flex-direction:row; align-items:center; width:100%; justify-content:space-between; }
+  .pf-row { flex-direction:column; }
+  .pf-narrow { flex:1 1 auto !important; }
+}
