@@ -106,7 +106,6 @@ function paint(root) {
           <textarea id="cm-body" rows="1" maxlength="4000" placeholder="Message #${esc(current.slug)}" aria-label="Message"></textarea>
           <button class="cm-send" id="cm-send" type="submit" aria-label="Send message">${icon("send", { size: 16 })}</button>
         </form>
-        <div class="cm-hint">Plain text only. Enter sends, Shift+Enter starts a new line — images and files are not accepted here.</div>
       </section>
     </div>`;
 

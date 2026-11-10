@@ -4,19 +4,15 @@
    sidebar, topbar, page header, content grid and mobile navigation.
    ========================================================================== */
 
+/* The navigation is a drawer at every width, so the workspace gets the whole
+   window instead of paying 258px for links that are opened occasionally. The
+   desktop-only "collapse to icons" mode is gone with it — a drawer that opens
+   over the content does the same job without squeezing the content. */
 .app-shell {
   display: grid;
   grid-template-columns: 1fr;
   min-height: 100dvh;
   background: var(--void);
-}
-@media (min-width: 1024px) {
-  .app-shell {
-    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-  }
-  body.sidebar-collapsed .app-shell {
-    grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
-  }
 }
 
 
@@ -40,15 +36,19 @@
   transform: none;
   box-shadow: 0 0 80px rgba(0, 0, 0, 0.7);
 }
+/* Wider on a desktop screen where there is room for a comfortable drawer. */
 @media (min-width: 1024px) {
   .app-sidebar {
-    position: sticky;
-    top: 0;
-    height: 100dvh;
-    width: auto;
-    transform: none;
-    box-shadow: none;
+    width: min(92vw, var(--sidebar-w));
   }
+}
+
+/* The drawer is modal: the page behind it must not scroll underneath. */
+body.drawer-open {
+  overflow: hidden;
+}
+body.drawer-open .app-sidebar {
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.72);
 }
 
 .sidebar-head {
@@ -80,10 +80,10 @@
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
 }
-@media (min-width: 1024px) {
-  .sidebar-close {
-    display: none;
-  }
+/* The drawer is modal at every width now, so it always needs its own close
+   button — a scrim click is not an affordance for everybody. */
+.sidebar-close {
+  display: grid;
 }
 
 .sidebar-workspace {
@@ -232,8 +232,12 @@
   color: #fde68a;
 }
 
-/* Collapsed sidebar (desktop toggle) */
+/* The old icon-collapse toggle has no job in a drawer. Its rules are kept
+   only so a stale local preference cannot change how anything looks. */
+#sidebar-collapse { display: none; }
+
 @media (min-width: 1024px) {
+  body.sidebar-collapsed .app-shell { grid-template-columns: 1fr; }
   body.sidebar-collapsed .sidebar-head .brand-word,
   body.sidebar-collapsed .workspace-switch .ws-meta,
   body.sidebar-collapsed .workspace-switch .ico,
@@ -323,10 +327,9 @@
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
-@media (min-width: 1024px) {
-  .topbar-toggle[data-sidebar-open] {
-    display: none;
-  }
+/* The drawer needs its opener on every screen size. */
+.topbar-toggle[data-sidebar-open] {
+  display: inline-grid;
 }
 
 .topbar-search {
@@ -698,11 +701,8 @@
   opacity: 1;
   visibility: visible;
 }
-@media (min-width: 1024px) {
-  .sidebar-scrim {
-    display: none;
-  }
-}
+/* Scrim is used at every width: the drawer is modal wherever it is opened. */
+.sidebar-scrim { display: block; }
 
 /* Setup banner: shown whenever a dependency is not configured */
 .setup-banner {
