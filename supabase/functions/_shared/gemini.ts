@@ -132,6 +132,27 @@ export function isQuotaExhausted(detail: string): boolean {
 export function providerError(status: number, detail: string): GeminiError {
   const retryAfter = extractRetrySeconds(detail);
 
+  /* A refused credential is never a shape problem, whatever status it arrives
+     with, so this is decided before the generic 400 handling below. */
+  if ((status === 400 || status === 401) && /api[ _]key|unauthorized|invalid key|API_KEY_INVALID|API key expired/i.test(detail)) {
+    return new GeminiError("The AI provider rejected the configured key.", "ai_bad_key", 502);
+  }
+
+  /* A 400 is the request's shape, not the account's health: an unsupported
+     parameter, a value out of range, or a model that rejects a field its
+     siblings accept. Repeating the identical body is pointless; retrying a
+     simpler body or a different model usually works. Marked retryable so the
+     chain can do exactly that instead of failing the customer's build. */
+  if (status === 400) {
+    const error = new GeminiError(
+      "The AI provider rejected this request. Retrying with a simpler request.",
+      "ai_request_rejected",
+      502
+    );
+    (error as GeminiError & { shape?: boolean }).shape = true;
+    return error;
+  }
+
   if (status === 429) {
     /* This limit belongs to the platform's own provider account. A customer
        reading "your allowance is used up" was reading about somebody else's
@@ -155,10 +176,6 @@ export function providerError(status: number, detail: string): GeminiError {
       429,
       retryAfter
     );
-  }
-
-  if ((status === 400 || status === 401) && /api key|unauthorized|invalid key/i.test(detail)) {
-    return new GeminiError("The AI provider rejected the configured key.", "ai_bad_key", 502);
   }
 
   if (status === 403 || /billing|permission|has not been used in project|is disabled/i.test(detail)) {
@@ -250,6 +267,61 @@ export function resetGeminiKeyHealth() {
   ambiguousQuotaUntil = 0;
   unknownProjectCooldownUntil = 0;
   rotationCursor = 0;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Model health
+ *
+ * Google sheds load per model, not per key: while `gemini-3.8-flash` answers
+ * 503 or hangs, a sibling model answers in under a second. A static fallback
+ * list cannot know that, so health is measured at runtime and the chain is
+ * re-ordered from it. A failing model is parked briefly and skipped instantly
+ * on the next call; a success clears it.
+ * ------------------------------------------------------------------------- */
+const modelCooldownUntil = new Map<string, number>();
+const modelSuccess = new Map<string, number>();
+const MODEL_COOLDOWN_MS = 90_000;
+
+function modelIsCooling(model: string, now = Date.now()): boolean {
+  return now < (modelCooldownUntil.get(model) ?? 0);
+}
+
+function parkModel(model: string, ms = MODEL_COOLDOWN_MS) {
+  if (modelCooldownUntil.size > 64) modelCooldownUntil.clear();
+  modelCooldownUntil.set(model, Date.now() + ms);
+}
+
+function markModelOk(model: string) {
+  modelCooldownUntil.delete(model);
+  modelSuccess.set(model, (modelSuccess.get(model) ?? 0) + 1);
+}
+
+/** Secret-free health snapshot for the admin console and tests. */
+export function geminiModelHealth() {
+  const now = Date.now();
+  return [...new Set([...modelCooldownUntil.keys(), ...modelSuccess.keys()])].map((model) => ({
+    model,
+    coolingForMs: Math.max(0, (modelCooldownUntil.get(model) ?? 0) - now),
+    ok: modelSuccess.get(model) ?? 0
+  }));
+}
+
+/** Test-only reset for model health. */
+export function resetGeminiModelHealth() {
+  modelCooldownUntil.clear();
+  modelSuccess.clear();
+}
+
+/**
+ * Order the chain from measured health: models that are serving first, models
+ * in cooldown last (demoted, never dropped, so a stale cooldown cannot become
+ * an outage). The operator's configured primary keeps its place while healthy.
+ */
+export function orderChainByHealth(chain: string[]): string[] {
+  const fresh = chain.filter((model) => !modelIsCooling(model));
+  const cooling = chain.filter((model) => modelIsCooling(model));
+  const bySuccess = (a: string, b: string) => (modelSuccess.get(b) ?? 0) - (modelSuccess.get(a) ?? 0);
+  return [...fresh.sort(bySuccess), ...cooling.sort(bySuccess)];
 }
 
 async function requestWithKeyFailover(model: string, body: Record<string, unknown>, timeoutMs: number): Promise<Response> {
@@ -374,6 +446,24 @@ export interface GeminiOptions {
   thinkingBudget?: number;
 }
 
+/**
+ * The recovery shape for a request the provider called invalid: no JSON mode,
+ * no thinking directive, no temperature, and a modest output budget. Anything
+ * the provider may object to is removed so one relaxed attempt can still
+ * produce an answer.
+ */
+export function leanBody(body: Record<string, unknown>): Record<string, unknown> {
+  const config = { ...(body.generationConfig as Record<string, unknown> | undefined) };
+  const next: Record<string, unknown> = {
+    maxOutputTokens: Math.min(Number(config.maxOutputTokens ?? 8192) || 8192, 8192)
+  };
+  return {
+    ...body,
+    generationConfig: next,
+    safetySettings: undefined
+  };
+}
+
 /** Low-level call. Throws GeminiError with a stable code for the UI. */
 export async function gemini(parts: string | Part[], options: GeminiOptions = {}): Promise<string> {
   if (!geminiConfigured()) {
@@ -410,22 +500,40 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
   /* An explicit model is honoured exactly: if the caller asked for it, guessing
      a different one would make the choice in the UI a lie. Otherwise the live
      chain is used. */
-  const chain = options.model ? [options.model] : await resolvedModelChain(options.capability ?? "site");
+  /* An explicit model is tried first, then the live chain as a safety net: the
+     caller's choice leads, but a congested model no longer fails the build. */
+  const configured = options.model
+    ? [options.model, ...(await resolvedModelChain(options.capability ?? "site")).filter((m) => m !== options.model)]
+    : await resolvedModelChain(options.capability ?? "site");
+  const chain = orderChainByHealth(configured);
   let lastRetryable: GeminiError | null = null;
 
   for (const model of chain) {
+    /* Two shapes per model: the request as asked, then a relaxed one. A 400 is
+       about the body, so relaxing it can turn a hard failure into an answer. */
+    for (const lean of [false, true]) {
+    const attemptBody = lean ? leanBody(body) : body;
     let response: Response;
     try {
-      response = await requestWithKeyFailover(model, body, options.timeoutMs ?? 120000);
+      response = await requestWithKeyFailover(model, attemptBody, options.timeoutMs ?? 120000);
     } catch (error) {
       const mapped = error instanceof GeminiError ? error : new GeminiError("Could not reach the AI provider.", "ai_unreachable", 502);
       if (["ai_quota_exhausted", "ai_bad_key", "ai_forbidden", "functions_unavailable"].includes(mapped.code)) throw mapped;
       lastRetryable = mapped;
-      continue;
+      if (mapped.code === "ai_timeout" || mapped.code === "ai_unreachable") parkModel(model, 30_000);
+      break;
     }
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
+
+      if (response.status === 400) {
+        /* Shape problem. Relax once for this model, then move on. */
+        lastRetryable = providerError(400, detail);
+        if (!lean) continue;
+        parkModel(model);
+        break;
+      }
 
       if (RETRYABLE.has(response.status)) {
         const mapped = providerError(response.status, detail);
@@ -435,7 +543,10 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
            fallback's generic message. */
         if (mapped.code === "ai_quota_exhausted") throw mapped;
         lastRetryable = response.status === 503 ? new GeminiError("AI provider error (503).", "ai_provider_error", 502) : mapped;
-        continue;
+        /* Congestion is per model, so remember it and switch immediately next
+           time rather than paying the timeout again on every request. */
+        if (response.status === 503 || response.status === 504) parkModel(model);
+        break;
       }
 
       throw providerError(response.status, detail);
@@ -455,7 +566,7 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
           "ai_max_tokens",
           502
         );
-        continue;
+        break;
       }
       throw new GeminiError(
         blocked
@@ -466,7 +577,9 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
       );
     }
 
+    markModelOk(model);
     return text;
+    }
   }
 
   throw (
@@ -557,7 +670,10 @@ export async function geminiGrounded(
 
   if (options.system) body.systemInstruction = { parts: [{ text: options.system }] };
 
-  const chain = options.model ? [options.model] : await resolvedModelChain(options.capability ?? "site");
+  const configuredGrounding = options.model
+    ? [options.model, ...(await resolvedModelChain(options.capability ?? "site")).filter((m) => m !== options.model)]
+    : await resolvedModelChain(options.capability ?? "site");
+  const chain = orderChainByHealth(configuredGrounding);
   let lastRetryable: GeminiError | null = null;
 
   for (const model of chain) {
@@ -568,6 +684,7 @@ export async function geminiGrounded(
       const mapped = error instanceof GeminiError ? error : new GeminiError("Could not reach the AI provider.", "ai_unreachable", 502);
       if (["ai_quota_exhausted", "ai_bad_key", "ai_forbidden", "functions_unavailable"].includes(mapped.code)) throw mapped;
       lastRetryable = mapped;
+      if (mapped.code === "ai_timeout" || mapped.code === "ai_unreachable") parkModel(model, 30_000);
       continue;
     }
 
@@ -577,6 +694,7 @@ export async function geminiGrounded(
       if (RETRYABLE.has(response.status)) {
         if (mapped.code === "ai_quota_exhausted") throw mapped;
         lastRetryable = mapped;
+        if (response.status === 503 || response.status === 504) parkModel(model);
         continue;
       }
       /* Search grounding is not offered on every model. That is a "this model
@@ -588,6 +706,7 @@ export async function geminiGrounded(
           "ai_research_unsupported",
           422
         );
+        parkModel(model);
         continue;
       }
       throw mapped;

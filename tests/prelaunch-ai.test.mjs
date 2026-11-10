@@ -140,6 +140,9 @@ check("a response with no usable files fails loudly", emptyRejected);
 
 console.log("errors");
 
+ai.resetModelHealth(); // each scenario starts from a clean model-health slate
+
+ai.resetModelHealth();
 handler = () => new Response("quota", { status: 429 });
 let quota = null;
 try {
@@ -150,6 +153,7 @@ try {
 check("a spent allowance maps to ai_quota_exhausted", quota?.code === "ai_quota_exhausted", quota?.code);
 check("quota errors are 429, not 500", quota?.status === 429);
 
+ai.resetModelHealth();
 handler = () => new Response('{"error":{"status":"API_KEY_INVALID"}}', { status: 400 });
 let badKey = null;
 try {
@@ -161,6 +165,7 @@ check("an invalid key is reported as a configuration problem", badKey?.code === 
 
 /* A retired model must fall through to the next configured one. */
 process.env.SHINZORA_AI_MODEL_FALLBACKS = "gemini-4-fallback";
+ai.resetModelHealth();
 calls.length = 0;
 handler = (url) =>
   url.includes("gemini-3.8-flash") ? new Response("gone", { status: 404 }) : generation({ "index.html": "<p>ok</p>" });

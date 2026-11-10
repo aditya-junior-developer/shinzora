@@ -100,8 +100,43 @@ try {
   assert.equal(ai.geminiKey(), fakeKeys[2], "disabled keys are never selected");
   assert.equal(ai.geminiConfigured(), true);
 
+  /* ---- automatic model switching ---------------------------------------- */
+  ai.resetGeminiModelHealth();
+
+  // A congested model is demoted to the end, never dropped from the chain.
+  ai.resetGeminiModelHealth();
+  stub(() => responseJson({}, 503));
+  try { await ai.gemini("hi", { model: "gemini-3.8-flash" }); } catch { /* expected */ }
+  const health = ai.geminiModelHealth();
+  assert.ok(health.some((entry) => entry.model === "gemini-3.8-flash" && entry.coolingForMs > 0), "a 503 parks the model");
+  const order = ai.orderChainByHealth(["gemini-3.8-flash", "gemini-3.5-flash"]);
+  assert.equal(order[order.length - 1], "gemini-3.8-flash", "the cooling model is tried last");
+  assert.equal(order.length, 2, "the chain never loses a model");
+
+  // A 400 is a request-shape problem: recoverable, and it relaxes the body.
+  ai.resetGeminiModelHealth();
+  configure([{ id: "alpha", key: fakeKeys[0], projectId: "project-a", priority: 1 }]);
+  let sawLeanBody = false;
+  stub((call) => {
+    const body = JSON.parse(call.init?.body ?? "{}");
+    const hasJsonMode = body?.generationConfig?.responseMimeType === "application/json";
+    if (hasJsonMode) {
+      return responseJson({ error: { status: "INVALID_ARGUMENT", message: "temperature must be in the range [0.0, 2.0]" } }, 400);
+    }
+    sawLeanBody = true;
+    return responseJson({ candidates: [{ content: { parts: [{ text: "answered" }] } }] });
+  });
+  const recovered = await ai.gemini("hi", { model: "gemini-3.8-flash", json: true });
+  assert.equal(recovered, "answered", "a shape 400 is retried with a relaxed body");
+  assert.ok(sawLeanBody, "the retry actually dropped the rejected parameters");
+
+  // A rejected credential is never mistaken for a shape problem.
+  const keyError = ai.providerError(400, '{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}');
+  assert.notEqual(keyError.code, "ai_request_rejected", "a bad key is not retried as a shape error");
+
   globalThis.fetch = originalFetch;
   console.log("  ✓ Gemini keyring priority, same-model failover, project quota grouping, per-key rate limits, disabled keys, and URL secrecy");
+  console.log("  ✓ model auto-switching: congestion demotes, shape 400s recover, bad keys stay bad");
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

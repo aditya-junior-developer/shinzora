@@ -178,6 +178,65 @@ function availableKeys() {
   });
 }
 
+/* ---------------------------------------------------------- model health --
+   Google sheds load per model, not per key: at any moment one model answers
+   503 or hangs while a sibling answers in under a second. A static fallback
+   list cannot know that, so health is learned at runtime. A model that fails
+   is parked for a short while and skipped instantly on the next request; a
+   success clears it. This is what makes the chain "auto-switch" instead of
+   spending 35 seconds rediscovering the same outage on every call. */
+const modelCooldowns = new Map();
+const modelStats = new Map();
+const MODEL_COOLDOWN_MS = 90_000;
+
+export function resetModelHealth() {
+  modelCooldowns.clear();
+  modelStats.clear();
+}
+
+function modelIsCooling(model, now = Date.now()) {
+  return now < (modelCooldowns.get(model) || 0);
+}
+
+function parkModel(model, ms = MODEL_COOLDOWN_MS) {
+  if (modelCooldowns.size > 64) modelCooldowns.clear();
+  modelCooldowns.set(model, Date.now() + ms);
+  const stats = modelStats.get(model) || { ok: 0, fail: 0 };
+  stats.fail += 1;
+  modelStats.set(model, stats);
+}
+
+function markModelOk(model) {
+  modelCooldowns.delete(model);
+  const stats = modelStats.get(model) || { ok: 0, fail: 0 };
+  stats.ok += 1;
+  modelStats.set(model, stats);
+}
+
+/** Secret-free health snapshot for the admin console and tests. */
+export function modelHealth() {
+  const now = Date.now();
+  return [...new Set([...modelCooldowns.keys(), ...modelStats.keys()])].map((model) => ({
+    model,
+    coolingForMs: Math.max(0, (modelCooldowns.get(model) || 0) - now),
+    ...(modelStats.get(model) || { ok: 0, fail: 0 })
+  }));
+}
+
+/**
+ * Order the chain by measured health: models that are serving go first, models
+ * in cooldown are demoted to the end rather than dropped, so a stale cooldown
+ * can never turn into an outage. The configured primary still leads when it is
+ * healthy, which keeps the operator's choice honest.
+ */
+export function orderedChain(preferred = []) {
+  const base = preferred.length ? preferred : modelChain();
+  const fresh = base.filter((model) => !modelIsCooling(model));
+  const cooling = base.filter((model) => modelIsCooling(model));
+  const byHealth = (a, b) => (modelStats.get(b)?.ok || 0) - (modelStats.get(a)?.ok || 0);
+  return [...fresh.sort(byHealth), ...cooling.sort(byHealth)];
+}
+
 function park(key, ms = COOLDOWN_MS) {
   if (cooldowns.size > 64) cooldowns.clear();
   cooldowns.set(key, Date.now() + ms);
@@ -293,9 +352,42 @@ export class SandboxAiError extends Error {
 
 const RETRYABLE = new Set([404, 429, 503]);
 
+/* A 400 is the request's shape, not the account's health: an unsupported
+   parameter, a value out of range, or a model that does not accept a field the
+   others do. Retrying the identical body is pointless, but retrying a *simpler*
+   body (or a different model) usually works, so this is treated as recoverable
+   rather than fatal. The provider's own wording is kept for the log, never shown
+   to the customer. */
+export function isRequestShapeError(status, detail) {
+  return status === 400 && /INVALID_ARGUMENT|invalid argument|unsupported|out of range|must be/i.test(String(detail));
+}
+
 function translate(status, detail) {
-  if (status === 401 || status === 403 || /API key not valid|API_KEY_INVALID/i.test(detail)) {
+  /* A rejected credential is never a shape problem, whatever status it arrives
+     with, so this is checked before the generic 400 handling below. */
+  if (status === 401 || status === 403 || /API key not valid|API_KEY_INVALID|API key expired/i.test(detail)) {
     return new SandboxAiError("The AI provider rejected the configured key.", { code: "ai_bad_key", status: 503 });
+  }
+  if (isRequestShapeError(status, detail)) {
+    const error = new SandboxAiError("The AI provider rejected the shape of this request.", {
+      code: "ai_request_rejected",
+      status: 502
+    });
+    error.retryable = true;
+    error.shape = true;
+    error.detail = String(detail).slice(0, 300);
+    return error;
+  }
+  if (status === 400) {
+    /* A 400 we do not recognise is still worth one simplified retry. */
+    const error = new SandboxAiError("The AI provider rejected this request.", {
+      code: "ai_request_rejected",
+      status: 502
+    });
+    error.retryable = true;
+    error.shape = true;
+    error.detail = String(detail).slice(0, 300);
+    return error;
   }
   if (status === 429) {
     const match = detail.match(/retry in\s+(?:(\d+)h)?(?:(\d+)m)?(?:([0-9.]+)s)?/i);
@@ -334,7 +426,7 @@ function parseJson(text) {
   }
 }
 
-async function callModel(model, prompt, { timeoutMs = 120000, key = apiKey() } = {}) {
+async function callModel(model, prompt, { timeoutMs = 120000, key = apiKey(), lean = false } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -342,13 +434,18 @@ async function callModel(model, prompt, { timeoutMs = 120000, key = apiKey() } =
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       signal: controller.signal,
+      /* `lean` is the recovery shape: no JSON mode, a modest output budget and
+         no temperature override. It is what a request-shape 400 falls back to
+         for the same model before the chain moves on. */
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.85,
-          maxOutputTokens: 30000,
-          responseMimeType: "application/json"
-        }
+        generationConfig: lean
+          ? { maxOutputTokens: 8192 }
+          : {
+              temperature: 0.85,
+              maxOutputTokens: 30000,
+              responseMimeType: "application/json"
+            }
       })
     });
 
@@ -385,9 +482,21 @@ async function callModel(model, prompt, { timeoutMs = 120000, key = apiKey() } =
   }
 }
 
-/** Ask for JSON, trying each model in the chain on 404/429/503. */
+/**
+ * Ask for JSON, automatically switching to whatever can actually answer.
+ *
+ * Order of preference at every step:
+ *   1. the model that is configured (the operator's choice, when healthy)
+ *   2. the other configured fallbacks
+ *   3. whatever the provider says this key can really call
+ *
+ * For each model the keys are rotated first, because a spent key is an account
+ * problem, then the request shape is relaxed if the provider rejects it, and
+ * only then does the chain move on. Nothing in this loop can return a bare
+ * provider status code to the customer.
+ */
 export async function completeJson(prompt, { model = "" } = {}) {
-  const chain = model ? [model] : modelChain();
+  const chain = orderedChain(model ? [model, ...modelChain().filter((m) => m !== model)] : []);
   if (!chain.length) {
     throw new SandboxAiError("No AI model is configured for this deployment.", {
       code: "ai_unconfigured",
@@ -398,28 +507,55 @@ export async function completeJson(prompt, { model = "" } = {}) {
 
   let last = null;
   for (const candidate of chain) {
-    /* Rotate credentials before giving up on the model: one spent or rejected
-       key is an operator problem, not a reason to fail the customer's build. */
-    /* If every key is cooling down, try them anyway: a stale cooldown must
-       never become an outage, and the provider's own answer is the truth. */
     const healthy = availableKeys();
     const attemptKeys = healthy.length ? healthy : keyring();
+    let shapeFailedForThisModel = false;
+
     for (const key of attemptKeys) {
-      try {
-        return { text: await callModel(candidate, prompt, { key }), model: candidate };
-      } catch (error) {
-        last = error;
-        /* Only a key-specific refusal parks the credential. A retired model or
-           a provider fault keeps the key and moves on to the next model. */
-        if (error?.code === "ai_bad_key" || error?.code === "ai_quota_exhausted") {
-          park(key, error?.retryAfter ? error.retryAfter * 1000 : COOLDOWN_MS);
-        } else if (!error?.retryable) {
+      /* Two attempts per credential: the normal request, then one simplified
+         request if the provider rejected the shape. */
+      for (const lean of [false, true]) {
+        if (lean && !shapeFailedForThisModel) continue;
+        try {
+          const text = await callModel(candidate, prompt, { key, lean });
+          markModelOk(candidate);
+          return { text, model: candidate };
+        } catch (error) {
+          last = error;
+
+          if (error?.shape) {
+            /* Request shape: relax it, then move to the next model. The key is
+               perfectly good, so it is never parked for this. */
+            shapeFailedForThisModel = true;
+            if (!lean) continue;
+            parkModel(candidate);
+            break;
+          }
+
+          /* Key-scoped problems park the credential, never the model. */
+          if (error?.code === "ai_bad_key" || error?.code === "ai_quota_exhausted") {
+            park(key, error?.retryAfter ? error.retryAfter * 1000 : COOLDOWN_MS);
+            break;
+          }
+
+          /* Model-scoped or provider-scoped: park the model so the next request
+             skips it instantly, and try the next one. */
+          if (error?.retryable || error?.code === "ai_model_gone" || error?.code === "ai_timeout") {
+            parkModel(candidate, error?.code === "ai_timeout" ? 30_000 : MODEL_COOLDOWN_MS);
+            break;
+          }
+
           throw error;
         }
       }
+      if (modelIsCooling(candidate)) break;
     }
   }
-  throw last || new SandboxAiError("Every configured AI model is unavailable right now.", { code: "ai_provider_error" });
+
+  throw last || new SandboxAiError(
+    "Every AI model is busy right now. Try again in a minute.",
+    { code: "ai_provider_error", status: 503 }
+  );
 }
 
 /** Same contract as `sanitiseFiles` in the ai Edge Function. */
