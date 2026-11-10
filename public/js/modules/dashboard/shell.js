@@ -13,6 +13,7 @@ import { toast, toastError } from "../../ui/toast.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { markAllNotificationsRead, markNotificationRead, notifications as fetchNotifications, uid } from "./data.js";
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
+import { createDrawer } from "../../ui/drawer.js";
 
 export const NAV = [
   {
@@ -100,6 +101,10 @@ export const AGENT_NAV = [
 export const navFor = () => (state.profile?.account_type === "agent" ? AGENT_NAV : NAV);
 
 let realtimeChannel = null;
+/* The navigation drawer, created by bindChrome(). */
+let navDrawer = null;
+
+export const closeNavDrawer = () => navDrawer?.close();
 
 /* ------------------------------------------------------------------ chrome */
 export function renderSidebar(activeView) {
@@ -171,67 +176,16 @@ function renderSetupBanner() {
 
 /* -------------------------------------------------------------- interactions */
 export function bindChrome({ navigate }) {
-  /* Navigation drawer.
-     It used to be a permanent column on desktop and a drawer only on phones;
-     it is a drawer everywhere now, so the workspace gets the full width. That
-     makes it modal, which brings three obligations: the page behind must not
-     scroll, Escape and a click outside must close it, and focus must go
-     somewhere sensible when it opens rather than staying behind the scrim. */
-  const sidebar = qs("#app-sidebar");
-  const scrim = qs("#sidebar-scrim");
-  const toggles = qsa("[data-sidebar-open]");
-  let lastFocus = null;
-
-  const isOpen = () => Boolean(sidebar?.classList.contains("is-open"));
-
-  const openSidebar = () => {
-    if (!sidebar) return;
-    lastFocus = document.activeElement;
-    sidebar.classList.add("is-open");
-    scrim?.classList.add("is-visible");
-    document.body.classList.add("drawer-open");
-    sidebar.removeAttribute("aria-hidden");
-    sidebar.removeAttribute("inert");
-    toggles.forEach((button) => button.setAttribute("aria-expanded", "true"));
-    /* Focus the active link (or the first one) so a keyboard user lands inside
-       the thing they just opened. */
-    const target = sidebar.querySelector(".sidebar-link.is-active") || sidebar.querySelector(".sidebar-link");
-    target?.focus?.({ preventScroll: true });
-  };
-
-  const closeSidebar = ({ restoreFocus = false } = {}) => {
-    if (!sidebar) return;
-    const wasOpen = isOpen();
-    sidebar.classList.remove("is-open");
-    scrim?.classList.remove("is-visible");
-    document.body.classList.remove("drawer-open");
-    sidebar.setAttribute("aria-hidden", "true");
-    toggles.forEach((button) => button.setAttribute("aria-expanded", "false"));
-    if (wasOpen && restoreFocus) (lastFocus || toggles[0])?.focus?.({ preventScroll: true });
-  };
-
-  /* Closed is the starting state at every width: the drawer is opened on
-     purpose, not inherited from a previous desktop session. */
-  closeSidebar();
-  toggles.forEach((button) => on(button, "click", (event) => {
-    event.stopPropagation();
-    if (isOpen()) closeSidebar({ restoreFocus: true });
-    else openSidebar();
-  }));
-  on(qs("[data-sidebar-close]"), "click", () => closeSidebar({ restoreFocus: true }));
-  on(scrim, "click", () => closeSidebar({ restoreFocus: true }));
-  delegate(qs("#sidebar-nav"), "click", "[data-nav]", () => closeSidebar());
-  /* Sign out lives inside the drawer; leaving it open would strand the next
-     screen behind an invisible modal state. */
-  on(qs("#sidebar-signout"), "click", () => closeSidebar());
-
-  on(document, "keydown", (event) => {
-    if (event.key === "Escape" && isOpen()) {
-      event.preventDefault();
-      closeSidebar({ restoreFocus: true });
-    }
+  /* Navigation drawer. Same component the admin console uses, so the two
+     behave identically: modal while open, three ways out, closed on navigation
+     and on sign-out, and focus moved inside rather than left behind the scrim. */
+  navDrawer = createDrawer({
+    panel: qs("#app-sidebar"),
+    scrim: qs("#sidebar-scrim"),
+    toggles: "[data-sidebar-open]"
   });
-  window.addEventListener("shinzora:view", () => closeSidebar());
+  on(qs("#sidebar-signout"), "click", () => navDrawer?.close());
+  window.addEventListener("shinzora:view", () => navDrawer?.close());
 
   // Workspace + account menus
   bindMenu("#workspace-switch", "#workspace-menu");

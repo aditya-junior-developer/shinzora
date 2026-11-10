@@ -6,6 +6,12 @@ import { qs, qsa, esc, on, debounce } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { skeletonView, setupNotice } from "../dashboard/components.js";
+import { createDrawer } from "../../ui/drawer.js";
+
+/* The navigation drawer, created by bindShell(). */
+let adminDrawer = null;
+
+export const closeAdminDrawer = () => adminDrawer?.close();
 
 export const NAV = [
   {
@@ -126,9 +132,7 @@ export async function renderView(view) {
 export function navigate(view) {
   if (!LOADERS[view]) return;
   renderView(view);
-  if (window.matchMedia("(max-width: 1024px)").matches) {
-    qs("#admin-sidebar")?.classList.remove("is-open");
-  }
+  adminDrawer?.close();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -153,11 +157,16 @@ export function bindShell({ user, role }) {
     if (button) navigate(button.getAttribute("data-view"));
   });
 
-  const toggle = qs("#admin-menu-toggle");
-  on(toggle, "click", () => {
-    const sidebar = qs("#admin-sidebar");
-    const open = sidebar.classList.toggle("is-open");
-    toggle.setAttribute("aria-expanded", String(open));
+  /* The admin console gets the same drawer as the dashboard: it slides over the
+     content at every width, locks the page while it is open, and closes on
+     Escape, on the scrim, on its own close button and on navigation. Before
+     this the sidebar was a permanent column on a desktop and a half-wired
+     drawer on a phone. */
+  adminDrawer = createDrawer({
+    panel: qs("#admin-sidebar"),
+    scrim: qs("#admin-scrim"),
+    toggles: "#admin-menu-toggle",
+    activeSelector: ".admin-nav-link.is-active, .is-active"
   });
 
   const search = qs("#admin-search");

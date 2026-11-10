@@ -4,6 +4,8 @@
    the marketing pages. Respects prefers-reduced-motion.
    ========================================================================== */
 
+import { createDrawer } from "./drawer.js";
+
 const reduced = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -85,26 +87,15 @@ export function initMarketingNav() {
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
 
-  const toggle = nav.querySelector("[data-nav-toggle]");
-  const drawer = document.querySelector("[data-mobile-menu]");
-  if (toggle && drawer) {
-    const close = () => {
-      drawer.classList.remove("is-open");
-      toggle.setAttribute("aria-expanded", "false");
-      document.body.style.overflow = "";
-    };
-    toggle.addEventListener("click", () => {
-      const open = drawer.classList.toggle("is-open");
-      toggle.setAttribute("aria-expanded", String(open));
-      document.body.style.overflow = open ? "hidden" : "";
-    });
-    drawer.addEventListener("click", (event) => {
-      if (event.target.closest("a, [data-nav-close]")) close();
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") close();
-    });
-  }
+  /* Same drawer as the dashboard and the admin console. The marketing menu is
+     full-bleed rather than a side panel, so it gets no scrim, but the behaviour
+     — modal, body-locked, closed on Escape, on its own close button and on any
+     link it contains — is identical. */
+  createDrawer({
+    panel: document.querySelector("[data-mobile-menu]"),
+    toggles: "[data-nav-toggle]",
+    activeSelector: "[data-nav-close], a[href]"
+  });
 }
 
 /** Animated typing effect for the hero prompt example. */

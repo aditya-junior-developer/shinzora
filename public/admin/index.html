@@ -9,11 +9,11 @@
   <meta name="theme-color" content="#08060d" />
   <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/css/tokens.css?v=20261110j" />
-  <link rel="stylesheet" href="/css/components.css?v=20261110j" />
-  <link rel="stylesheet" href="/css/app.css?v=20261110j" />
-  <link rel="stylesheet" href="/css/views.css?v=20261110j" />
-  <link rel="stylesheet" href="/css/admin.css?v=20261110j" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261110k" />
+  <link rel="stylesheet" href="/css/components.css?v=20261110k" />
+  <link rel="stylesheet" href="/css/app.css?v=20261110k" />
+  <link rel="stylesheet" href="/css/views.css?v=20261110k" />
+  <link rel="stylesheet" href="/css/admin.css?v=20261110k" />
 </head>
 <body class="admin">
   <!-- Access is decided server-side before this panel is ever shown. There is no
@@ -41,6 +41,9 @@
         <img class="brand-mark" src="/assets/icons/mark.png" alt="" width="26" height="26" decoding="async" />
         <span class="brand-word">SHINZORA</span>
         <span class="admin-brand-tag">Admin</span>
+        <button class="admin-drawer-close" data-admin-close data-drawer-close aria-label="Close navigation">
+          <i data-icon="x" data-size="16"></i>
+        </button>
       </div>
       <nav id="admin-nav" aria-label="Admin sections"></nav>
       <div class="admin-sidebar-foot">
@@ -52,6 +55,8 @@
         </div>
       </div>
     </aside>
+
+    <div class="admin-scrim" id="admin-scrim"></div>
 
     <div class="admin-main">
       <header class="admin-topbar">
@@ -73,6 +78,6 @@
   </div>
 
   <script src="/js/vendor/supabase-js.js"></script>
-  <script type="module" src="/js/boot/admin.js?v=20261110j"></script>
+  <script type="module" src="/js/boot/admin.js?v=20261110k"></script>
 </body>
 </html>

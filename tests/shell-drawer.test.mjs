@@ -30,7 +30,7 @@ const SHELL = `
     <aside class="app-sidebar" id="app-sidebar" aria-label="Workspace navigation">
       <div class="sidebar-head">
         <a class="nav-brand" href="/app/"><span class="brand-word">SHINZORA</span></a>
-        <button class="sidebar-close" data-sidebar-close aria-label="Close navigation">x</button>
+        <button class="sidebar-close" data-sidebar-close data-drawer-close aria-label="Close navigation">x</button>
       </div>
       <div class="sidebar-workspace">
         <button class="workspace-switch" id="workspace-switch" aria-haspopup="menu" aria-expanded="false">

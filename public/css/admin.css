@@ -10,15 +10,19 @@ body.admin {
 
 .admin-shell {
   display: grid;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: 1fr;
   min-height: 100vh;
 }
 
 /* ------------------------------------------------------------------ sidebar */
+/* The sidebar is a drawer at every width — desktop included. It starts off
+   canvas and slides over the content, so the console is the full width of the
+   screen until someone asks for the menu. */
 .admin-sidebar {
-  position: sticky;
-  top: 0;
-  align-self: start;
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 280px;
+  z-index: 60;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -27,13 +31,59 @@ body.admin {
   background: linear-gradient(180deg, rgba(18, 12, 28, 0.96), rgba(10, 8, 16, 0.98));
   border-right: 1px solid var(--line);
   overflow-y: auto;
+  transform: translateX(-102%);
+  transition: transform var(--t-base);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+}
+
+.admin-sidebar.is-open {
+  transform: none;
+}
+
+.admin-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(6, 4, 12, 0.66);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--t-base), visibility var(--t-base);
+}
+
+.admin-scrim.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.drawer-open {
+  overflow: hidden;
+}
+
+.admin-drawer-close {
+  position: absolute;
+  top: var(--s-4);
+  right: var(--s-2);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+}
+
+.admin-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
 }
 
 .admin-brand {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 10px;
-  padding: 0 var(--s-2) var(--s-4);
+  /* Room for the drawer's close button, which sits in the top-right corner. */
+  padding: 0 calc(var(--s-2) + 30px) var(--s-4) var(--s-2);
 }
 
 .admin-brand .brand-word {
@@ -42,6 +92,7 @@ body.admin {
 }
 
 .admin-brand-tag {
+  flex: none;
   font-size: var(--fs-2xs);
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -593,32 +644,10 @@ body.admin {
 
 /* ------------------------------------------------------------------ mobile */
 .admin-menu-toggle {
-  display: none;
+  display: inline-flex;
 }
 
 @media (max-width: 1024px) {
-  .admin-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: 268px;
-    z-index: 60;
-    transform: translateX(-102%);
-    transition: transform var(--t-base);
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
-  }
-
-  .admin-sidebar.is-open {
-    transform: none;
-  }
-
-  .admin-menu-toggle {
-    display: inline-flex;
-  }
-
   .admin-split {
     grid-template-columns: 1fr;
   }

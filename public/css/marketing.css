@@ -106,19 +106,17 @@
   .nav-links {
     display: flex;
   }
-  .nav-toggle {
-    display: none;
-  }
   .nav-actions {
     margin-left: 0;
   }
 }
 
 /* Between the drawer breakpoint and a genuinely wide window there is not room
-   for seven links and three actions. The secondary links step out of the bar —
-   they stay in the footer and in the drawer — instead of squeezing every label
-   onto two lines. */
-@media (min-width: 960px) and (max-width: 1199px) {
+   for seven links, three actions and the menu button. The secondary links step
+   out of the bar — they stay in the footer and in the drawer — instead of
+   squeezing every label onto two lines. The ceiling moved up when the menu
+   button became permanent. */
+@media (min-width: 960px) and (max-width: 1399px) {
   .nav-inner {
     gap: var(--s-3);
   }
@@ -130,6 +128,18 @@
   }
   .nav-link--secondary {
     display: none;
+  }
+}
+
+/* The menu button lives in the bar at every width now, so the wide layout has
+   to give it back the ~40px it takes: slightly tighter link padding and group
+   gaps, which keeps all seven links on one line. */
+@media (min-width: 1400px) {
+  .nav-inner {
+    gap: var(--s-3);
+  }
+  .nav-link {
+    padding: 8px 9px;
   }
 }
 
@@ -163,6 +173,9 @@
   opacity: 1;
   visibility: visible;
   transform: none;
+  /* Flip visibility at once on the way in, so the panel can take focus on the
+     frame it opens. On the way out it still waits for the fade. */
+  transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease), visibility 0s;
 }
 .mobile-menu a:not(.btn) {
   display: flex;
@@ -177,9 +190,29 @@
 .mobile-menu .btn {
   margin-top: var(--s-3);
 }
+/* The menu is a drawer at every width now, not a small-screen fallback: the
+   three-line button is in the bar on a phone and on a 4K monitor alike. */
+.mobile-menu-close {
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin: calc(-1 * var(--s-2)) 0 var(--s-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+.mobile-menu-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
 @media (min-width: 960px) {
   .mobile-menu {
-    display: none !important;
+    max-width: 460px;
+    right: auto;
+    border-right: 1px solid var(--line);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
   }
 }
 
