@@ -5,11 +5,12 @@
 import { qs, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { money, date, dateTime, timeAgo, initials, statusLabel } from "../../../lib/format.js";
-import { adminApi } from "../api.js";
+import { adminApi, peopleMeta } from "../api.js";
 import { adminState } from "../shell.js";
 import { emptyState } from "../../dashboard/components.js";
 import { openModal, formDialog, confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
+import { presenceDot, presenceLabel, presenceState } from "../../../ui/presence.js";
 
 const PLAN_FILTERS = ["all", "free", "pro", "enterprise"];
 
@@ -23,7 +24,7 @@ export default async function render(root, { state }) {
     <div class="admin-head">
       <div>
         <h1>Customers</h1>
-        <p>Every registered account with its business profile, plan and usage. Data comes from profiles, businesses, subscriptions and onboarding_progress.</p>
+        <p>Every business owner, with the business they run, their plan and their usage. Freelancers and agents have their own section.</p>
       </div>
       <div class="admin-filters">
         <div class="admin-tabs" id="plan-filter">
@@ -81,8 +82,15 @@ export default async function render(root, { state }) {
   async function load() {
     try {
       const response = await adminApi.customers({ search, limit: 100 });
-      rows = response.customers || [];
-      qs("#customer-count").textContent = `${response.total ?? rows.length} accounts${search ? ` matching “${search}”` : ""}`;
+      const all = response.customers || [];
+      /* One extra read gives every row its handle, its account kind and its
+         heartbeat. Accounts that work as agents are not customers of a business
+         here — they are listed under Freelancers. */
+      const meta = await peopleMeta(all.map((row) => row.id));
+      rows = all
+        .map((row) => ({ ...row, ...(meta.get(row.id) || {}) }))
+        .filter((row) => row.account_type !== "agent");
+      qs("#customer-count").textContent = `${rows.length} business accounts${search ? ` matching “${search}”` : ""}`;
       paint();
     } catch (error) {
       safeSet("#customer-table", `<div class="admin-empty">${esc(error.message || "Could not load customers.")}</div>`);
@@ -106,9 +114,14 @@ export default async function render(root, { state }) {
               (row) => `<tr>
                 <td>
                   <div class="customer-cell">
-                    <span class="avatar">${esc(initials(row.name || row.email))}</span>
+                    <span class="customer-avatar">
+                      <span class="avatar">${esc(initials(row.name || row.email))}</span>
+                      ${presenceDot(row.last_seen_at, { size: 10 })}
+                    </span>
                     <div><strong>${esc(row.name || "Unnamed")}</strong><span>${esc(row.email || "")}${
                 row.phone ? ` · ${esc(row.phone)}` : ""
+              }</span><span class="cell-sub">${esc(presenceLabel(presenceState(row.last_seen_at)))}${
+                row.username ? ` · @${esc(row.username)}` : ""
               }</span></div>
                   </div>
                 </td>
@@ -116,7 +129,13 @@ export default async function render(root, { state }) {
                 <td><span class="badge badge-${row.plan === "enterprise" ? "brand" : row.plan === "pro" ? "ok" : "neutral"}">${esc(row.plan)}</span></td>
                 <td>${row.ai_used} / ${row.ai_limit}</td>
                 <td>${row.projects}${row.published ? ` <span class="dim">(${row.published} live)</span>` : ""}</td>
-                <td>${row.onboarded ? `<span class="badge badge-ok">Complete</span>` : `<span class="badge badge-warn">Step ${row.onboarding_step}</span>`}</td>
+                <td>${
+                  row.onboarded
+                    ? `<span class="badge badge-ok">Complete</span>`
+                    : Number.isFinite(Number(row.onboarding_step))
+                      ? `<span class="badge badge-warn">Step ${Number(row.onboarding_step)}</span>`
+                      : `<span class="badge badge-neutral">Not started</span>`
+                }</td>
                 <td class="dim">${esc(timeAgo(row.joined))}</td>
                 <td class="cell-actions"><button class="btn btn-secondary btn-sm" data-open="${esc(row.id)}">Open</button></td>
               </tr>`

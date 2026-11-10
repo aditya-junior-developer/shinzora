@@ -18,6 +18,7 @@ import { qs, delegate, esc, on, debounce } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { pageHead, emptyState, skeletonView, avatar } from "../components.js";
+import { presenceDot, presenceLabel, presenceState } from "../../../ui/presence.js";
 import { openModal } from "../../../ui/modal.js";
 import { toastError } from "../../../ui/toast.js";
 
@@ -83,9 +84,15 @@ function paint(root) {
 /* A real photo when one was uploaded, initials when not. Same classes either
    way, so a mixed roster still lines up. */
 function personAvatar(person, size = "lg") {
-  if (!person || !person.avatarUrl) return avatar(person?.name, null, size);
-  const variant = size.startsWith("avatar-") ? size : `avatar-${size}`;
-  return `<span class="avatar ${variant} ft-avatar"><img src="${esc(person.avatarUrl)}" alt="" loading="lazy" /></span>`;
+  const picture = (() => {
+    if (!person || !person.avatarUrl) return avatar(person?.name, null, size);
+    const variant = size.startsWith("avatar-") ? size : `avatar-${size}`;
+    return `<span class="avatar ${variant} ft-avatar"><img src="${esc(person.avatarUrl)}" alt="" loading="lazy" /></span>`;
+  })();
+  /* The dot sits under the picture, the same place it sits everywhere else.
+     `lastSeenAt` comes from find_team_search (0033). */
+  if (!person) return picture;
+  return `<span class="presence-wrap">${picture}${presenceDot(person.lastSeenAt, { size: 11 })}</span>`;
 }
 
 const pill = (text, tone = "") => `<span class="ft-pill${tone ? ` ${tone}` : ""}">${esc(text)}</span>`;
@@ -124,7 +131,9 @@ function paintResults(root) {
             ${personAvatar(person, "lg")}
             <div class="ft-ident">
               <h3 class="ft-name">${esc(person.name)}</h3>
-              <div class="ft-handle">@${esc(person.username || "no-handle")}</div>
+              <div class="ft-handle">@${esc(person.username || "no-handle")}${
+                person.lastSeenAt ? `<span class="ft-seen"> · ${esc(presenceLabel(presenceState(person.lastSeenAt)))}</span>` : ""
+              }</div>
             </div>
             ${person.availability ? pill(person.availability, available ? "is-available" : "") : ""}
           </div>

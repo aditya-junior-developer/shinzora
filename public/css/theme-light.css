@@ -1,0 +1,467 @@
+/* ==========================================================================
+   Shinzora — the light theme
+   --------------------------------------------------------------------------
+   The dark theme is the default and lives in tokens.css. This file is the other
+   one: a warm off-white paper, ink-dark text, and the same purple as the accent
+   so a workspace looks like the same product in both.
+
+   It is a *theme*, not a second design system: the token names are identical and
+   nothing here introduces a new component. What it does do is correct the parts
+   of the dark stylesheets that were written with literal white-alpha values
+   rather than tokens — those are listed at the bottom, one selector each, and
+   they are the whole reason light mode needed a file of its own.
+
+   Enabled by `<html data-theme="daylight">`, which the boot script sets from the
+   saved preference before first paint so there is no flash of the wrong theme.
+   ========================================================================== */
+
+:root[data-theme="daylight"] {
+  color-scheme: light;
+
+  /* ---- Surfaces: warm paper, not pure white ---------------------------- */
+  /* #fbf7f4 rather than #ffffff: a full-white field at full brightness is the
+     single most common cause of "my eyes hurt" on a light theme, and the warm
+     tint costs nothing in legibility. */
+  --void: #f4eee9;
+  --base: #fbf7f4;
+  --base-elev: #fffdfb;
+  --panel: #fffdfb;
+  --panel-2: #f8f2ee;
+  --panel-3: #f1e9e4;
+  --ink-glass: rgba(255, 253, 251, 0.78);
+  --ink-glass-strong: rgba(255, 253, 251, 0.94);
+
+  /* ---- Brand: the same purple, deepened so it holds on paper ------------ */
+  --purple-900: #2b1055;
+  --purple-800: #3d1473;
+  --purple-700: #4f1d91;
+  --purple-600: #6425b8;
+  --purple-500: #6d28d9;
+  --purple-400: #7c3aed;
+  --violet: #7c3aed;
+  --violet-soft: #6d28d9;
+  --lavender: #5b21b6;
+  --lavender-dim: #6b6480;
+
+  /* ---- Text ------------------------------------------------------------- */
+  --white: #17121f;
+  --text: #221c2c;
+  --text-2: #4d4459;
+  --text-3: #5f566d; /* 7.1:1 on --base */
+  --text-4: #6b6279;
+
+  /* ---- Lines ------------------------------------------------------------ */
+  --line: rgba(34, 28, 44, 0.1);
+  --line-strong: rgba(34, 28, 44, 0.18);
+  --line-violet: rgba(109, 40, 217, 0.32);
+  --line-violet-soft: rgba(109, 40, 217, 0.16);
+
+  /* ---- Status ----------------------------------------------------------- */
+  --ok: #047857;
+  --ok-dim: rgba(4, 120, 87, 0.1);
+  --warn: #b45309;
+  --warn-dim: rgba(180, 83, 9, 0.1);
+  --danger: #be123c;
+  --danger-dim: rgba(190, 18, 60, 0.08);
+  --info: #1d4ed8;
+  --info-dim: rgba(29, 78, 216, 0.08);
+
+  /* ---- Gradients -------------------------------------------------------- */
+  --grad-brand: linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(190, 24, 93, 0.08));
+  --grad-sheen: linear-gradient(180deg, rgba(34, 28, 44, 0.05), rgba(34, 28, 44, 0) 62%);
+  --grad-panel: linear-gradient(168deg, #fffdfb 0%, #fdf8f5 60%, #faf3ef 100%);
+  --grad-text: linear-gradient(102deg, #221c2c 12%, #4c1d95 52%, #7c3aed 88%);
+  --grad-line: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.4), transparent);
+
+  /* ---- Atmosphere: a soft rose wash instead of a violet glow ------------ */
+  --glow-violet: radial-gradient(60% 60% at 50% 0%, rgba(190, 24, 93, 0.1), transparent 72%);
+  --glow-soft: radial-gradient(50% 50% at 50% 50%, rgba(124, 58, 237, 0.08), transparent 70%);
+
+  /* ---- Elevation: warm shadows, never pure black ------------------------ */
+  --shadow-xs: 0 1px 2px rgba(60, 40, 30, 0.08);
+  --shadow-sm: 0 2px 8px rgba(60, 40, 30, 0.08);
+  --shadow-md: 0 12px 28px -14px rgba(60, 40, 30, 0.22);
+  --shadow-lg: 0 24px 56px -26px rgba(60, 40, 30, 0.28);
+  --shadow-violet: 0 20px 48px -26px rgba(124, 58, 237, 0.38);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  /* The three places the corrections below would otherwise hard-code a colour,
+     so the second light theme can differ without a second copy of them. */
+  --sidebar-grad: linear-gradient(180deg, #fdf9f6 0%, #f7efe9 100%);
+  --topbar-glass: rgba(251, 247, 244, 0.86);
+  --scrim: rgba(60, 40, 30, 0.32);
+  --field: #ffffff;
+  --hover-tint: rgba(34, 28, 44, 0.06);
+}
+
+/* --------------------------------------------------------------------------
+   Blossom — the third theme: white, pink and purple
+   --------------------------------------------------------------------------
+   Where Daylight is paper, Blossom is a clean white page with the brand's pink
+   and purple in the light. Same tokens, same components; only the palette and
+   the three literals above move. It is deliberately not a saturated theme: the
+   pink appears in washes and rules, never behind body text.
+   -------------------------------------------------------------------------- */
+:root[data-theme="blossom"] {
+  color-scheme: light;
+
+  /* ---- Surfaces: white with the faintest rose-violet cast -------------- */
+  --void: #f6f2fb;
+  --base: #fdfbff;
+  --base-elev: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #faf6ff;
+  --panel-3: #f4ecfd;
+  --ink-glass: rgba(255, 255, 255, 0.8);
+  --ink-glass-strong: rgba(255, 255, 255, 0.95);
+
+  /* ---- Brand: purple kept, pink added as the second accent -------------- */
+  --purple-900: #3b0764;
+  --purple-800: #581c87;
+  --purple-700: #6b21a8;
+  --purple-600: #7e22ce;
+  --purple-500: #7c3aed;
+  --purple-400: #8b5cf6;
+  --violet: #7c3aed;
+  --violet-soft: #6d28d9;
+  --lavender: #5b21b6;
+  --lavender-dim: #746b86;
+
+  /* ---- Text ------------------------------------------------------------- */
+  --white: #1b1226;
+  --text: #241a30;
+  --text-2: #4f4563;
+  --text-3: #605572;  /* 7.2:1 on --base */
+  --text-4: #6d6280;
+
+  /* ---- Lines ------------------------------------------------------------ */
+  --line: rgba(36, 26, 48, 0.1);
+  --line-strong: rgba(36, 26, 48, 0.18);
+  --line-violet: rgba(219, 39, 119, 0.3);
+  --line-violet-soft: rgba(124, 58, 237, 0.16);
+
+  /* ---- Status ----------------------------------------------------------- */
+  --ok: #047857;
+  --ok-dim: rgba(4, 120, 87, 0.1);
+  --warn: #b45309;
+  --warn-dim: rgba(180, 83, 9, 0.1);
+  --danger: #be123c;
+  --danger-dim: rgba(190, 18, 60, 0.08);
+  --info: #1d4ed8;
+  --info-dim: rgba(29, 78, 216, 0.08);
+
+  /* ---- Gradients: purple into pink -------------------------------------- */
+  --grad-brand: linear-gradient(135deg, #7c3aed 0%, #a21caf 55%, #db2777 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(219, 39, 119, 0.1));
+  --grad-sheen: linear-gradient(180deg, rgba(36, 26, 48, 0.045), rgba(36, 26, 48, 0) 62%);
+  --grad-panel: linear-gradient(168deg, #ffffff 0%, #fdf9ff 58%, #fbf3fd 100%);
+  --grad-text: linear-gradient(102deg, #241a30 12%, #7e22ce 52%, #db2777 88%);
+  --grad-line: linear-gradient(90deg, transparent, rgba(219, 39, 119, 0.36), transparent);
+
+  /* ---- Atmosphere ------------------------------------------------------- */
+  --glow-violet: radial-gradient(60% 60% at 50% 0%, rgba(219, 39, 119, 0.09), transparent 72%);
+  --glow-soft: radial-gradient(50% 50% at 50% 50%, rgba(124, 58, 237, 0.08), transparent 70%);
+
+  /* ---- Elevation: violet-tinted, still soft ----------------------------- */
+  --shadow-xs: 0 1px 2px rgba(76, 29, 149, 0.07);
+  --shadow-sm: 0 2px 8px rgba(76, 29, 149, 0.08);
+  --shadow-md: 0 12px 28px -14px rgba(76, 29, 149, 0.2);
+  --shadow-lg: 0 24px 56px -26px rgba(76, 29, 149, 0.26);
+  --shadow-violet: 0 20px 48px -26px rgba(219, 39, 119, 0.32);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --sidebar-grad: linear-gradient(180deg, #fdfaff 0%, #f7effd 100%);
+  --topbar-glass: rgba(253, 251, 255, 0.86);
+  --scrim: rgba(45, 20, 60, 0.3);
+  --field: #ffffff;
+  --hover-tint: rgba(36, 26, 48, 0.06);
+}
+
+/* --------------------------------------------------------------------------
+   Corrections for literals
+   The dark stylesheets paint glass with rgba(255,255,255,...), which on paper
+   is invisible. These are the surfaces a person actually stares at.
+   -------------------------------------------------------------------------- */
+
+:root[data-tone="light"] body {
+  background: var(--base);
+  color: var(--text);
+}
+
+:root[data-tone="light"] .app-sidebar,
+:root[data-tone="light"] .admin-sidebar {
+  background: var(--sidebar-grad);
+  border-right-color: var(--line);
+}
+
+:root[data-tone="light"] .app-topbar,
+:root[data-tone="light"] .admin-topbar {
+  background: var(--topbar-glass);
+  border-bottom-color: var(--line);
+}
+
+:root[data-tone="light"] .card,
+:root[data-tone="light"] .admin-card,
+:root[data-tone="light"] .plan-card,
+:root[data-tone="light"] .panel,
+:root[data-tone="light"] .stat-card {
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+:root[data-tone="light"] .input,
+:root[data-tone="light"] .textarea,
+:root[data-tone="light"] .select,
+:root[data-tone="light"] select,
+:root[data-tone="light"] textarea,
+:root[data-tone="light"] input[type="text"],
+:root[data-tone="light"] input[type="email"],
+:root[data-tone="light"] input[type="password"],
+:root[data-tone="light"] input[type="search"],
+:root[data-tone="light"] input[type="number"],
+:root[data-tone="light"] input[type="url"] {
+  background: var(--field);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+:root[data-tone="light"] .btn-ghost:hover,
+:root[data-tone="light"] .topbar-icon:hover,
+:root[data-tone="light"] .topbar-toggle:hover,
+:root[data-tone="light"] .icon-btn:hover,
+:root[data-tone="light"] .menu-item:hover,
+:root[data-tone="light"] .sidebar-close:hover {
+  background: rgba(34, 28, 44, 0.06);
+  color: var(--text);
+}
+
+:root[data-tone="light"] .btn-secondary {
+  background: var(--field);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+:root[data-tone="light"] .btn-primary {
+  color: #ffffff;
+}
+
+:root[data-tone="light"] .menu,
+:root[data-tone="light"] .dropdown,
+:root[data-tone="light"] .modal,
+:root[data-tone="light"] .drawer {
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: var(--shadow-lg);
+}
+
+:root[data-tone="light"] .modal-backdrop,
+:root[data-tone="light"] .sidebar-scrim,
+:root[data-tone="light"] .admin-scrim,
+:root[data-tone="light"] .drawer-scrim {
+  background: var(--scrim);
+}
+
+:root[data-tone="light"] .chat-item.is-active,
+:root[data-tone="light"] .settings-nav-item.is-active,
+:root[data-tone="light"] .sidebar-link.is-active,
+:root[data-tone="light"] .admin-nav-link.is-active {
+  background: rgba(124, 58, 237, 0.1);
+  color: #4c1d95;
+}
+
+:root[data-tone="light"] .bubble,
+:root[data-tone="light"] .bubble-mine {
+  color: var(--text);
+}
+
+:root[data-tone="light"] .bubble-mine {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.2);
+}
+
+:root[data-tone="light"] .badge-ok {
+  color: #065f46;
+}
+
+:root[data-tone="light"] .badge-warn {
+  color: #92400e;
+}
+
+:root[data-tone="light"] .table th,
+:root[data-tone="light"] .admin-table th {
+  background: var(--panel-2);
+  color: var(--text-2);
+}
+
+:root[data-tone="light"] .table tr:hover td,
+:root[data-tone="light"] .admin-table tr:hover td {
+  background: rgba(124, 58, 237, 0.05);
+}
+
+/* The theme picker itself — three swatches, no copy to misread. */
+.theme-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-3);
+}
+
+.theme-choice {
+  display: grid;
+  gap: 10px;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.theme-choice:hover {
+  border-color: var(--line-violet);
+}
+
+.theme-choice[aria-pressed="true"] {
+  border-color: var(--line-violet);
+  box-shadow: 0 0 0 1px var(--line-violet) inset;
+}
+
+.theme-choice[aria-pressed="true"] .theme-choice-name::after {
+  content: " · current";
+  color: var(--violet-soft);
+  font-weight: 500;
+}
+
+.theme-choice-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.theme-choice-swatch {
+  display: flex;
+  height: 46px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.theme-choice-swatch span {
+  flex: 1;
+}
+
+.theme-choice-note {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- presence */
+
+.presence {
+  --presence-color: var(--text-4);
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--presence-color);
+  flex: none;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.presence-active {
+  --presence-color: #22c55e;
+}
+
+.presence-recent {
+  --presence-color: #f59e0b;
+}
+
+/* Offline is a ring with a cross, not a dim dot: it reads at 8px and it does not
+   depend on telling green from amber. */
+.presence-offline {
+  background: transparent;
+  border: 1.5px solid var(--text-4);
+  box-shadow: none;
+  position: relative;
+}
+
+.presence-offline::before,
+.presence-offline::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 12%;
+  width: 76%;
+  height: 1.5px;
+  background: var(--text-4);
+  transform-origin: center;
+}
+
+.presence-offline::before { transform: translateY(-50%) rotate(45deg); }
+.presence-offline::after { transform: translateY(-50%) rotate(-45deg); }
+
+.presence-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  flex: none;
+  background: var(--grad-brand-soft);
+  border: 1px solid var(--line-violet-soft);
+  color: var(--lavender);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  overflow: visible;
+}
+
+.presence-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.presence-avatar-initials {
+  line-height: 1;
+}
+
+/* Bottom-left, as asked: under the picture rather than on the shoulder. */
+.presence-avatar .presence {
+  position: absolute;
+  left: -1px;
+  bottom: -1px;
+}
+
+/* Alerts: the dark stylesheet tints them with pale, high-luminance text that
+   reads on black and disappears on paper. Each tone is re-cut for light. */
+:root[data-tone="light"] .alert {
+  background: var(--panel-2);
+  border-color: var(--line-strong);
+  color: var(--text-2);
+}
+:root[data-tone="light"] .alert strong,
+:root[data-tone="light"] .alert-title {
+  color: var(--text);
+}
+:root[data-tone="light"] .alert-info {
+  background: var(--info-dim);
+  border-color: rgba(29, 78, 216, 0.24);
+  color: #1e40af;
+}
+:root[data-tone="light"] .alert-warn {
+  background: var(--warn-dim);
+  border-color: rgba(180, 83, 9, 0.26);
+  color: #92400e;
+}
+:root[data-tone="light"] .alert-danger {
+  background: var(--danger-dim);
+  border-color: rgba(190, 18, 60, 0.24);
+  color: #9f1239;
+}
+:root[data-tone="light"] .alert-ok {
+  background: var(--ok-dim);
+  border-color: rgba(4, 120, 87, 0.24);
+  color: #065f46;
+}
+

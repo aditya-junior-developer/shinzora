@@ -15,11 +15,11 @@
 <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="stylesheet" href="/css/tokens.css?v=20261110k" />
-<link rel="stylesheet" href="/css/components.css?v=20261110k" />
-<link rel="stylesheet" href="/css/marketing.css?v=20261110k" />
-<link rel="stylesheet" href="/css/marketing-sections.css?v=20261110k" />
-<link rel="stylesheet" href="/css/fx.css?v=20261110k" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261104a" />
+<link rel="stylesheet" href="/css/components.css?v=20261104a" />
+<link rel="stylesheet" href="/css/marketing.css?v=20261104a" />
+<link rel="stylesheet" href="/css/marketing-sections.css?v=20261104a" />
+<link rel="stylesheet" href="/css/fx.css?v=20261104a" />
 <script src="/js/config/runtime.js"></script>
 </head>
 <body>
@@ -1013,77 +1013,12 @@
   </section>
 </main>
 
-<!-- =============================== FOOTER ================================ -->
-<footer class="site-footer">
-  <div class="container">
-    <div class="footer-grid">
-      <div class="footer-brand">
-        <a class="nav-brand" href="/" aria-label="Shinzora home">
-          <span class="brand-mark" aria-hidden="true"><img src="/assets/icons/mark.png" alt="" width="30" height="30" decoding="async" /></span>
-          <span class="brand-word">SHINZORA</span>
-        </a>
-        <p>Your business. Built, powered and managed with intelligence. A platform for founders who want one system
-          instead of eleven.</p>
-      </div>
-      <div class="footer-col">
-        <h3 class="footer-col-title">Product</h3>
-        <ul>
-          <li><a href="#ai-builder">AI website builder</a></li>
-          <li><a href="#operations">Business OS</a></li>
-          <li><a href="#platform">Platform overview</a></li>
-          <li><a href="#services">Human services</a></li>
-          <li><a href="#pricing">Pricing</a></li>
-          <li><a href="/docs/">Documentation</a></li>
-          <li><a href="/download/">Applications</a></li>
-          <li><a href="/install/">Install as an app</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h3 class="footer-col-title">Account</h3>
-        <ul>
-          <li><a href="/auth/signup/">Create account</a></li>
-          <li><a href="/auth/login/">Sign in</a></li>
-          <li><a href="/auth/forgot-password/">Reset password</a></li>
-          <li><a href="/app/">Dashboard</a></li>
-          <li><a href="/system-check/">System status</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h3 class="footer-col-title">Company</h3>
-        <ul>
-          <li><a href="#contact">Contact</a></li>
-          <li><a href="#faq">FAQ</a></li>
-          <li><a href="/legal/terms/">Terms of service</a></li>
-          <li><a href="/legal/privacy/">Privacy policy</a></li>
-          <li><a href="/legal/refunds/">Refund policy</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <button class="footer-motion" type="button" data-motion-toggle aria-pressed="false">
-        <i data-icon="pause" data-size="13"></i><span data-motion-label>Pause motion</span>
-      </button>
-      <span class="footer-copyright">© <span data-year>2026</span> Shinzora. All rights reserved.</span>
-      <nav class="footer-social" aria-label="Shinzora on social platforms">
-        <a class="footer-social-link" href="https://www.instagram.com/shinzora.ai/" target="_blank" rel="noopener noreferrer"
-           aria-label="Shinzora on Instagram (opens in a new tab)" title="Instagram"><i data-icon="instagram" data-size="16"></i></a>
-        <a class="footer-social-link" href="https://www.youtube.com/@ai.shinzora" target="_blank" rel="noopener noreferrer"
-           aria-label="Shinzora on YouTube (opens in a new tab)" title="YouTube"><i data-icon="youtube" data-size="16"></i></a>
-        <a class="footer-social-link" href="http://wa.me/917703815245?text=hello%20shinzora" target="_blank" rel="noopener noreferrer"
-           aria-label="Chat with Shinzora on WhatsApp (opens in a new tab)" title="WhatsApp"><i data-icon="whatsapp" data-size="16"></i></a>
-        <a class="footer-social-link" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=official.shinzora%40proton.me"
-           aria-label="Email Shinzora at official.shinzora@proton.me" title="Email"><i data-icon="mail" data-size="16"></i></a>
-      </nav>
-      <div class="footer-legal">
-        <a href="/legal/terms/">Terms</a>
-        <a href="/legal/privacy/">Privacy</a>
-        <a href="/legal/refunds/">Refunds</a>
-        <a href="/legal/acceptable-use/">Acceptable use</a>
-        <a href="/system-check/">System status</a>
-      </div>
-    </div>
-  </div>
-</footer>
+<div class="legal-strip">
+  <a href="/legal/terms/">Terms</a><span aria-hidden="true">·</span><a href="/legal/privacy/">Privacy</a><span aria-hidden="true">·</span><a href="/legal/refunds/">Refunds</a><span aria-hidden="true">·</span><a href="/legal/acceptable-use/">Acceptable use</a><span aria-hidden="true">·</span><a href="https://wa.me/917703815245?text=hello%20shinzora" target="_blank" rel="noopener noreferrer">WhatsApp</a><span aria-hidden="true">·</span><a href="https://www.instagram.com/shinzora.ai/" target="_blank" rel="noopener noreferrer">Instagram</a><span aria-hidden="true">·</span><a href="/system-check/">System status</a>
+  <button class="legal-motion" type="button" data-motion-toggle aria-pressed="false">
+    <span data-motion-label>Pause motion</span>
+  </button>
+</div>
 
 <div class="install-prompt" id="install-prompt" hidden>
   <img src="/assets/icons/icon-192.png" alt="" width="38" height="38" />
@@ -1100,7 +1035,7 @@
 </div>
 
 <script src="/js/vendor/supabase-js.js"></script>
-<script type="module" src="/js/boot/site-auth.js?v=20261110k"></script>
-<script type="module" src="/js/boot/landing.js?v=20261110k"></script>
+<script type="module" src="/js/boot/site-auth.js?v=20261104a"></script>
+<script type="module" src="/js/boot/landing.js?v=20261104a"></script>
 </body>
 </html>

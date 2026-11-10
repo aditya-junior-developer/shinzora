@@ -17,6 +17,7 @@ import { icon } from "../../../lib/icons.js";
 import { date } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { pageHead, emptyState, skeletonView, avatar } from "../components.js";
+import { presenceDot } from "../../../ui/presence.js";
 import { toast, toastError } from "../../../ui/toast.js";
 
 const rpc = async (name, args = {}) => {
@@ -225,7 +226,13 @@ function paintStream(stream, scroll) {
       previous = m;
       return `${separator}
       <div class="cm-msg ${m.authorId === selfId ? "is-self" : ""} ${same ? "is-continuation" : ""}">
-        ${same ? `<span class="cm-msg-gutter" aria-hidden="true"></span>` : avatar(m.authorName, null, "sm")}
+        ${
+          same
+            ? `<span class="cm-msg-gutter" aria-hidden="true"></span>`
+            : `<span class="presence-wrap">${avatar(m.authorName, null, "sm")}${presenceDot(m.lastSeenAt, {
+                size: 9
+              })}</span>`
+        }
         <div class="cm-msg-main">
           ${
             same

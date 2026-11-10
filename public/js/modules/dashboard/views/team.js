@@ -19,6 +19,7 @@ import { icon } from "../../../lib/icons.js";
 import { timeAgo } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { pageHead, emptyState, skeletonView, avatar } from "../components.js";
+import { presenceDot, presenceLabel, presenceState } from "../../../ui/presence.js";
 import { toast, toastError } from "../../../ui/toast.js";
 
 const rpc = async (name, args = {}) => {
@@ -84,7 +85,7 @@ function paint(root) {
         ${avatar(business.name, null, "lg")}
         <div>
           <div class="team-head-name">${esc(business.name || "Business")}</div>
-          <div class="mk-note">${members.length} ${members.length === 1 ? "member" : "members"} · you are the ${esc(business.role || "member")}</div>
+          <div class="mk-note"><span id="team-count">${members.length} ${members.length === 1 ? "member" : "members"}</span> · you are the ${esc(business.role || "member")}</div>
         </div>
       </div>
     </div>
@@ -142,6 +143,23 @@ function paint(root) {
   delegate(root, "click", "[data-invite-email]", (_event, button) => inviteEmail(root, button.dataset.inviteEmail, button));
   delegate(root, "click", "[data-revoke]", (_event, button) => revoke(root, button.dataset.revoke, button));
   delegate(root, "click", "[data-remove]", (_event, button) => removeMember(root, button.dataset.remove, button));
+
+  /* Message a teammate: the same personal conversation the Messages screen
+     opens, reached from the row of the person you are looking at. It creates or
+     reuses the thread server-side, then hands over to Messages with it open. */
+  delegate(root, "click", "[data-team-message]", async (_event, button) => {
+    const username = button.dataset.teamMessage;
+    if (!username) return;
+    button.disabled = true;
+    try {
+      const result = await sb.rpc("dm_start", { p_username: username });
+      if (result.error) throw result.error;
+      location.href = `/app/?view=messages&c=${encodeURIComponent(result.data.conversationId)}`;
+    } catch (error) {
+      button.disabled = false;
+      toastError(normalizeError(error));
+    }
+  });
 }
 
 async function loadTeam(root) {
@@ -158,6 +176,10 @@ async function loadTeam(root) {
 function paintMembers(root) {
   const box = qs("#team-members", root);
   if (!box) return;
+  /* The head is painted before the list arrives, so it used to say "0 members"
+     next to three of them. It is updated here, where the number is known. */
+  const count = qs("#team-count", root);
+  if (count) count.textContent = `${members.length} ${members.length === 1 ? "member" : "members"}`;
   if (!members.length) {
     box.innerHTML = `<p class="muted">No members yet. Invite the first person above.</p>`;
     return;
@@ -165,14 +187,20 @@ function paintMembers(root) {
   box.innerHTML = `<ul class="team-list">${members
     .map(
       (member) => `<li class="team-row">
-        ${avatar(member.fullName, null, "sm")}
+        <span class="team-avatar-wrap">
+          ${avatar(member.fullName, member.avatarUrl || null, "sm")}
+          ${presenceDot(member.lastSeenAt, { size: 9 })}
+        </span>
         <div class="team-row-main">
           <div class="team-row-name">${esc(member.fullName || "Member")}${member.isOwner ? ` <span class="badge badge-neutral">Owner</span>` : ""}</div>
-          <div class="mk-note">${member.username ? `@${esc(member.username)} · ` : ""}${esc(member.memberType || "member")}${member.joinedAt ? ` · joined ${esc(timeAgo(member.joinedAt))}` : ""}</div>
+          <div class="mk-note">${member.username ? `@${esc(member.username)} · ` : ""}${esc(member.memberType || "member")}${member.joinedAt ? ` · joined ${esc(timeAgo(member.joinedAt))}` : ""} · ${esc(presenceLabel(presenceState(member.lastSeenAt)))}</div>
         </div>
-        ${isOwner() && !member.isOwner
-          ? `<button class="btn btn-ghost btn-sm" data-remove="${esc(member.userId)}">Remove</button>`
-          : ""}
+        <div class="team-row-actions">
+          ${member.username ? `<button class="btn btn-secondary btn-sm" data-team-message="${esc(member.username)}">${icon("message-square", { size: 13 })}Message</button>` : ""}
+          ${isOwner() && !member.isOwner
+            ? `<button class="btn btn-ghost btn-sm" data-remove="${esc(member.userId)}">Remove</button>`
+            : ""}
+        </div>
       </li>`
     )
     .join("")}</ul>`;

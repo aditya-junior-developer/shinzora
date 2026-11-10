@@ -9,11 +9,26 @@
   <meta name="theme-color" content="#08060d" />
   <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/css/tokens.css?v=20261110k" />
-  <link rel="stylesheet" href="/css/components.css?v=20261110k" />
-  <link rel="stylesheet" href="/css/app.css?v=20261110k" />
-  <link rel="stylesheet" href="/css/views.css?v=20261110k" />
-  <link rel="stylesheet" href="/css/admin.css?v=20261110k" />
+  <link rel="stylesheet" href="/css/tokens.css?v=20261104a" />
+  <link rel="stylesheet" href="/css/components.css?v=20261104a" />
+  <link rel="stylesheet" href="/css/app.css?v=20261104a" />
+  <link rel="stylesheet" href="/css/views.css?v=20261104a" />
+  <link rel="stylesheet" href="/css/admin.css?v=20261104a" />
+<link rel="stylesheet" href="/css/theme-light.css?v=20261104a" />
+<script>
+/* The saved theme is applied before the first paint. A stylesheet swap after
+   load would flash the dark theme at somebody who chose the light one, so this
+   is the one script that has to run inline, ahead of everything else. */
+(function () {
+  try {
+    var theme = localStorage.getItem("shinzora:theme");
+    if (theme === "blossom" || theme === "daylight" || theme === "midnight") {
+      document.documentElement.setAttribute("data-theme", theme);
+      document.documentElement.setAttribute("data-tone", theme === "midnight" ? "dark" : "light");
+    }
+  } catch (error) { /* storage blocked: keep the default theme */ }
+})();
+</script>
 </head>
 <body class="admin">
   <!-- Access is decided server-side before this panel is ever shown. There is no
@@ -78,6 +93,6 @@
   </div>
 
   <script src="/js/vendor/supabase-js.js"></script>
-  <script type="module" src="/js/boot/admin.js?v=20261110k"></script>
+  <script type="module" src="/js/boot/admin.js?v=20261104a"></script>
 </body>
 </html>

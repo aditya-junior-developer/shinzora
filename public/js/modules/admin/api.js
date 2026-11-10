@@ -78,3 +78,22 @@ export const adminApi = {
   audit: (params) => call("audit", params),
   monitor: () => call("monitor")
 };
+
+/* --------------------------------------------------------------------------
+   Presence and account kind for a set of accounts.
+
+   Read directly from `profiles` rather than through the admin function: the
+   admins' RLS policy already allows selecting every profile, and the alternative
+   is redeploying a 500-line Edge Function to add two columns to one response.
+   Only three columns are asked for, and only for ids the console is already
+   showing.
+   -------------------------------------------------------------------------- */
+export async function peopleMeta(ids = []) {
+  if (!sb || !ids.length) return new Map();
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id, username, account_type, last_seen_at")
+    .in("id", ids.slice(0, 200));
+  if (error) return new Map();
+  return new Map((data || []).map((row) => [row.id, row]));
+}

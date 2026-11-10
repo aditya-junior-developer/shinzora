@@ -8,6 +8,7 @@
 
 import { sb, getSession, normalizeError } from "./supabase.js";
 import { PLAN_LIMITS, planById } from "../config/env.js";
+import { adoptProfileTheme } from "../ui/theme.js";
 
 export const state = {
   session: null,
@@ -114,6 +115,10 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
   }
 
   state.profile = one(result.profile?.data);
+  /* The account's saved theme seeds a device that has never chosen one. The
+     inline pre-paint script has already painted the local preference, so this
+     only ever changes anything on a fresh browser. */
+  if (state.profile?.theme) adoptProfileTheme(state.profile.theme);
   state.business = one(result.business?.data);
   state.subscription = one(result.subscription?.data);
   state.onboarding = one(result.onboarding?.data);

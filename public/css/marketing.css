@@ -113,7 +113,7 @@
 
 /* Between the drawer breakpoint and a genuinely wide window there is not room
    for seven links, three actions and the menu button. The secondary links step
-   out of the bar — they stay in the footer and in the drawer — instead of
+   out of the bar — they stay in the drawer and the legal strip — instead of
    squeezing every label onto two lines. The ceiling moved up when the menu
    button became permanent. */
 @media (min-width: 960px) and (max-width: 1399px) {
@@ -709,7 +709,7 @@
     padding: 7px 9px;
   }
   /* The two header buttons plus the menu toggle do not fit on a 360px phone.
-     Sign-in is still reachable from the menu and the footer, so drop the ghost
+     Sign-in is still reachable from the menu, so drop the ghost
      button rather than letting the header push the page sideways. */
   .nav-actions .btn-ghost {
     display: none;

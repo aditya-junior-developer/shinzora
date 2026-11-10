@@ -29,6 +29,9 @@
   --panel-2: #151221;
   --panel-3: #1a1628;
   --ink-glass: rgba(20, 17, 32, 0.62);
+  /* Hover wash for rows and nav items: white on dark, ink on light. Rules read
+     this instead of hard-coding rgba(255,255,255,...), which vanishes on paper. */
+  --hover-tint: rgba(255, 255, 255, 0.05);
   --ink-glass-strong: rgba(14, 12, 23, 0.86);
 
   /* ---- Brand: purple / violet / lavender --------------------------------- */

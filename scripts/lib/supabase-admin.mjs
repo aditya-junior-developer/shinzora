@@ -131,7 +131,8 @@ export const APPLICATION_TABLES = [
   "team_conversation_members", "team_chat_messages",
   "freelancer_profiles", "marketplace_jobs", "marketplace_proposals",
   "marketplace_contracts", "marketplace_reviews", "marketplace_job_questions",
-  "freelancer_portfolio_items", "community_channels", "community_messages"
+  "freelancer_portfolio_items", "community_channels", "community_messages",
+  "referrals"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

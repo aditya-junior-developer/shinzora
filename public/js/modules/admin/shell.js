@@ -20,6 +20,7 @@ export const NAV = [
       { id: "overview", label: "Overview", icon: "layout-dashboard" },
       { id: "businesses", label: "Businesses", icon: "building-2" },
       { id: "customers", label: "Customers", icon: "users" },
+      { id: "freelancers", label: "Freelancers", icon: "briefcase" },
       { id: "payments", label: "Payments", icon: "receipt" },
       { id: "services", label: "Service requests", icon: "briefcase" },
       { id: "marketing", label: "Marketing requests", icon: "megaphone" }
@@ -50,6 +51,7 @@ const LOADERS = {
   overview: () => import("./views/overview.js"),
   businesses: () => import("./views/businesses.js"),
   customers: () => import("./views/customers.js"),
+  freelancers: () => import("./views/freelancers.js"),
   payments: () => import("./views/payments.js"),
   services: () => import("./views/payments.js"),
   subscriptions: () => import("./views/operations.js"),

@@ -1,6 +1,6 @@
 /* ==========================================================================
    Shinzora — marketing sections
-   Process, pricing, FAQ, contact, closing CTA, footer, PWA install prompt.
+   Process, pricing, FAQ, contact, closing CTA, legal strip, PWA install prompt.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -457,87 +457,60 @@
 }
 
 /* --------------------------------------------------------------------------
-   Footer
+   Legal strip
+
+   The footer that used to live here was four short columns of links under a
+   brand paragraph — a lot of page for very little. It is now the one thing a
+   visitor actually needs from it: the legal pages and a way to reach a human,
+   in a single line that wraps on a phone.
    -------------------------------------------------------------------------- */
-.site-footer {
-  position: relative;
-  border-top: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), transparent 40%);
-  padding-block: var(--s-9) var(--s-5);
-  margin-top: clamp(3rem, 2rem + 4vw, 6rem);
-}
-.footer-grid {
-  display: grid;
-  gap: var(--s-7);
-  grid-template-columns: 1fr;
-}
-@media (min-width: 700px) {
-  .footer-grid {
-    grid-template-columns: 1.4fr 1fr 1fr;
-  }
-}
-@media (min-width: 1000px) {
-  .footer-grid {
-    grid-template-columns: 1.8fr 1fr 1fr 1fr;
-  }
-}
-.footer-brand {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
-  max-width: 34ch;
-}
-.footer-brand img,
-.footer-brand svg {
-  height: 26px;
-  width: auto;
-  align-self: flex-start;
-}
-.footer-brand p {
-  font-size: var(--fs-sm);
-  color: var(--text-3);
-  line-height: 1.65;
-}
-.footer-col-title {
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-4);
-  margin-bottom: var(--s-3);
-  font-weight: 600;
-}
-.footer-col ul {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.footer-col a {
-  font-size: var(--fs-sm);
-  color: var(--text-2);
-  transition: color var(--t-fast) var(--ease);
-}
-.footer-col a:hover {
-  color: #fff;
-}
-.footer-bottom {
+.legal-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--s-4);
-  margin-top: var(--s-8);
-  padding-top: var(--s-5);
+  justify-content: center;
+  gap: 0.5rem 0.9rem;
+  max-width: 72rem;
+  margin: clamp(2.5rem, 2rem + 3vw, 4.5rem) auto 0;
+  padding: var(--s-5) var(--s-4) var(--s-7);
   border-top: 1px solid var(--line);
   font-size: var(--fs-xs);
   color: var(--text-4);
 }
-.footer-legal {
-  display: flex;
-  gap: var(--s-4);
-  flex-wrap: wrap;
+.legal-strip a {
+  color: var(--text-3);
+  transition: color var(--t-fast) var(--ease);
 }
-.footer-legal a:hover {
-  color: var(--text-2);
+.legal-strip a:hover,
+.legal-strip a:focus-visible {
+  color: var(--text);
+}
+.legal-strip .legal-motion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.legal-strip .legal-motion:hover,
+.legal-strip .legal-motion:focus-visible {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+.legal-strip .legal-motion[aria-pressed="true"] {
+  color: var(--violet-soft, #ddd0ff);
+  border-color: rgba(168, 85, 247, 0.42);
+}
+.legal-strip span[aria-hidden="true"] {
+  color: var(--text-4);
+  opacity: 0.6;
 }
 
 /* --------------------------------------------------------------------------
@@ -692,45 +665,3 @@
   text-decoration: underline;
 }
 
-/* Footer — social links beside the copyright.
-   Four destinations only, each with an accessible label, and a hover that
-   lifts the glyph without turning the footer into a light show. */
-.footer-social {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.footer-social-link {
-  display: inline-grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  color: var(--text-3);
-  transition:
-    color var(--t-fast) var(--ease),
-    border-color var(--t-fast) var(--ease),
-    background var(--t-fast) var(--ease),
-    transform var(--t-fast) var(--ease);
-}
-.footer-social-link:hover,
-.footer-social-link:focus-visible {
-  color: var(--text);
-  border-color: rgba(168, 85, 247, 0.42);
-  background: rgba(124, 58, 237, 0.14);
-  transform: translateY(-1px);
-}
-.footer-social-link:focus-visible {
-  outline: 2px solid rgba(168, 85, 247, 0.6);
-  outline-offset: 2px;
-}
-.footer-social-link .ico {
-  display: block;
-}
-@media (max-width: 560px) {
-  .footer-bottom {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}

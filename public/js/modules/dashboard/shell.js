@@ -14,6 +14,7 @@ import { sb, normalizeError } from "../../lib/supabase.js";
 import { markAllNotificationsRead, markNotificationRead, notifications as fetchNotifications, uid } from "./data.js";
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
 import { createDrawer } from "../../ui/drawer.js";
+import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 
 export const NAV = [
   {
@@ -186,6 +187,14 @@ export function bindChrome({ navigate }) {
   });
   on(qs("#sidebar-signout"), "click", () => navDrawer?.close());
   window.addEventListener("shinzora:view", () => navDrawer?.close());
+
+  /* Presence: one heartbeat a minute while the tab is visible, and once more on
+     the way out so the last time is the time they left rather than a minute
+     before it. Nothing about the page depends on the response. */
+  startPresence();
+  /* Referral months come due on a calendar, not on a user action, so this is the
+     only place they are granted. Once a day per device is enough. */
+  void runReferralTick();
 
   // Workspace + account menus
   bindMenu("#workspace-switch", "#workspace-menu");

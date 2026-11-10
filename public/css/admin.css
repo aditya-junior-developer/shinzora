@@ -678,3 +678,24 @@ body.drawer-open {
     font-size: 1.3rem;
   }
 }
+
+/* Presence sits under-left of the avatar in every admin list, the same place the
+   dashboard puts it, so the dot means one thing across the product. */
+.customer-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.customer-avatar .presence {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+}
+
+.cell-sub {
+  display: block;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}

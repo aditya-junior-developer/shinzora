@@ -242,11 +242,18 @@ async function ensureQuota(userId: string, mode: string): Promise<Record<string,
 async function currentUsage(userId: string): Promise<Record<string, unknown> | null> {
   const { data } = await admin()
     .from("subscriptions")
-    .select("plan, ai_credits_used, ai_credits_limit, ai_period_start, current_period_end")
+    .select("plan, ai_credits_used, ai_credits_limit, ai_period_start, current_period_end, bonus_credits")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!data) return { plan: "free", used: 0, limit: 30, remaining: 30 };
+  /* The allowance is base-for-the-plan plus whatever referrals have earned; the
+     `subscriptions_allowance` trigger (0032) keeps `ai_credits_limit` equal to
+     exactly that, so the stored number is used as-is and the bonus is only
+     reported for the label beside it. Re-deriving it here would be a second
+     source of truth that could disagree with the RPC that actually charges. */
+  const bonus = Number((data as { bonus_credits?: number } | null)?.bonus_credits ?? 0);
+
+  if (!data) return { plan: "free", used: 0, limit: 30, remaining: 30, bonus: 0 };
 
   const periodStart = new Date();
   periodStart.setUTCDate(1);
@@ -261,6 +268,9 @@ async function currentUsage(userId: string): Promise<Record<string, unknown> | n
     used,
     limit,
     remaining: Math.max(limit - used, 0),
+    /* Credits per month that came from referrals rather than the plan. The UI
+       shows it as a note, never as a separate allowance to spend. */
+    bonus,
     period_end: data.current_period_end ?? null
   };
 }

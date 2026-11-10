@@ -16,12 +16,15 @@ import { pageHead, setupNotice, skeletonView, statusBadge } from "../components.
 import { confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
+import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
 
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: "user" },
   { id: "business", label: "Business", icon: "building-2" },
   { id: "security", label: "Security", icon: "shield-check" },
+  { id: "appearance", label: "Appearance", icon: "palette" },
   { id: "preferences", label: "Preferences", icon: "sliders-horizontal" },
+  { id: "referrals", label: "Referrals", icon: "gift" },
   { id: "integrations", label: "Integrations", icon: "plug-zap" },
   { id: "data", label: "Data", icon: "database" }
 ];
@@ -50,7 +53,7 @@ export default async function render(root) {
 
   root.innerHTML = `
     ${pageHead({ title: "Settings", desc: "Account, business profile, security and integrations for this workspace." })}
-    <div class="grid-main-side">
+    <div class="settings-layout">
       <div class="card" style="align-self:start">
         <nav class="settings-nav" id="settings-nav">
           ${SECTIONS.map(
@@ -79,7 +82,9 @@ export default async function render(root) {
     if (section === "profile") body.innerHTML = profileSection();
     if (section === "business") body.innerHTML = businessSection();
     if (section === "security") body.innerHTML = securitySection();
+    if (section === "appearance") body.innerHTML = appearanceSection();
     if (section === "preferences") body.innerHTML = preferencesSection();
+    if (section === "referrals") body.innerHTML = referralSection();
     if (section === "integrations") body.innerHTML = integrationsSection(runtime);
     if (section === "data") body.innerHTML = dataSection();
 
@@ -89,7 +94,9 @@ export default async function render(root) {
       bindLogo();
     }
     if (section === "security") bindSecurity();
+    if (section === "appearance") bindAppearance();
     if (section === "preferences") bindPreferences();
+    if (section === "referrals") bindReferrals();
     if (section === "data") bindData();
   }
 
@@ -541,6 +548,158 @@ export default async function render(root) {
         });
       } catch (error) {
         toastError(normalizeError(error));
+      }
+    });
+  }
+
+  /* ----------------------------------------------------------- appearance */
+  function appearanceSection() {
+    const active = currentTheme();
+    return `<div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Theme</div>
+          <div class="card-sub">Applies immediately, on this device and the next one you sign in on.</div>
+        </div>
+      </div>
+      <div class="card-body">
+        ${themePicker(active)}
+        <div class="alert alert-info" style="margin-top:var(--s-4);font-size:var(--fs-2xs)">
+          ${icon("info", { size: 14 })}
+          <span>Blossom and Daylight are both light, but they are not the same white: Blossom is a clean page with pink in the rules, Daylight is warm paper with no pure white anywhere, which is the one that stops a light theme hurting after an hour. All three pass the same contrast checks, and your choice follows the account to other devices.</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function bindAppearance() {
+    delegate(qs("#settings-body"), "click", "[data-theme-choice]", async (event, button) => {
+      const id = button.getAttribute("data-theme-choice");
+      applyTheme(id);
+      qsa("[data-theme-choice]").forEach((node) =>
+        node.setAttribute("aria-pressed", String(node.getAttribute("data-theme-choice") === id))
+      );
+      const saved = await saveThemeToProfile(id);
+      if (saved?.error) {
+        toast({
+          title: "Theme applied here",
+          message: "It could not be saved to your account, so other devices will keep the old one.",
+          tone: "warning"
+        });
+        return;
+      }
+      toast({ title: "Theme saved" }, { tone: "success", duration: 2000 });
+    });
+  }
+
+  /* -------------------------------------------------------------- referrals */
+  function referralSection() {
+    return `<div class="stack gap-4">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Invite a member</div>
+            <div class="card-sub">Both of you get 10 bonus AI credits a month for three months.</div>
+          </div>
+        </div>
+        <div class="card-body" id="referral-body">
+          <div class="dim" style="font-size:var(--fs-sm)">Loading your code…</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Have a code?</div><div class="card-sub">One code per account, and it cannot be your own.</div></div></div>
+        <div class="card-body">
+          <form class="row gap-2 wrap" id="referral-redeem-form">
+            <label class="sr-only" for="referral-code-input">Referral code</label>
+            <input class="input grow" id="referral-code-input" placeholder="SHZ-XXXXXX" autocomplete="off" spellcheck="false" style="text-transform:uppercase" />
+            <button class="btn btn-primary" type="submit" id="referral-redeem-submit">Redeem</button>
+          </form>
+          <div class="field-hint" id="referral-redeem-note">Bonus credits are added to your monthly AI allowance.</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  async function bindReferrals() {
+    const body = qs("#referral-body");
+    const paint = async () => {
+      try {
+        const { data, error } = await sb.rpc("referral_summary");
+        if (error) throw normalizeError(error);
+        const friends = Array.isArray(data?.friends) ? data.friends : [];
+        body.innerHTML = `
+          <div class="stack gap-3">
+            <div class="row gap-2 wrap">
+              <div class="grow">
+                <div class="field-label">Your code</div>
+                <div class="mono" id="referral-code" style="font-size:1.15rem;letter-spacing:0.12em;color:var(--text)">${esc(data?.code || "—")}</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" type="button" id="referral-copy">${icon("copy", { size: 14 })}Copy</button>
+            </div>
+            <div class="row gap-4 wrap" style="font-size:var(--fs-xs)">
+              <div><span class="dim">Invited</span> <strong>${Number(data?.invited || 0)}</strong></div>
+              <div><span class="dim">Bonus credits / month</span> <strong>${Number(data?.bonusCredits || 0)}</strong></div>
+              <div><span class="dim">Your plan allowance</span> <strong>${aiCredits().limit}</strong></div>
+            </div>
+            ${
+              friends.length
+                ? `<div class="stack gap-2">${friends
+                    .map(
+                      (friend) => `<div class="row between gap-3" style="font-size:var(--fs-xs);padding:8px 0;border-bottom:1px solid var(--line)">
+                        <span>${esc(friend.name)}${friend.username ? ` <span class="dim mono">@${esc(friend.username)}</span>` : ""}</span>
+                        <span class="dim">${Number(friend.monthsGranted || 0)} of ${Number(friend.monthsTotal || 3)} months credited</span>
+                      </div>`
+                    )
+                    .join("")}</div>`
+                : `<div class="dim" style="font-size:var(--fs-xs)">Nobody has used your code yet.</div>`
+            }
+            ${
+              data?.redeemed
+                ? `<div class="alert alert-ok" style="font-size:var(--fs-2xs)">${icon("check", { size: 14 })}<span>You redeemed a code. Bonus months left: ${Math.max(
+                    0,
+                    Number(data.redeemed.months_total || 0) - Number(data.redeemed.months_granted || 0)
+                  )}.</span></div>`
+                : ""
+            }
+          </div>`;
+        qs("#referral-copy")?.addEventListener("click", async () => {
+          const code = data?.code || "";
+          try {
+            await navigator.clipboard.writeText(code);
+            toast({ title: "Code copied" }, { tone: "success", duration: 1800 });
+          } catch {
+            toast({ title: "Copy failed", message: code, tone: "warning" });
+          }
+        });
+      } catch (error) {
+        body.innerHTML = `<div class="dim" style="font-size:var(--fs-sm)">${esc(error.message || "Referrals are unavailable right now.")}</div>`;
+      }
+    };
+    await paint();
+
+    on(qs("#referral-redeem-form"), "submit", async (event) => {
+      event.preventDefault();
+      const input = qs("#referral-code-input");
+      const button = qs("#referral-redeem-submit");
+      const note = qs("#referral-redeem-note");
+      const code = input.value.trim();
+      if (!code) return;
+      button.disabled = true;
+      note.textContent = "Redeeming…";
+      try {
+        const { data, error } = await sb.rpc("referral_redeem", { p_code: code });
+        if (error) throw normalizeError(error);
+        note.innerHTML = `Code accepted. <strong>${Number(data?.bonusCredits || 10)}</strong> bonus AI credits are on your account, and ${
+          Number(data?.monthsLeft || 0)
+        } more month(s) will be added automatically.`;
+        input.value = "";
+        await loadIdentity();
+        await paint();
+        toast({ title: "Referral accepted" }, { tone: "success" });
+      } catch (error) {
+        note.textContent = error.message || "That code could not be redeemed.";
+      } finally {
+        button.disabled = false;
       }
     });
   }

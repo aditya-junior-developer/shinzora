@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [data, notifView, shell, adminUi, adminFn, idempotency, teamSql, teamUi, settings, messagesView] = await Promise.all([
+const [data, notifView, shell, adminUi, adminFn, idempotency, teamSql, teamUi, teamView, settings, messagesView] = await Promise.all([
   read("../public/js/modules/dashboard/data.js"),
   read("../public/js/modules/dashboard/views/notifications.js"),
   read("../public/js/modules/dashboard/shell.js"),
@@ -11,6 +11,7 @@ const [data, notifView, shell, adminUi, adminFn, idempotency, teamSql, teamUi, s
   read("../supabase/migrations/0017_announcement_delivery_idempotency.sql"),
   read("../supabase/migrations/0018_team_invites_and_chat.sql"),
   read("../public/js/modules/messaging/team-chat.js"),
+  read("../public/js/modules/dashboard/views/team.js"),
   read("../public/js/modules/dashboard/views/settings.js"),
   read("../public/js/modules/dashboard/views/messages.js")
 ]);
@@ -26,7 +27,9 @@ assert.match(teamSql, /team_search_by_email[\s\S]*?lower\(p\.email\) = normalize
 assert.match(teamSql, /team_accept_invite[\s\S]*?invite_email_normalized = mail/, "invite acceptance requires the signed-in email to match");
 assert.match(teamSql, /team_chat_start[\s\S]*?is_business_team_member/, "conversation creation validates team membership");
 assert.match(teamSql, /values \('team-chat-files',[\s\S]*?false, 20971520/, "message attachments use private storage");
-assert.match(teamUi, /https:\/\/mail\.google\.com\/mail\//, "email invitations open Gmail for the user to send");
+/* Team chat is the inbox now, so the Gmail invitation hand-off lives with the
+   invite flow it belongs to — the team screen — not inside the message thread. */
+assert.match(teamView, /https:\/\/mail\.google\.com\/mail\//, "email invitations open Gmail for the user to send");
 assert.match(teamUi, /ALLOWED_FILES = new Set\(\["image\/jpeg"[\s\S]*?"application\/pdf"\]/, "team chat supports image and PDF attachments");
 assert.match(teamUi, /rpc\("team_chat_send"/, "messages are sent through the secure team-chat RPC");
 assert.match(teamUi, /QUICK_EMOJI[\s\S]*?linkify\(/, "team chat supports emoji and safe clickable links");
@@ -34,8 +37,11 @@ assert.match(teamUi, /QUICK_EMOJI[\s\S]*?linkify\(/, "team chat supports emoji a
    product actually forks on, plus the handle that identifies the account. */
 assert.match(settings, /name="account_type"[\s\S]*?I run a business[\s\S]*?I work as an agent/, "users can change how they use Shinzora");
 assert.match(settings, /name="username"[\s\S]*?set_username/, "users can edit their handle through the RPC that enforces uniqueness");
-assert.match(messagesView, /Team chat[\s\S]*?Shinzora support/, "team chat keeps the existing support channel available");
-assert.match(messagesView, /!params\.has\("channel"\) && params\.has\("c"\)/, "legacy support links with only a conversation ID still open support");
-assert.match(messagesView, /url\.searchParams\.delete\("c"\)[\s\S]*?params\.delete\("c"\)/, "switching message tabs clears stale conversation IDs");
+/* One Messages surface. The support channel that used to sit beside the inbox
+   was removed on request — a support button already exists in the drawer — so
+   the assertions that guarded the second tab are now assertions that it stayed
+   gone, and that an old `?c=` link still lands on the thread it named. */
+assert.doesNotMatch(messagesView, /data-channel=/, "the support tab is not rendered again");
+assert.match(messagesView, /ctx\.params|[?&]c=/, "a conversation link still opens straight into that thread");
 
 console.log("  ✓ notifications, idempotent announcements, Gmail invitations and secure team chat contracts");

@@ -849,7 +849,11 @@ html {
   top: calc(var(--nav-h) + var(--s-4));
 }
 .settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   text-align: left;
+  width: 100%;
   padding: 8px 11px;
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
@@ -857,11 +861,18 @@ html {
   transition: all var(--t-fast) var(--ease);
 }
 .settings-nav button:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  background: var(--hover-tint);
+}
+/* The label must not shrink to an ellipsis when the icon sits in the same row. */
+.settings-nav button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .settings-nav button.is-active {
-  color: #fff;
+  color: var(--text);
   background: rgba(124, 58, 237, 0.18);
   box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.22);
 }
@@ -2542,4 +2553,207 @@ html {
 @media (max-width: 640px) {
   .boot-failure { flex-direction:column; padding:16px; }
   .boot-failure-actions .btn { flex:1 1 auto; justify-content:center; }
+}
+
+/* --- Messages: username search, presence in the list, team actions ------- */
+
+.team-avatar-wrap,
+.chat-avatar-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.team-avatar-wrap .presence,
+.chat-avatar-wrap .presence {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+}
+
+.team-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.dm-search {
+  position: relative;
+  padding: 0 10px 10px;
+}
+
+.dm-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dm-search-field svg {
+  color: var(--text-3);
+  flex: none;
+}
+
+.dm-search-field .input {
+  border: 0;
+  background: transparent;
+  padding: 9px 0;
+  font-size: var(--fs-sm);
+  box-shadow: none;
+}
+
+.dm-search-field .input:focus {
+  outline: none;
+}
+
+.dm-search-results {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: calc(100% - 4px);
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dm-search-results[hidden] {
+  display: none;
+}
+
+.dm-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  color: var(--text);
+}
+
+.dm-search-row:hover,
+.dm-search-row:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dm-search-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dm-search-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-search-handle {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+
+.dm-search-go {
+  color: var(--text-4);
+  display: grid;
+  place-items: center;
+}
+
+.dm-search-empty {
+  padding: 12px;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.dm-head-identity {
+  min-width: 0;
+}
+
+.dm-head-status {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .team-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .team-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* Presence sits beside every picture in the product, under-left, so a face and
+   its status read as one object. The wrapper is only positioning: no size, no
+   border, so it inherits whatever avatar variant it contains. */
+.presence-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+}
+
+.presence-wrap .presence {
+  position: absolute;
+  left: -1px;
+  bottom: -1px;
+  box-shadow: 0 0 0 2px var(--surface, #0b0710);
+  border-radius: 999px;
+}
+
+.ft-seen {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+/* ----------------------------------------------------------------------------
+   Messages: the composer on a phone
+   ----------------------------------------------------------------------------
+   Six emoji, an attach button, the field and Send in one flex row left the
+   textarea about twenty pixels wide on a 400px screen — the words stacked one
+   letter per line. The tools become their own scrollable row and the field
+   keeps the full width; nothing changes above 760px.
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .chat-compose {
+    flex-wrap: wrap;
+  }
+  .chat-compose .team-compose-tools {
+    order: 2;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .chat-compose .team-compose-tools::-webkit-scrollbar {
+    display: none;
+  }
+  .chat-compose .chat-input {
+    order: 1;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .chat-compose .chat-send {
+    order: 3;
+    flex: none;
+  }
 }
