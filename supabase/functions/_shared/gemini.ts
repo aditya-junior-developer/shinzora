@@ -7,6 +7,7 @@
 
 import { resolveChain, type Capability } from "./models.ts";
 import { configuredGeminiKeys, primaryGeminiKey, type GeminiApiKey } from "./keyring.ts";
+import { fallbackComplete, fallbackConfigured } from "./fallback.ts";
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -430,6 +431,11 @@ type Part = { text: string };
 type Content = { role: "user" | "model"; parts: Part[] };
 
 export interface GeminiOptions {
+  /** Skip the OpenAI-compatible fallback for this call. Grounded search sets
+      this because no other provider has an equivalent to Google's built-in
+      google_search tool, and returning ungrounded text would be worse than
+      returning an error. */
+  noFallback?: boolean;
   system?: string;
   history?: Content[];
   temperature?: number;
@@ -588,6 +594,25 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
     }
   }
 
+  /* Google is out of options: a key we are not allowed to use, a quota that
+     resets at midnight, or a model that stayed busy through the whole chain.
+     If a free gateway is configured, use it rather than handing the customer an
+     error. The original Gemini error is kept if the fallback also fails, because
+     it describes the actual cause better than a second failure would. */
+  if (fallbackConfigured() && !options.noFallback) {
+    try {
+      return await fallbackComplete(typeof parts === "string" ? parts : parts.map((part) => part.text ?? "").join("\n"), {
+        system: options.system,
+        json: options.json,
+        temperature: options.temperature,
+        maxOutputTokens: Math.min(options.maxOutputTokens ?? 8192, 8192),
+        timeoutMs: options.timeoutMs ?? 120000
+      });
+    } catch {
+      /* fall through to the Gemini error below */
+    }
+  }
+
   throw (
     lastRetryable ??
     new GeminiError(
@@ -655,6 +680,8 @@ export async function geminiGrounded(
   prompt: string,
   options: GeminiOptions = {}
 ): Promise<GroundedAnswer> {
+  /* Never falls back: google_search is Google-only, and answering without
+     sources while claiming to have searched would be a lie the UI repeats. */
   if (!geminiConfigured()) {
     throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
   }
