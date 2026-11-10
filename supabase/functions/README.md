@@ -40,7 +40,7 @@ request: a valid JWT is not enough.
 ## Secrets
 
 ```bash
-supabase secrets set GEMINI_API_KEY=...            GEMINI_MODEL=gemini-2.0-flash
+supabase secrets set GEMINI_API_KEY=...            GEMINI_MODEL=gemini-3.8-flash
 supabase secrets set UPI_ID=yourupi@bank           UPI_PAYEE_NAME="Your Business"
 supabase secrets set RAZORPAY_KEY_ID=... RAZORPAY_KEY_SECRET=... RAZORPAY_WEBHOOK_SECRET=...
 supabase secrets set GITHUB_CLIENT_ID=... GITHUB_CLIENT_SECRET=... GITHUB_SCOPES=repo

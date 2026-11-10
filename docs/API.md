@@ -34,7 +34,7 @@ Error envelope, returned with a non-2xx status:
 {
   "available": true,
   "environment": "production",
-  "ai": { "configured": true, "model": "gemini-2.0-flash" },
+  "ai": { "configured": true, "model": "gemini-3.8-flash" },
   "payments": {
     "upi_configured": true,
     "upi_payee_name": "Shinzora",
@@ -59,7 +59,7 @@ Error envelope, returned with a non-2xx status:
 ```
 
 ```json
-{ "reply": "…", "conversationId": "uuid", "model": "gemini-2.0-flash", "usage": { "plan": "pro", "used": 12, "limit": 800 } }
+{ "reply": "…", "conversationId": "uuid", "model": "gemini-3.8-flash", "usage": { "plan": "pro", "used": 12, "limit": 800 } }
 ```
 
 Persists the conversation and both messages. Business context is read server-side from `businesses`; `context` is optional
@@ -89,7 +89,7 @@ extra text from the current screen.
   "seo": { "title": "…", "description": "…", "keywords": ["…"] },
   "design_system": { "colors": { "…": "…" }, "fonts": { "…": "…" }, "radius": "…", "spacing": "…" },
   "notes": "…",
-  "model": "gemini-2.0-flash"
+  "model": "gemini-3.8-flash"
 }
 ```
 

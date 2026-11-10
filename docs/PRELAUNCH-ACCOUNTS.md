@@ -77,7 +77,7 @@ the code paths:
 ```bash
 # .env (local) or Project → Settings → Environment Variables (Vercel)
 SHINZORA_AI_API_KEY=<your Gemini API key>
-SHINZORA_AI_MODEL=gemini-2.0-flash     # optional
+SHINZORA_AI_MODEL=gemini-3.8-flash     # optional
 ```
 
 Reload the page; `GET /api/prelaunch/health` reports `ai_configured: true`, and

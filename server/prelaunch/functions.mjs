@@ -1577,7 +1577,7 @@ export async function handleFunction(root, name, action, payload, session) {
      can tell the operator exactly which secret is missing. */
   if (name === "config") {
     const aiKey = sandboxAi.aiConfigured();
-    const model = process.env.SHINZORA_AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash";
+    const model = process.env.SHINZORA_AI_MODEL || process.env.GEMINI_MODEL || "gemini-3.8-flash";
     return {
       available: true,
       environment: "prelaunch",

@@ -18,6 +18,29 @@ The browser is told only *whether* AI is configured. `GET /api/prelaunch/fn/conf
 returns `{"ai":{"configured":true,"model":"gemini-3.8-flash","key_env":null}}` —
 no key, no key fragment.
 
+## Credential pooling (9 November 2026)
+
+The five keys come from five different Google accounts, so each is a separate
+free-tier allowance. The keyring now treats each numbered slot as its own quota
+pool (`slot-1` … `slot-5`); before this change every slot carried
+`legacy-unclassified`, and a spent allowance on one account parked the whole
+ring while four untouched accounts sat idle.
+
+| Situation | Behaviour |
+| --- | --- |
+| Key 1 returns 429 (daily quota) | key 2 is tried next; only keys that actually failed are parked |
+| Key 1 returns 503 (model overloaded) | no key is parked — 503 is per model, not per account |
+| `SHINZORA_AI_SHARED_QUOTA=1` | every key shares one pool (only correct when they come from one project) |
+| `SHINZORA_AI_KEY_PROJECT_<n>` | states a slot's real Google project explicitly |
+
+Rotation across accounts helps against **429**. It cannot help against **503**,
+which is Google shedding load per model regardless of account.
+
+Model choice is pinned: `SHINZORA_AI_MODEL=gemini-3.8-flash` with
+`SHINZORA_AI_MODEL_FALLBACKS` empty, so the chain is exactly one model. No
+discovered model is ever added silently — an unrequested fallback changes output
+shape, latency and cost.
+
 ## What the key can do today
 
 | Capability | Status | Evidence |

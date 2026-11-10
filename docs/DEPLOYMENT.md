@@ -446,7 +446,7 @@ Expected shape (values depend on which secrets you set):
 ```json
 {
   "available": true,
-  "ai": { "configured": true, "model": "gemini-2.0-flash" },
+  "ai": { "configured": true, "model": "gemini-3.8-flash" },
   "payments": { "upi_configured": true, "razorpay_configured": false },
   "domains": { "provider": "none", "configured": false },
   "integrations": { "github_configured": false, "vercel_configured": false }

@@ -38,10 +38,10 @@ additional_redirect_urls = [
   "https://shinzora.in/auth/reset/"
 ]
 jwt_expiry = 3600
-enable_signup = true
+enabled = true
 
 [auth.email]
-enable_signup = true
+enabled = true
 double_confirm_changes = true
 enable_confirmations = true
 
@@ -56,8 +56,6 @@ verify_jwt = false
 
 [functions.ai]
 verify_jwt = true
-# Site generation streams nothing but produces large JSON payloads.
-[functions.ai.resources]
 [functions.integrations]
 verify_jwt = true
 

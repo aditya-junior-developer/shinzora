@@ -103,7 +103,7 @@ export function configuredGeminiKeys(): GeminiApiKey[] {
   for (const [index, name] of ["SHINZORA_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"].entries()) {
     const key = cleanKey(Deno.env.get(name));
     if (key) add({
-      id: `legacy-${index + 1}`, key, projectId: slotProject(1, "legacy-slot-1"), priority: 300 + index
+      id: `legacy-${index + 1}`, key, projectId: slotProject(index + 1, `legacy-slot-${index + 1}`), priority: 300 + index
     });
   }
 
