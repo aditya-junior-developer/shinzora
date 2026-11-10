@@ -542,7 +542,13 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
            fast keeps the real reason instead of overwriting it with the last
            fallback's generic message. */
         if (mapped.code === "ai_quota_exhausted") throw mapped;
-        lastRetryable = response.status === 503 ? new GeminiError("AI provider error (503).", "ai_provider_error", 502) : mapped;
+        lastRetryable = response.status === 503
+          ? new GeminiError(
+              "The AI model is busy right now, so this did not finish. Nothing was taken from your allowance - try again in a minute.",
+              "ai_model_busy",
+              503
+            )
+          : mapped;
         /* Congestion is per model, so remember it and switch immediately next
            time rather than paying the timeout again on every request. */
         if (response.status === 503 || response.status === 504) parkModel(model);
@@ -585,9 +591,9 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
   throw (
     lastRetryable ??
     new GeminiError(
-      "Every configured AI model is unavailable right now. Try again in a minute.",
-      "ai_provider_error",
-      502
+      "The AI model is busy right now. Nothing was taken from your allowance - try again in a minute.",
+      "ai_model_busy",
+      503
     )
   );
 }

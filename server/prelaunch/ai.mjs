@@ -553,8 +553,8 @@ export async function completeJson(prompt, { model = "" } = {}) {
   }
 
   throw last || new SandboxAiError(
-    "Every AI model is busy right now. Try again in a minute.",
-    { code: "ai_provider_error", status: 503 }
+    "The AI model is busy right now. Try again in a minute.",
+    { code: "ai_model_busy", status: 503 }
   );
 }
 

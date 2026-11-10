@@ -196,24 +196,22 @@ export async function isUsable(model: string, capability: Capability): Promise<b
 }
 
 /**
- * The order models are tried in for one generation.
+ * The exact models this deployment may call, in order.
  *
- * The deployment's configured model comes first, then its configured fallbacks,
- * then models the provider confirmed are live for this key, preferring the same
- * family (a flash model falling back to another flash model keeps output shape
- * and latency predictable).
+ * Strict by design: the configured model is the only model unless the operator
+ * explicitly names additional ones in SHINZORA_AI_MODEL_FALLBACKS. Discovery is
+ * used to report which models exist and to validate a caller's choice, never to
+ * silently widen the chain. A fallback the owner did not ask for changes output
+ * shape, latency and cost, and that is the owner's decision to make.
  */
-export async function resolveChain(capability: Capability = "site"): Promise<string[]> {
+export async function resolveChain(_capability: Capability = "site"): Promise<string[]> {
   const configured = primary();
   const fallbacks = (Deno.env.get("SHINZORA_AI_MODEL_FALLBACKS") ?? "")
     .split(",")
     .map((model) => model.trim())
     .filter(Boolean);
 
-  const live = await availableModels(capability);
-  const liveIds = live.map((model) => model.id);
-
-  return [configured, ...fallbacks, ...liveIds].filter(
+  return [configured, ...fallbacks].filter(
     (model, index, all) => Boolean(model) && all.indexOf(model) === index
   );
 }

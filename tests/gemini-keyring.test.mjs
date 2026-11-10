@@ -134,9 +134,44 @@ try {
   const keyError = ai.providerError(400, '{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}');
   assert.notEqual(keyError.code, "ai_request_rejected", "a bad key is not retried as a shape error");
 
+  /* ---- the configured model is the ONLY model --------------------------- */
+  /* The owner pinned gemini-3.8-flash. Discovery must never widen the chain:
+     an unrequested fallback changes output shape, latency and cost. */
+  ai.resetGeminiModelHealth();
+  configure([{ id: "alpha", key: fakeKeys[0], projectId: "project-a", priority: 1 }]);
+  stub(() => responseJson({
+    models: [
+      { name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] },
+      { name: "models/gemini-3.5-flash", supportedGenerationMethods: ["generateContent"] },
+      { name: "models/gemini-flash-lite-latest", supportedGenerationMethods: ["generateContent"] }
+    ]
+  }));
+  const chain = await ai.resolvedModelChain("site");
+  assert.deepEqual(chain, ["gemini-3.8-flash"], "only the configured model is in the chain");
+  assert.ok(!chain.includes("gemini-3.5-flash"), "a discovered sibling is not silently added");
+  assert.ok(!chain.includes("gemini-flash-lite-latest"), "a discovered lite model is not silently added");
+
+  /* And with the model congested, the request fails honestly instead of
+     answering from a different model. */
+  ai.resetGeminiModelHealth();
+  configure([{ id: "alpha", key: fakeKeys[0], projectId: "project-a", priority: 1 }]);
+  stub(() => responseJson({ error: { status: "UNAVAILABLE" } }, 503));
+  let busy = null;
+  try {
+    await ai.gemini("hi");
+  } catch (error) {
+    busy = error;
+  }
+  assert.equal(busy?.code, "ai_model_busy", "a congested model reports busy, not a provider code");
+  assert.ok(!/provider error \(503\)/i.test(busy?.message ?? ""), "no raw status code reaches the customer");
+  assert.ok(/allowance/i.test(busy?.message ?? ""), "the customer is told nothing was charged");
+  const modelsTried = new Set(generateCalls().map((call) => (call.url.match(/models\/([^:]+):/) ?? [])[1]));
+  assert.deepEqual([...modelsTried], ["gemini-3.8-flash"], "no other model was called");
+
   globalThis.fetch = originalFetch;
   console.log("  ✓ Gemini keyring priority, same-model failover, project quota grouping, per-key rate limits, disabled keys, and URL secrecy");
   console.log("  ✓ model auto-switching: congestion demotes, shape 400s recover, bad keys stay bad");
+  console.log("  ✓ the configured model is the only model: discovery never widens the chain");
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
