@@ -72,31 +72,38 @@ operations) and **0036** (support conversation roles).
 
 ## Live status on 4 November 2026
 
-What is actually running on `zmkgfmlcpzjfgxdmbtvi` right now, as opposed to what
-is in this repository:
+What is running on `zmkgfmlcpzjfgxdmbtvi` right now, as opposed to what is in
+this repository. All of it was verified against the live project, not inferred
+from the source.
 
 | Layer | State |
 |-------|-------|
-| Migrations 0035 (store operations) | **Applied and verified** — 14 functions, 2 triggers, 4 tables, 4 order columns, 5 ticket columns |
-| Migration 0036 (support roles) | **Applied and verified** — the check constraint now accepts `owner`, `admin`, `system`, `assistant`, `customer` |
-| Client (inventory, orders, analytics, support, assistant, `/track/`) | **Shipped in this commit** — every screen reads and writes through the RPCs above |
-| Edge Function `ai` | **Not redeployed** — the new `data_analysis`, `command` and `support_autoreply` actions exist in `supabase/functions/ai/index.ts` but the deployment is still version 23, which only knows `chat`, `generate`, `build_*`, `revise`, `domain_ideas`, `copy`, `support_reply`, `research` and `models` |
-| Edge Function `admin` | **Not redeployed** — the `escalated` filter exists in source only |
+| Migration 0035 (store operations) | **Applied and verified** — 14 functions, 2 triggers, 4 tables, 4 order columns, 5 ticket columns |
+| Migration 0036 (support roles) | **Applied and verified** — the check constraint accepts `owner`, `admin`, `system`, `assistant`, `customer` |
+| Edge Function `ai` | **Deployed, version 24** — the downloaded bundle contains `data_analysis`, `command`, `COMMAND_ACTIONS`, `assistant_command_apply` and `support_autoreply` |
+| Edge Function `admin` | **Deployed, version 14** — the bundle contains the `escalated` filter |
+| Client (inventory, orders, analytics, support, assistant, `/track/`) | **Pushed to `main`** (`67d6994`) and live on the next Vercel build |
+| Function contract | `node scripts/smoke-functions.mjs --remote` → every function refuses unauthenticated calls, leaks no secret, hides stack traces |
 
-The deploy is blocked, not forgotten: `SUPABASE_ACCESS_TOKEN` in `.env` returns
-`401 Invalid access token`, and both `supabase functions deploy` and the
-Management API need a valid one. There is no workaround that does not either
-duplicate the AI gateway or serve function source from a third party, and both
-are worse than waiting for a real token.
+### What is still unproven, and why
 
-    # once a valid token is in .env
-    node scripts/deploy-functions.mjs ai admin
+Deploying a function proves it bundled and answers. It does not prove the three
+new AI actions return a useful answer, because that needs a signed-in account and
+a real generation — and creating a test account in the live project is a data
+mutation nobody asked for. The checks that were run instead:
 
-Until then the three affected screens degrade honestly rather than breaking:
+- `node --check` and the repo's static checks on every edited file,
+- the deployed bundle grepped for each new action (above),
+- 187 staging checks against a real Postgres (PGlite), covering the SQL behind
+  every new screen,
+- 19 new client assertions in `tests/store-operations.test.mjs`.
 
-- **Analytics → "Analyse with AI"** says the updated function is not deployed.
-  Every number on the page is still real; they come from `store_analytics()`.
-- **Assistant → command bar** says the same, and changes nothing in the store.
-  The chat half keeps working — `chat` is deployed.
-- **Support → automatic replies** saves the per-ticket switch (that is a
-  database write, and it works), then reports that nothing was sent.
+The first signed-in use of **Analyse with AI**, a **command** and **automatic
+reply** is therefore the remaining acceptance step. If any of them misbehaves,
+the failure will be visible in the UI and in `ai_usage_log`, not silent.
+
+### One repository fix made during the deploy
+
+`supabase/config.toml` declared `enabled = true` twice inside `[auth]`. Older
+CLIs tolerated it; the current one refuses to parse the file, which blocked every
+deploy. The duplicate line was removed and the file now parses as TOML.

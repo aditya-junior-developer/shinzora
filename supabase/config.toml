@@ -38,7 +38,6 @@ additional_redirect_urls = [
   "https://shinzora.in/auth/reset/"
 ]
 jwt_expiry = 3600
-enabled = true
 
 [auth.email]
 enabled = true
