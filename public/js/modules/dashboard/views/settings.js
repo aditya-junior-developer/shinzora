@@ -26,6 +26,22 @@ const SECTIONS = [
   { id: "data", label: "Data", icon: "database" }
 ];
 
+/* The social platforms a business profile offers. Keys are what the panel
+   labels; values are stored in `businesses.socials` as { key: url }. */
+const SOCIAL_FIELDS = [
+  { key: "instagram", label: "Instagram" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "x", label: "X (Twitter)" },
+  { key: "facebook", label: "Facebook" },
+  { key: "youtube", label: "YouTube" },
+  { key: "github", label: "GitHub" }
+];
+
+const businessSocials = () => {
+  const socials = state.business?.socials;
+  return socials && typeof socials === "object" && !Array.isArray(socials) ? socials : {};
+};
+
 let section = "profile";
 
 export default async function render(root) {
@@ -281,6 +297,22 @@ export default async function render(root) {
               <input class="input" id="biz-email" name="email" value="${esc(business.email || "")}" />
             </div>
           </div>
+
+          <!-- A freelancer reading your pitch panel sees these, so they are
+               grouped and labelled rather than mixed in with contact details. -->
+          <div class="field">
+            <span class="field-label">Social links</span>
+            <p class="field-hint">Shown on your business card in the marketplace, next to the Pitch button.</p>
+          </div>
+          <div class="grid-2">
+            ${SOCIAL_FIELDS.map(
+              (social) => `<div class="field">
+                <label class="field-label" for="biz-${social.key}">${esc(social.label)}</label>
+                <input class="input" id="biz-${social.key}" name="social_${social.key}" type="url"
+                  value="${esc(businessSocials()[social.key] || "")}" placeholder="https://" />
+              </div>`
+            ).join("")}
+          </div>
           <div class="row gap-2">
             <button class="btn btn-primary" type="submit" id="save-business">Save business</button>
             <a class="btn btn-ghost" href="/onboarding/">Re-run onboarding</a>
@@ -358,11 +390,25 @@ export default async function render(root) {
     qs("#business-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
-      const values = Object.fromEntries(new FormData(form).entries());
-      const { valid, errors } = validateForm(values, {
-        name: [rules.required, rules.min(2)],
-        website_url: [rules.url]
+      const raw = Object.fromEntries(new FormData(form).entries());
+      const socialRules = {};
+      SOCIAL_FIELDS.forEach((social) => {
+        socialRules[`social_${social.key}`] = [rules.url];
       });
+      const { valid, errors } = validateForm(raw, {
+        name: [rules.required, rules.min(2)],
+        website_url: [rules.url],
+        ...socialRules
+      });
+      /* Social inputs are not columns: they collect into the `socials` jsonb,
+         dropping anything left blank so the panel never renders an empty link. */
+      const socials = {};
+      SOCIAL_FIELDS.forEach((social) => {
+        const value = String(raw[`social_${social.key}`] || "").trim();
+        if (value) socials[social.key] = value;
+        delete raw[`social_${social.key}`];
+      });
+      const values = { ...raw, socials };
       paintErrors(form, errors);
       if (!valid) return;
       const button = qs("#save-business");

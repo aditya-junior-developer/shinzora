@@ -807,6 +807,73 @@ export async function run(db, api, { fixtures }) {
     ? pass("0028", "a signed-out visitor gets an error from the directory, not a list of people")
     : fail("0028", `anonymous directory call returned ${anonSearch ?? "rows"}`);
 
+  /* ================================================ 8. the pitch panel (0029)
+     A business profile is public; the row behind it is not. This proves the
+     panel returns the logo, website and socials a freelancer needs, the roles
+     with their screening questions, and none of the columns the owner filled
+     in for their own planning. */
+  const panelOwner = await one(
+    db,
+    `insert into auth.users (email, raw_user_meta_data) values ('panel.owner@example.test', '{}'::jsonb) returning id`
+  );
+  await db.query(`update public.profiles set full_name = 'Panel Owner', username = 'panel.owner' where id = $1`, [panelOwner.id]);
+  const panelBusiness = await one(
+    db,
+    `insert into public.businesses (owner_id, name, category, description, location, website_url, logo_url,
+                                    socials, phone, email, target_audience, brand_colors)
+     values ($1, 'Panel Co', 'retail', 'Sells things', 'Pune', 'https://panel.example', 'https://panel.example/logo.png',
+             '{"instagram":"https://instagram.com/panel","broken":"not-a-url"}'::jsonb,
+             '+911234567890', 'secret@panel.example', 'internal notes', '["#fff"]'::jsonb)
+     returning id`,
+    [panelOwner.id]
+  );
+  const panelJob = await one(
+    db,
+    `insert into public.marketplace_jobs (owner_id, business_id, title, description, skills, budget_min, budget_max, currency)
+     values ($1, $2, 'Panel role', 'A role created for the staging check only.', array['design'], 1000, 2000, 'INR')
+     returning id`,
+    [panelOwner.id, panelBusiness.id]
+  );
+  await db.query(
+    `insert into public.marketplace_job_questions (job_id, position, prompt)
+     values ($1, 1, 'Show us your best work'), ($1, 2, 'What would you do first?')`,
+    [panelJob.id]
+  );
+
+  const panel = await asUser(ownerId, () =>
+    rows(db, `select public.marketplace_business_profile('${panelBusiness.id}') as p`)
+  );
+  const panelJson = panel[0]?.p;
+  panelJson?.roles?.[0]?.questions?.length === 2
+    ? pass("0029", "the pitch panel returns each open role with its screening questions")
+    : fail("0029", `roles/questions missing: ${JSON.stringify(panelJson?.roles)}`);
+  panelJson?.logoUrl === "https://panel.example/logo.png" && panelJson?.websiteUrl === "https://panel.example"
+    ? pass("0029", "the panel carries the logo and website a freelancer needs")
+    : fail("0029", `logo/website missing: ${JSON.stringify(panelJson && { l: panelJson.logoUrl, w: panelJson.websiteUrl })}`);
+  panelJson?.socials?.instagram === "https://instagram.com/panel" && panelJson?.socials?.broken === undefined
+    ? pass("0029", "social links are returned, and a malformed one is dropped rather than shown")
+    : fail("0029", `socials: ${JSON.stringify(panelJson?.socials)}`);
+  !JSON.stringify(panelJson || {}).includes("secret@panel.example") &&
+  !JSON.stringify(panelJson || {}).includes("+911234567890") &&
+  !JSON.stringify(panelJson || {}).includes("internal notes")
+    ? pass("0029", "the panel leaks none of the owner's private columns (phone, email, audience)")
+    : fail("0029", "a private business column reached the public panel payload");
+
+  const strangerPanel = await asUser(outsider.id, () =>
+    throws(db, `select public.marketplace_business_profile('${panelBusiness.id}')`)
+  );
+  !strangerPanel
+    ? pass("0029", "any signed-in person can open a discoverable business's panel")
+    : fail("0029", `signed-in panel call failed: ${strangerPanel}`);
+
+  await db.query(`update public.businesses set discoverable = false where id = $1`, [panelBusiness.id]);
+  const hiddenPanel = await asUser(outsider.id, () =>
+    throws(db, `select public.marketplace_business_profile('${panelBusiness.id}')`)
+  );
+  hiddenPanel && /not listed publicly/i.test(hiddenPanel)
+    ? pass("0029", "a business that opted out of the directory cannot be opened by id either")
+    : fail("0029", `hidden business panel returned ${hiddenPanel ?? "data"}`);
+
   /* ---- archiving a ticket hides it without destroying it ---- */
   const ticket = await one(db, `select id, owner_id from public.support_tickets limit 1`);
   if (ticket) {

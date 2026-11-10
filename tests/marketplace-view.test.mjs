@@ -121,6 +121,45 @@ const BUSINESSES = [
   }
 ];
 
+/* What the pitch panel fetches when a business card is opened. Shaped exactly
+   like marketplace_business_profile() in migration 0029. */
+const BUSINESS_PROFILE = {
+  businessId: "biz-1",
+  name: "Klyro",
+  category: "Finance",
+  description: "A B2B agency building sites for finance teams.",
+  location: "New Delhi",
+  websiteUrl: "https://klyro.example.com",
+  logoUrl: "https://cdn.example.com/klyro.png",
+  stage: "launched",
+  socials: { instagram: "https://instagram.com/klyro", linkedin: "https://linkedin.com/company/klyro" },
+  ownerName: "Aditya",
+  ownerUsername: "aditya",
+  isOwn: false,
+  stats: { openProjects: 1, totalProjects: 3, completedContracts: 2 },
+  roles: [
+    {
+      jobId: "job-klyro",
+      title: "Marketing site rebuild",
+      description: "Rebuild the marketing site on the new design system.",
+      requirements: "Six pages and a blog.",
+      skills: ["web design", "next.js"],
+      budgetMin: 40000,
+      budgetMax: 70000,
+      currency: "INR",
+      deliveryDays: 21,
+      createdAt: new Date().toISOString(),
+      proposals: 2,
+      mine: false,
+      myProposal: null,
+      questions: [
+        { questionId: "bq-1", prompt: "Show a site you rebuilt end to end" },
+        { questionId: "bq-2", prompt: "What would you do in the first week?" }
+      ]
+    }
+  ]
+};
+
 const BOARD = [
   {
     jobId: "job-open",
@@ -260,6 +299,7 @@ async function world() {
     marketplace_browse_jobs: BOARD,
     marketplace_list_freelancers: PEOPLE,
     marketplace_list_businesses: BUSINESSES,
+    marketplace_business_profile: BUSINESS_PROFILE,
     marketplace_find_user: {
       userId: "freelancer", username: "asha", name: "Asha",
       accountType: "agent", headline: "Designer for local businesses",
@@ -575,4 +615,120 @@ test("every icon the view asks for exists", async () => {
   );
   const missing = [...used].filter((name) => !available.has(name));
   assert.deepEqual(missing, [], `unknown icons fall back to a question mark: ${missing.join(", ")}`);
+});
+
+test("a business card offers a Pitch button", async () => {
+  const { window, root, view } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+
+  const button = root.querySelector('[data-mk-business="biz-1"]');
+  assert.ok(button, "every listed business has a pitch button");
+  assert.match(button.textContent, /Pitch/);
+});
+
+test("the pitch panel shows who the business is before it asks for anything", async () => {
+  const { window, root, view, calls } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  root.querySelector('[data-mk-business="biz-1"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  assert.equal(count(calls, "marketplace_business_profile"), 1, "the panel loads the full profile");
+  assert.deepEqual(calls.filter((c) => c.name === "marketplace_business_profile")[0].args, { p_business: "biz-1" });
+
+  const panel = root.querySelector("[data-mk-dialog-root]");
+  assert.ok(panel, "a dialog opened");
+  const text = panel.textContent;
+  assert.match(text, /Klyro/, "the business name");
+  assert.match(text, /Finance/, "its category");
+  assert.match(text, /New Delhi/, "where it is");
+  assert.match(text, /A B2B agency building sites/, "what it does");
+  assert.ok(panel.querySelector('img[src*="klyro.png"]'), "the logo is rendered, not just its URL");
+
+  const links = [...panel.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+  assert.ok(links.includes("https://klyro.example.com"), "the website is linked");
+  assert.ok(links.includes("https://instagram.com/klyro"), "so is Instagram");
+  assert.ok(links.includes("https://linkedin.com/company/klyro"), "and LinkedIn");
+  assert.match(text, /Instagram/, "social links are labelled, not raw URLs");
+});
+
+test("the panel lists the roles and the questions attached to each", async () => {
+  const { window, root, view } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  root.querySelector('[data-mk-business="biz-1"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  const role = root.querySelector('[data-mk-role="job-klyro"]');
+  assert.ok(role, "the open role renders inside the panel");
+  assert.match(role.textContent, /Marketing site rebuild/, "with its title");
+  assert.match(role.textContent, /Show a site you rebuilt end to end/, "and the first question it asks");
+  assert.match(role.textContent, /What would you do in the first week\?/, "and the second");
+  assert.match(role.textContent, /They ask 2 questions/, "the count is stated");
+});
+
+test("pitching from the panel sends one pitch with every answer", async () => {
+  const { window, root, view, calls, toasts } = await world();
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  root.querySelector('[data-mk-business="biz-1"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  const role = root.querySelector('[data-mk-role="job-klyro"]');
+  role.querySelector("[data-mk-pitch-role]").dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  const form = role.querySelector("[data-mk-role-pitch]");
+  assert.ok(form, "choosing a role opens its pitch form");
+  for (const [name, value] of [["coverNote", "I rebuilt six sites last year."], ["bidAmount", "55000"], ["deliveryDays", "18"], ["q_bq-1", "https://example.com/case"], ["q_bq-2", "Audit and a content plan."]]) {
+    const field = form.querySelector(`[name="${name}"]`);
+    assert.ok(field, `${name} is asked for`);
+    field.value = value;
+  }
+
+  form.dispatchEvent(new window.Event("submit", { bubbles: true }));
+  await settle();
+
+  assert.equal(count(calls, "marketplace_pitch"), 1, "exactly one pitch is sent");
+  const sent = calls.filter((c) => c.name === "marketplace_pitch")[0].args;
+  assert.equal(sent.p_job, "job-klyro");
+  assert.equal(sent.p_bid_amount, 55000);
+  assert.equal(sent.p_delivery_days, 18);
+  assert.deepEqual(sent.p_answers, { "bq-1": "https://example.com/case", "bq-2": "Audit and a content plan." });
+  assert.ok(toasts.some((t) => /Pitch sent/.test(t.message || "")));
+});
+
+test("a business with no open roles says so instead of showing an empty form", async () => {
+  const { window, root, view } = await world();
+  globalThis.__rpc = (name, args) => {
+    if (name === "marketplace_business_profile") return { ...BUSINESS_PROFILE, roles: [], stats: { openProjects: 0 } };
+    return ({ marketplace_my_workspace: WORKSPACE, marketplace_browse_jobs: BOARD, marketplace_list_freelancers: PEOPLE, marketplace_list_businesses: BUSINESSES })[name] ?? null;
+  };
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  root.querySelector('[data-mk-business="biz-1"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  const panel = root.querySelector("[data-mk-dialog-root]");
+  assert.match(panel.textContent, /No open roles right now/);
+  assert.equal(panel.querySelectorAll("[data-mk-pitch-role]").length, 0, "nothing to pitch on");
+});
+
+test("an owner opening their own business is told, not offered a pitch", async () => {
+  const { window, root, view } = await world();
+  globalThis.__rpc = (name) => {
+    if (name === "marketplace_business_profile") {
+      return { ...BUSINESS_PROFILE, isOwn: true, roles: [{ ...BUSINESS_PROFILE.roles[0], mine: true }] };
+    }
+    return ({ marketplace_my_workspace: WORKSPACE, marketplace_browse_jobs: BOARD, marketplace_list_freelancers: PEOPLE, marketplace_list_businesses: BUSINESSES })[name] ?? null;
+  };
+  await view.default(root);
+  root.querySelector('[data-mk-tab="businesses"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  root.querySelector('[data-mk-business="biz-1"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  await settle();
+
+  const panel = root.querySelector("[data-mk-dialog-root]");
+  assert.equal(panel.querySelectorAll("[data-mk-pitch-role]").length, 0, "you cannot pitch on your own role");
+  assert.match(panel.textContent, /your own role/i);
 });

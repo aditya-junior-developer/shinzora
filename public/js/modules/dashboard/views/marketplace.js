@@ -18,7 +18,7 @@
 
 import { qs, delegate, esc } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { timeAgo } from "../../../lib/format.js";
+import { timeAgo, initials } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { pageHead, emptyState, skeletonView } from "../components.js";
 import { toast, toastError } from "../../../ui/toast.js";
@@ -202,9 +202,23 @@ function viewBusinesses() {
           ${businesses
             .map(
               (business) => `<article class="mk-card">
-              <div class="mk-card-top">
-                <h3 class="mk-title">${esc(business.name)}</h3>
-                <span class="mk-status mk-muted">${esc(business.category || "Business")}</span>
+              <div class="mk-biz-head">
+                ${
+                  business.logoUrl
+                    ? `<span class="mk-biz-logo"><img src="${esc(business.logoUrl)}" alt="" loading="lazy" /></span>`
+                    : `<span class="mk-biz-logo is-empty">${esc(initials(business.name))}</span>`
+                }
+                <div class="mk-biz-ident">
+                  <div class="mk-card-top">
+                    <h3 class="mk-title">${esc(business.name)}</h3>
+                    <span class="mk-status mk-muted">${esc(business.category || "Business")}</span>
+                  </div>
+                  ${
+                    business.ownerUsername
+                      ? `<div class="mk-note">@${esc(business.ownerUsername)}</div>`
+                      : ""
+                  }
+                </div>
               </div>
               <p class="mk-desc">${esc((business.description || "No description yet.").slice(0, 180))}</p>
               <dl class="mk-meta">
@@ -219,11 +233,16 @@ function viewBusinesses() {
                   ? `<a class="mk-link" href="${esc(business.websiteUrl)}" target="_blank" rel="noopener noreferrer">Website</a>`
                   : ""
               }
-              ${
-                business.openProjects
-                  ? `<button class="btn btn-ghost btn-sm" data-mk-tab-jump="browse">See their projects</button>`
-                  : ""
-              }
+              <div class="mk-biz-actions">
+                <button class="btn btn-primary btn-sm" data-mk-business="${esc(business.businessId)}">
+                  ${icon("send", { size: 14 })}Pitch
+                </button>
+                ${
+                  business.openProjects
+                    ? `<button class="btn btn-ghost btn-sm" data-mk-tab-jump="browse">See their projects</button>`
+                    : ""
+                }
+              </div>
             </article>`
             )
             .join("")}
@@ -551,6 +570,13 @@ function bind(root, body) {
     openPitchDialog(root, button.dataset.mkPitch)
   );
 
+  /* The pitch button on a business card opens that business, not a bare form:
+     the roles it is hiring for and the questions it asks are the context a
+     freelancer needs before writing anything. */
+  delegate(body, "click", "[data-mk-business]", (event, button) =>
+    openBusinessDialog(root, button.dataset.mkBusiness)
+  );
+
   delegate(body, "click", "[data-mk-accept]", async (event, button) => {
     if (!confirm("Hire this person? A contract starts, the project closes, and every other pitch is rejected.")) return;
     await act(async () => {
@@ -688,6 +714,239 @@ async function act(run, root) {
   } catch (error) {
     toastError(error);
   }
+}
+
+/* ------------------------------------------------------- the pitch panel
+   One dialog per business: who they are, then the roles they are hiring for
+   with the screening questions attached to each. Picking a role opens its
+   pitch form underneath, so an agent can read the brief and answer the
+   questions without leaving the page or losing their place in the list. */
+
+const SOCIAL_LABELS = {
+  instagram: "Instagram",
+  linkedin: "LinkedIn",
+  twitter: "X",
+  x: "X",
+  facebook: "Facebook",
+  youtube: "YouTube",
+  github: "GitHub",
+  dribbble: "Dribbble",
+  behance: "Behance",
+  website: "Website",
+  other: "Link"
+};
+
+const socialLabel = (key) => SOCIAL_LABELS[String(key).toLowerCase()] || String(key).replace(/[_-]+/g, " ");
+
+async function openBusinessDialog(root, businessId) {
+  const { holder, close } = mountDialog(
+    root,
+    `<div class="mk-biz-panel"><p class="mk-desc">Loading this business…</p></div>`
+  );
+
+  let profile;
+  try {
+    profile = await rpc("marketplace_business_profile", { p_business: businessId });
+  } catch (error) {
+    holder.querySelector(".mk-biz-panel").innerHTML =
+      `<p class="mk-desc">${esc(error.message || "That business could not be opened.")}</p>`;
+    toastError(error);
+    return;
+  }
+
+  holder.querySelector(".mk-dialog").innerHTML = businessPanel(profile);
+  bindBusinessPanel(holder, close, root, profile);
+}
+
+function businessPanel(profile) {
+  const socials = Object.entries(profile.socials || {});
+  const roles = Array.isArray(profile.roles) ? profile.roles : [];
+  const stats = profile.stats || {};
+
+  return `<div class="mk-biz-panel">
+    <header class="mk-biz-panel-head">
+      ${
+        profile.logoUrl
+          ? `<span class="mk-biz-logo is-lg"><img src="${esc(profile.logoUrl)}" alt="${esc(profile.name)} logo" /></span>`
+          : `<span class="mk-biz-logo is-lg is-empty">${esc(initials(profile.name))}</span>`
+      }
+      <div class="mk-biz-panel-ident">
+        <h3 class="mk-title">${esc(profile.name || "Business")}</h3>
+        <div class="mk-note">
+          ${esc(profile.category || "Business")}${
+            profile.location ? ` · ${esc(profile.location)}` : ""
+          }${profile.ownerUsername ? ` · @${esc(profile.ownerUsername)}` : ""}
+        </div>
+        <div class="mk-biz-badges">
+          <span class="mk-status mk-muted">${stats.openProjects || 0} open ${
+            stats.openProjects === 1 ? "role" : "roles"
+          }</span>
+          ${stats.completedContracts ? `<span class="mk-status mk-positive">${stats.completedContracts} completed</span>` : ""}
+          ${profile.stage ? `<span class="mk-status mk-muted">${esc(profile.stage)}</span>` : ""}
+        </div>
+      </div>
+      <button class="mk-dialog-x" type="button" data-mk-close-dialog aria-label="Close">${icon("x", { size: 16 })}</button>
+    </header>
+
+    ${profile.description ? `<p class="mk-desc">${esc(profile.description)}</p>` : ""}
+
+    ${
+      profile.websiteUrl || socials.length
+        ? `<div class="mk-biz-links">
+            ${
+              profile.websiteUrl
+                ? `<a class="mk-link" href="${esc(profile.websiteUrl)}" target="_blank" rel="noopener noreferrer">${icon("globe", { size: 13 })}Website</a>`
+                : ""
+            }
+            ${socials
+              .map(
+                ([key, url]) =>
+                  `<a class="mk-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${icon("link", { size: 13 })}${esc(
+                    socialLabel(key)
+                  )}</a>`
+              )
+              .join("")}
+          </div>`
+        : ""
+    }
+
+    <section class="mk-biz-roles">
+      <h4 class="mk-section-title">Roles they are hiring for</h4>
+      ${
+        roles.length
+          ? roles
+              .map(
+                (role) => `<article class="mk-role" data-mk-role="${esc(role.jobId)}">
+                <div class="mk-card-top">
+                  <h5 class="mk-role-title">${esc(role.title)}</h5>
+                  <span class="mk-role-budget">${esc(amount(role.budgetMin, role.currency))} – ${esc(
+                    amount(role.budgetMax, role.currency)
+                  )}</span>
+                </div>
+                <p class="mk-desc">${esc((role.description || "").slice(0, 220))}${
+                  (role.description || "").length > 220 ? "…" : ""
+                }</p>
+                <div class="mk-chips">${(role.skills || []).map(chip).join("")}</div>
+                <div class="mk-note">
+                  ${role.deliveryDays ? `${role.deliveryDays} days` : "Delivery flexible"} · ${
+                    role.proposals
+                  } pitch${role.proposals === 1 ? "" : "es"} so far
+                </div>
+                ${
+                  (role.questions || []).length
+                    ? `<div class="mk-role-questions">
+                        <div class="mk-role-q-label">They ask ${
+                          role.questions.length
+                        } question${role.questions.length > 1 ? "s" : ""}</div>
+                        <ol>${role.questions.map((q) => `<li>${esc(q.prompt)}</li>`).join("")}</ol>
+                      </div>`
+                    : ""
+                }
+                <div class="mk-role-actions">
+                  ${
+                    role.mine
+                      ? `<span class="mk-note">${icon("info", { size: 13 })}This is your own role.</span>`
+                      : role.myProposal
+                        ? `<span class="mk-note">${icon("check-check", { size: 13 })}You pitched — <span class="mk-status mk-${tone(
+                            role.myProposal.status
+                          )}">${esc(role.myProposal.status)}</span></span>`
+                        : `<button class="btn btn-primary btn-sm" type="button" data-mk-pitch-role="${esc(
+                            role.jobId
+                          )}">${icon("send", { size: 13 })}Pitch this role</button>`
+                  }
+                </div>
+                <div class="mk-role-form" data-mk-role-form="${esc(role.jobId)}"></div>
+              </article>`
+              )
+              .join("")
+          : emptyState({
+              icon: "briefcase",
+              title: "No open roles right now",
+              desc: "This business is not hiring on Shinzora at the moment. You can still open a project board above and pitch elsewhere."
+            })
+      }
+    </section>
+  </div>`;
+}
+
+function bindBusinessPanel(holder, close, root, profile) {
+  const roles = Array.isArray(profile.roles) ? profile.roles : [];
+  delegate(holder, "click", "[data-mk-pitch-role]", (_event, button) => {
+    const role = roles.find((entry) => entry.jobId === button.dataset.mkPitchRole);
+    const host = holder.querySelector(`[data-mk-role-form="${button.dataset.mkPitchRole}"]`);
+    if (!role || !host) return;
+    /* One form at a time: a second "Pitch this role" replaces the first rather
+       than leaving two half-written pitches on screen. */
+    holder.querySelectorAll("[data-mk-role-form]").forEach((node) => {
+      if (node !== host) node.innerHTML = "";
+    });
+    if (host.innerHTML) {
+      host.innerHTML = "";
+      return;
+    }
+    host.innerHTML = pitchFormFor(role);
+    host.querySelector("textarea")?.focus();
+  });
+
+  delegate(holder, "submit", "[data-mk-role-pitch]", async (event, form) => {
+    event.preventDefault();
+    const jobId = form.dataset.mkRolePitch;
+    const role = roles.find((entry) => entry.jobId === jobId);
+    if (!role) return;
+    const data = new FormData(form);
+    const answers = {};
+    (role.questions || []).forEach((question) => {
+      answers[question.questionId] = String(data.get(`q_${question.questionId}`) || "");
+    });
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      await rpc("marketplace_pitch", {
+        p_job: jobId,
+        p_cover_note: String(data.get("coverNote") || ""),
+        p_bid_amount: Number(data.get("bidAmount")),
+        p_delivery_days: Number(data.get("deliveryDays")),
+        p_answers: answers
+      });
+      close();
+      toast("Pitch sent.");
+      await load();
+      paint(root);
+    } catch (error) {
+      if (submit) submit.disabled = false;
+      toastError(error);
+    }
+  });
+}
+
+/* The same fields the board's pitch dialog uses, rendered inside the role it
+   belongs to so the questions stay visible while they are being answered. */
+function pitchFormFor(role) {
+  const questions = role.questions || [];
+  return `<form class="mk-form mk-role-pitch" data-mk-role-pitch="${esc(role.jobId)}">
+    <label>Your pitch<textarea name="coverNote" rows="3" maxlength="4000" required
+      placeholder="Why you, what you would do first, and anything they should know."></textarea></label>
+    <div class="mk-row">
+      <label>Bid amount<input name="bidAmount" type="number" min="1" step="1" required
+        value="${role.budgetMax ? Number(role.budgetMax) : ""}" /></label>
+      <label>Delivery (days)<input name="deliveryDays" type="number" min="1" max="730" required
+        value="${role.deliveryDays || ""}" /></label>
+    </div>
+    ${
+      questions.length
+        ? questions
+            .map(
+              (question) => `<label>${esc(question.prompt)}
+                <textarea name="q_${esc(question.questionId)}" rows="2" maxlength="2000" required></textarea>
+              </label>`
+            )
+            .join("")
+        : ""
+    }
+    <div class="mk-row mk-actions">
+      <button class="btn btn-primary btn-sm" type="submit">Send pitch</button>
+    </div>
+  </form>`;
 }
 
 /* ----------------------------------------------------------------- dialogs */

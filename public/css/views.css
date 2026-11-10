@@ -1983,6 +1983,72 @@ html {
   box-shadow:0 24px 60px rgba(0,0,0,.55);
   border-radius:var(--radius-lg, 14px); padding:20px; width:min(520px, 100%); display:flex; flex-direction:column; gap:14px;
 }
+/* The business pitch panel is the widest dialog we use: it holds a company
+   profile, several roles, and the form for the one being pitched on. */
+.mk-dialog:has(.mk-biz-panel) { width:min(760px, 100%); max-height:min(88vh, 900px); overflow-y:auto; }
+
+.mk-biz-head { display:flex; align-items:flex-start; gap:11px; }
+.mk-biz-ident { min-width:0; flex:1 1 auto; }
+.mk-biz-logo {
+  flex:0 0 auto; display:grid; place-items:center; width:44px; height:44px;
+  border-radius:12px; overflow:hidden; background:var(--surface-2, rgba(255,255,255,.06));
+  border:1px solid var(--border); font-size:var(--fs-sm); font-weight:600; color:var(--text-dim);
+}
+.mk-biz-logo img { width:100%; height:100%; object-fit:cover; display:block; }
+.mk-biz-logo.is-lg { width:56px; height:56px; border-radius:14px; font-size:var(--fs-md); }
+.mk-biz-logo.is-empty { background:rgba(124,58,237,.16); color:var(--accent, #7C3AED); }
+.mk-biz-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:10px; }
+
+.mk-biz-panel { display:flex; flex-direction:column; gap:14px; }
+.mk-biz-panel-head { display:flex; align-items:flex-start; gap:13px; }
+.mk-biz-panel-ident { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:4px; }
+.mk-biz-panel-ident .mk-title { font-size:var(--fs-h3); }
+.mk-biz-badges { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+.mk-dialog-x {
+  flex:0 0 auto; display:grid; place-items:center; width:30px; height:30px;
+  border-radius:8px; border:1px solid transparent; background:transparent;
+  color:var(--text-dim); cursor:pointer;
+}
+.mk-dialog-x:hover { background:rgba(255,255,255,.07); color:inherit; }
+.mk-biz-links {
+  display:flex; flex-wrap:wrap; gap:8px 16px; padding:10px 0;
+  border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+}
+.mk-biz-links .mk-link { display:inline-flex; align-items:center; gap:6px; }
+
+.mk-biz-roles { display:flex; flex-direction:column; gap:10px; }
+.mk-role {
+  border:1px solid var(--border); border-radius:var(--r-lg, 12px);
+  padding:12px 13px; display:flex; flex-direction:column; gap:9px;
+  background:var(--surface-2, rgba(255,255,255,.02));
+}
+.mk-role-title { margin:0; font-size:var(--fs-sm); font-weight:600; }
+.mk-role-budget { font-size:var(--fs-sm); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.mk-role-questions {
+  border-left:2px solid rgba(124,58,237,.45); padding-left:11px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.mk-role-q-label {
+  font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-dim); font-weight:600;
+}
+.mk-role-questions ol { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
+.mk-role-questions li { font-size:var(--fs-sm); line-height:1.5; color:var(--text-dim); display:flex; gap:7px; }
+.mk-role-questions li::before { content:"•"; color:var(--accent, #7C3AED); flex:0 0 auto; }
+.mk-role-actions { display:flex; flex-wrap:wrap; align-items:center; gap:9px; }
+.mk-role-form:empty { display:none; }
+.mk-role-form .mk-role-pitch {
+  border-top:1px dashed var(--border); padding-top:12px; margin-top:2px;
+}
+
+@media (max-width:640px) {
+  .mk-dialog:has(.mk-biz-panel) { padding:16px; }
+  .mk-biz-panel-head { flex-wrap:wrap; }
+  .mk-biz-panel-ident { flex:1 1 180px; }
+  .mk-role-budget { font-size:var(--fs-2xs); }
+  .mk-biz-actions .btn, .mk-role-actions .btn { flex:1 1 auto; justify-content:center; }
+}
+
 .hidden { display:none !important; }
 
 /* Marketplace — project requirements, screening answers, pitch dialog */
