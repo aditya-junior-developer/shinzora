@@ -89,6 +89,26 @@ cannot keep a scrim over a desktop layout.
   offset content, animated width, scrim and scroll lock scoped to the phone
   breakpoint, and the rail clipping (not deleting) its labels.
 
+## The admin console
+
+The admin drawer is the shared `createDrawer`, not this controller — the console
+is genuinely modal on every width. It has the same four exits (its ✕, the scrim,
+Escape, and the menu button) and all four are now covered by
+`tests/admin-drawer.test.mjs`, which drives the real controller against the real
+`public/admin/index.html`.
+
+Two changes were needed there:
+
+* the menu button now sits **above** the scrim (`z-index: 65`, scrim is 55). It
+  used to sit under it, so a second click on the button that opened the drawer
+  landed on the scrim: the drawer closed, but not because the control answered.
+* the console **registers the service worker itself** (`registerServiceWorker()`
+  in `public/js/boot/admin.js`). Before, only the marketing site and the dashboard
+  registered one, so a browser that went straight to `/admin/` kept running
+  whatever code and CSS the old worker had cached — and an old `admin.css` leaves
+  the navigation permanently on screen, which is indistinguishable from "the
+  drawer will not close".
+
 ## If the hamburger ever seems dead
 
 That is almost always a mixed-version page, not this controller. The service

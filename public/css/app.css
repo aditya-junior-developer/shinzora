@@ -448,6 +448,10 @@
    is present at every width — in the rail it is the only way back out. */
 .topbar-toggle[data-sidebar-toggle] {
   display: inline-grid;
+  /* Below 1024px the scrim covers the topbar. Keeping the button above it means
+     the same control closes what it opened instead of swallowing the click. */
+  position: relative;
+  z-index: calc(var(--z-sidebar) + 1);
 }
 
 .topbar-search {

@@ -645,6 +645,12 @@ body.drawer-open {
 /* ------------------------------------------------------------------ mobile */
 .admin-menu-toggle {
   display: inline-flex;
+  /* Above the scrim (55) so the button that opened the drawer can close it. The
+     scrim covers the topbar, so without this the click lands on the scrim: the
+     drawer does close, but the control the user aimed at never answers, which
+     reads as "it will not close". */
+  position: relative;
+  z-index: 65;
 }
 
 @media (max-width: 1024px) {

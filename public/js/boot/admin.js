@@ -15,6 +15,7 @@ import { qs } from "../lib/dom.js";
 import { hydrateIcons } from "../lib/icons.js";
 import { checkAdmin } from "../modules/admin/api.js";
 import { bindShell, renderView, adminState, viewExists } from "../modules/admin/shell.js";
+import { registerServiceWorker } from "../ui/pwa.js";
 
 const gate = qs("#admin-gate");
 const shell = qs("#admin-shell");
@@ -136,6 +137,14 @@ async function enterApp(user, role) {
   adminState.identity = { user, role };
 
   bindShell({ user, role });
+
+  /* The console registers the service worker itself. It used to be wired only on
+     the marketing site and the dashboard, so a browser that went straight to
+     /admin/ kept running whatever code the old worker had already cached — and
+     an old admin.css keeps the navigation permanently on screen, which reads as
+     "the drawer opens but will not close". Registering here means a new deploy
+     replaces the old worker, and the shared controller reloads the tab once. */
+  registerServiceWorker();
 
   const requested = new URL(location.href).searchParams.get("view");
   /* Any view the shell can load is reachable by link — including the ones added
