@@ -124,7 +124,11 @@ export function skeletonView(rows = 4) {
 }
 
 export function avatar(name, email, size = "") {
-  return `<span class="avatar ${size}">${esc(initials(name || email || "SZ"))}</span>`;
+  // The stylesheet defines .avatar-sm/.avatar-lg/.avatar-xl, so "sm" has to
+  // become "avatar-sm". Passing an already-prefixed class still works.
+  const variant = !size ? "" : size.startsWith("avatar-") ? size : `avatar-${size}`;
+  const cls = variant ? `avatar ${variant}` : "avatar";
+  return `<span class="${cls}">${esc(initials(name || email || "SZ"))}</span>`;
 }
 
 export function metaRow(parts) {

@@ -37,13 +37,16 @@ export const NAV = [
       { id: "store", label: "Online Store", icon: "store" },
       { id: "inventory", label: "Inventory", icon: "boxes" },
       { id: "orders", label: "Orders", icon: "package" },
-      { id: "customers", label: "Customers", icon: "users" }
+      { id: "customers", label: "Customers", icon: "users" },
+      { id: "find-team", label: "Find Team", icon: "users-round" },
+      { id: "team", label: "Team", icon: "users" }
     ]
   },
   {
     label: "Growth",
     items: [
       { id: "marketplace", label: "Marketplace", icon: "package" },
+      { id: "community", label: "Community", icon: "messages-square" },
       { id: "marketing", label: "Request for Extra Service", icon: "megaphone" },
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
@@ -53,6 +56,7 @@ export const NAV = [
   {
     label: "Account",
     items: [
+      { id: "invitations", label: "Invitations", icon: "inbox" },
       { id: "notifications", label: "Notifications", icon: "bell" },
       { id: "billing", label: "Billing", icon: "credit-card" },
       { id: "settings", label: "Settings", icon: "settings" }
