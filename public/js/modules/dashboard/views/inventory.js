@@ -6,7 +6,7 @@
 
 import { qs, qsa, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, timeAgo } from "../../../lib/format.js";
+import { money, timeAgo, toMinor, fromMinor } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { state } from "../../../lib/store.js";
 import { products as fetchProducts } from "../data.js";
@@ -291,7 +291,20 @@ export default async function render(root) {
       fields: [
         { name: "name", label: "Product name", value: existing?.name || "", required: true },
         { name: "sku", label: "SKU", value: existing?.sku || "", placeholder: "SA-001" },
-        { name: "price", label: "Price (₹, in paise)", type: "number", value: existing?.price ?? 0, required: true, hint: "Amounts are stored in minor units to avoid rounding errors." },
+        /* Rupees, exactly as written on the price tag. "Price (₹, in paise)"
+           asked a shopkeeper to type 168 for ₹1.68, and typing 100 showed ₹1.00
+           — the field and the table disagreed because one spoke rupees and the
+           other paise. The conversion now happens in format.js: toMinor on save,
+           fromMinor when an existing price is put back in the box. */
+        {
+          name: "price",
+          label: "Price (₹)",
+          type: "number",
+          step: "0.01",
+          value: fromMinor(existing?.price ?? 0),
+          required: true,
+          hint: "Rupees and paise — type 1.68 for ₹1.68. Stored as 168 paise so nothing rounds away."
+        },
         { name: "stock", label: "Stock on hand", type: "number", value: existing?.stock ?? 0, required: true },
         {
           name: "status",
@@ -312,19 +325,20 @@ export default async function render(root) {
 
     try {
       if (existing) {
+        const patch = { ...values, price: toMinor(values.price), stock: Number(values.stock), updated_at: new Date().toISOString() };
         const { error } = await sb
           .from("store_products")
-          .update({ ...values, price: Number(values.price), stock: Number(values.stock), updated_at: new Date().toISOString() })
+          .update(patch)
           .eq("id", existing.id);
         if (error) throw normalizeError(error);
-        Object.assign(existing, values, { price: Number(values.price), stock: Number(values.stock) });
+        Object.assign(existing, patch);
       } else {
         const { data, error } = await sb
           .from("store_products")
           .insert({
             owner_id: state.user.id,
             ...values,
-            price: Number(values.price),
+            price: toMinor(values.price),
             stock: Number(values.stock),
             currency: "INR"
           })

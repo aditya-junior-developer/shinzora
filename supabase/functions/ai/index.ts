@@ -945,7 +945,7 @@ const COMMAND_SCHEMA = {
       type: "OBJECT",
       properties: {
         name: { type: "STRING" },
-        price: { type: "NUMBER" },
+        price: { type: "NUMBER", description: "Integer paise. ₹1.68 is 168." },
         stock: { type: "INTEGER" },
         category: { type: "STRING" },
         description: { type: "STRING" },
@@ -982,6 +982,8 @@ async function handleCommand(caller: Caller, body: Record<string, unknown>) {
 
 Allowed actions and their payloads:
   create_product    { name, price, stock, category?, description? }
+                    price is PAISE as an integer: ₹1.68 is 168, ₹2,499 is 249900.
+                    "at 100 rupees" is 10000. A price the sentence does not state is 0.
   update_stock      { productId, stock }        (productId must come from CATALOGUE)
   set_order_status  { orderId, status, note? }  (orderId must come from ORDERS; status is one of pending, paid, processing, shipped, delivered, cancelled, refunded, fulfilled)
   add_customer      { name?, email?, phone?, city?, notes? }
@@ -991,7 +993,8 @@ Rules:
 - Use ids only from the context. Never invent an id or a product name.
 - If something required is missing, set understood false and list what is missing.
 - Never choose an action that is not on the list. If nothing fits, use action "none" with understood false.
-- Prices and stock are plain numbers (64, not "sixty-four"). A missing price is 0, not an omission.
+- Numbers are plain digits (64, not "sixty-four"), and every rupee amount is
+  converted to paise before it goes in the payload.
 
 CONTEXT
 ${JSON.stringify(context).slice(0, 4000)}

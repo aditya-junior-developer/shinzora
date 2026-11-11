@@ -24,6 +24,29 @@ export function money(minorUnits = 0, currency = INR, opts = {}) {
   }
 }
 
+/**
+ * Rupees, as a person types them, to stored minor units (paise).
+ *
+ * The database keeps money in integer paise so no arithmetic ever touches a
+ * float, but nobody types "168" meaning ₹1.68 except a developer. A form field
+ * therefore shows and accepts rupees ("1.68") and converts here — one place, so
+ * the inventory, the order form and anything later cannot disagree about it.
+ *
+ * Rounds to the nearest paisa: 1.68 → 168, 0.1 → 10, 2499 → 249900. An empty or
+ * unreadable value is 0, never NaN — a NaN price would fail the whole insert.
+ */
+export function toMinor(rupees = 0) {
+  const amount = Number(String(rupees ?? "").replace(/[^0-9.\-]/g, ""));
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round(amount * 100);
+}
+
+/** Stored paise back to the rupees a form field should show: 168 → 1.68. */
+export function fromMinor(minorUnits = 0) {
+  const amount = Number(minorUnits || 0) / 100;
+  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
+}
+
 /** Plain number with Indian grouping. */
 export function num(value, opts = {}) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 1, ...opts }).format(Number(value || 0));

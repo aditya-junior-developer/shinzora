@@ -6,7 +6,7 @@
 
 import { qs, qsa, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, timeAgo, dateTime, statusLabel } from "../../../lib/format.js";
+import { money, timeAgo, dateTime, statusLabel, toMinor } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { orders as fetchOrders, logActivity } from "../data.js";
 import { pageHead, setupNotice, emptyState, skeletonView, statusBadge } from "../components.js";
@@ -319,7 +319,17 @@ export default async function render(root) {
         { name: "customer_email", label: "Customer email" },
         { name: "item", label: "Item description", required: true },
         { name: "quantity", label: "Quantity", type: "number", value: 1, required: true },
-        { name: "unit_price", label: "Unit price (paise)", type: "number", value: 0, required: true },
+        /* Rupees here too: "Unit price (paise)" meant typing 168 for ₹1.68, and
+           a shopkeeper recording a sale read it as rupees. */
+        {
+          name: "unit_price",
+          label: "Unit price (₹)",
+          type: "number",
+          step: "0.01",
+          value: 0,
+          required: true,
+          hint: "Rupees and paise — type 1.68 for ₹1.68."
+        },
         {
           name: "status",
           label: "Status",
@@ -338,7 +348,8 @@ export default async function render(root) {
     if (!values) return;
 
     try {
-      const total = Number(values.unit_price) * Number(values.quantity);
+      const unitPrice = toMinor(values.unit_price);
+      const total = unitPrice * Number(values.quantity);
       const { data: order, error } = await sb
         .from("store_orders")
         .insert({
@@ -360,7 +371,7 @@ export default async function render(root) {
         order_id: order.id,
         product_name: values.item,
         quantity: Number(values.quantity),
-        unit_price: Number(values.unit_price),
+        unit_price: unitPrice,
         currency: "INR"
       });
 
