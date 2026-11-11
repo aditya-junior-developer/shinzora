@@ -8,6 +8,7 @@
 import { resolveChain, type Capability } from "./models.ts";
 import { configuredGeminiKeys, primaryGeminiKey, type GeminiApiKey } from "./keyring.ts";
 import { fallbackComplete, fallbackConfigured } from "./fallback.ts";
+import { parseModelJson } from "./json-repair.ts";
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -450,6 +451,11 @@ export interface GeminiOptions {
      the code then walks to the next model in the chain — and the cumulative wall
      clock is what the platform answers with 546. */
   thinkingBudget?: number;
+  /* An OpenAPI-style schema handed to the provider so the grammar constrains
+     the answer instead of a sentence asking nicely for JSON. Optional: older
+     models and the relaxed retry drop it, which is exactly why the parser stays
+     tolerant. */
+  responseSchema?: Record<string, unknown>;
 }
 
 /**
@@ -487,6 +493,7 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
       temperature: options.temperature ?? 0.7,
       maxOutputTokens: options.maxOutputTokens ?? 8192,
       ...(options.json ? { responseMimeType: "application/json" } : {}),
+      ...(options.json && options.responseSchema ? { responseSchema: options.responseSchema } : {}),
       ...(typeof options.thinkingBudget === "number"
         ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
         : {})
@@ -623,30 +630,59 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
   );
 }
 
-/** Call Gemini and parse a JSON object, tolerating ```json fences. */
-export async function geminiJson<T = unknown>(prompt: string, options: GeminiOptions = {}): Promise<T> {
-  const raw = await gemini(prompt, { ...options, json: true });
-  const cleaned = raw
-    .replace(/^\uFEFF/, "")
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
+/** Reasons from `parseModelJson` that mean "ran out of room", not "bad syntax". */
+const TRUNCATED = /mid-JSON|incomplete|no complete JSON/i;
 
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start > -1 && end > start) {
-      try {
-        return JSON.parse(cleaned.slice(start, end + 1)) as T;
-      } catch {
-        /* fall through */
-      }
+/**
+ * Call Gemini and read a JSON value out of the answer.
+ *
+ * The previous version stripped fences and then sliced from the first `{` to
+ * the last `}`, which fails on every wrapper the model actually produces: prose
+ * around the object, a trailing comma, curly quotes pasted into a string. Worse,
+ * when the answer was *cut off* — the output budget ran out mid-object — the
+ * slice was unbalanced and the caller got "The AI returned malformed JSON.
+ * Retrying usually fixes this.", a sentence that blames the model for something
+ * a retry can never fix.
+ *
+ * So: repair what can be proven safe, retry once with a bigger budget when the
+ * answer was simply truncated, and otherwise report the honest reason.
+ */
+export async function geminiJson<T = unknown>(prompt: string, options: GeminiOptions = {}): Promise<T> {
+  const budget = options.maxOutputTokens ?? 4096;
+
+  const attempt = (overrides: GeminiOptions = {}) =>
+    gemini(prompt, { ...options, json: true, ...overrides }).then((raw) => parseModelJson<T>(raw));
+
+  let read = await attempt();
+  if (read.ok) return read.value;
+
+  const truncated = TRUNCATED.test(read.reason);
+
+  /* A second, larger attempt only for truncation: the prompt and the schema were
+     fine, the answer just did not fit. Reasoning is switched off for the retry
+     because thinking tokens come out of the same budget that cut the answer
+     short. */
+  if (truncated && budget < 8192) {
+    try {
+      read = await attempt({
+        maxOutputTokens: Math.min(Math.max(budget * 2, 2048), 8192),
+        thinkingBudget: 0
+      });
+      if (read.ok) return read.value;
+    } catch {
+      /* the retry failing must not mask the real reason below */
     }
-    throw new GeminiError("The AI returned malformed JSON. Retrying usually fixes this.", "ai_bad_json", 502);
   }
+
+  throw new GeminiError(
+    truncated || TRUNCATED.test(read.reason)
+      ? "The AI's answer was cut off before it finished, so nothing was used. Try again."
+      : "The AI returned something that could not be read as JSON, so nothing was used. Try again.",
+    truncated || TRUNCATED.test(read.reason) ? "ai_truncated" : "ai_bad_json",
+    502
+  );
 }
+
 
 /** Usage accounting helpers. */
 export function estimateTokens(text: string): number {

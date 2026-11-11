@@ -933,6 +933,39 @@ ${question ? `OWNER ASKS: ${question}` : ""}`,
    ========================================================================== */
 const COMMAND_ACTIONS = ["create_product", "update_stock", "set_order_status", "add_customer"] as const;
 
+/* The shape of a command, as a provider-side schema.
+   This is a grammar, not a prompt: the model cannot answer with prose, a fence
+   or a second object, so the client never has to guess what it got back. */
+const COMMAND_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    understood: { type: "BOOLEAN" },
+    action: { type: "STRING", enum: ["create_product", "update_stock", "set_order_status", "add_customer", "none"] },
+    payload: {
+      type: "OBJECT",
+      properties: {
+        name: { type: "STRING" },
+        price: { type: "NUMBER" },
+        stock: { type: "INTEGER" },
+        category: { type: "STRING" },
+        description: { type: "STRING" },
+        productId: { type: "STRING" },
+        orderId: { type: "STRING" },
+        status: { type: "STRING" },
+        note: { type: "STRING" },
+        email: { type: "STRING" },
+        phone: { type: "STRING" },
+        city: { type: "STRING" },
+        notes: { type: "STRING" }
+      }
+    },
+    summary: { type: "STRING" },
+    missing: { type: "ARRAY", items: { type: "STRING" } }
+  },
+  required: ["understood", "action", "summary"],
+  propertyOrdering: ["understood", "action", "payload", "summary", "missing"]
+} as const;
+
 async function handleCommand(caller: Caller, body: Record<string, unknown>) {
   const request = clean(body.request, 800);
   const context = (body.context ?? {}) as Record<string, unknown>;
@@ -957,14 +990,26 @@ Rules:
 - Choose exactly one action. If the sentence asks for two things, do the first and say so in summary.
 - Use ids only from the context. Never invent an id or a product name.
 - If something required is missing, set understood false and list what is missing.
-- Never choose an action that is not on the list.
+- Never choose an action that is not on the list. If nothing fits, use action "none" with understood false.
+- Prices and stock are plain numbers (64, not "sixty-four"). A missing price is 0, not an omission.
 
 CONTEXT
 ${JSON.stringify(context).slice(0, 4000)}
 
 REQUEST
 ${request}`,
-    { temperature: 0.2, maxOutputTokens: 500 }
+    {
+      temperature: 0.2,
+      /* 500 was the budget that broke this feature: with thinking tokens taken
+         out of the same allowance the answer arrived cut off mid-object, which
+         surfaces as "malformed JSON". The schema below keeps the answer small,
+         so this only buys headroom. */
+      maxOutputTokens: 1600,
+      /* Structured extraction, not a reasoning task. Spending the budget on
+         thinking is what truncated the object in the first place. */
+      thinkingBudget: 0,
+      responseSchema: COMMAND_SCHEMA
+    }
   );
 
   const action = String(parsed.action || "");
