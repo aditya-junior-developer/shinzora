@@ -13,6 +13,7 @@
    ========================================================================== */
 
 import { qs, delegate, esc, on, debounce } from "../../../lib/dom.js";
+import mountHub from "../../messaging/group-chat.js";
 import { icon } from "../../../lib/icons.js";
 import { date } from "../../../lib/format.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
@@ -39,6 +40,34 @@ export default async function render(root) {
   try {
     const { data: session } = await sb.auth.getSession();
     selfId = session?.session?.user?.id || null;
+
+    /**
+     * One surface for everybody.
+     *
+     * A signed-in member gets the same three-column hub here as under Messages —
+     * the public rooms are its Channels — so an admin, an owner and a freelancer
+     * all see the same page. There is no role branch in this file; the only
+     * branch is signed in versus signed out, because a visitor with no account
+     * has no groups to put in the rail. That visitor keeps the read-only page
+     * below.
+     */
+    if (selfId) {
+      const search = globalThis.location?.search || "";
+      const wanted = new URLSearchParams(search).get("channel");
+      root.innerHTML =
+        pageHead({
+          title: "Community",
+          desc: "The public rooms, in the same hub as your groups. Everyone signed in sees this page — nothing about it changes with your role.",
+          badge: `<span class="badge badge-neutral">${icon("message-circle", { size: 12 })}Text only</span>`
+        }) + `<div id="community-hub"></div>`;
+      const host = qs("#community-hub", root);
+      const mounted = await mountHub(host, { channel: wanted || null, preferChannel: true });
+      root.__cmCleanup = () => {
+        host.innerHTML = "";
+      };
+      return mounted;
+    }
+
     /* The group count is real data from the group RPC, so the bar below either
        names a number it fetched or says nothing at all. A failure here must not
        take the public room down with it. */

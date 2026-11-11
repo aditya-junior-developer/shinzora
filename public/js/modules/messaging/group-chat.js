@@ -38,6 +38,17 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ALLOWED_FILES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
 const QUICK_EMOJI = ["🙂", "👍", "🎉", "❤️", "🙏", "✨"];
 
+/** "Today" / "Yesterday" / a long date, for the day pills in a room. */
+function dayLabel(value) {
+  const when = new Date(value);
+  if (Number.isNaN(when.getTime())) return "";
+  const startOf = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((startOf(new Date()) - startOf(when)) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return when.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+}
+
 /** One line of a message, cut at `max`, for pin bars and search hits. */
 function oneLine(value, max = 120) {
   const flat = String(value || "").replace(/\s+/g, " ").trim();
@@ -374,12 +385,21 @@ export default async function mountGroups(root, options = {}) {
       return;
     }
     let lastAuthor = null;
+    let lastDay = "";
     messagesEl.innerHTML = rows
       .map((message) => {
         const mine = message.authorId === me;
         const showWho = message.authorId !== lastAuthor;
         lastAuthor = message.authorId;
-        return `<div class="bubble-row${mine ? " is-mine" : ""}" data-message="${esc(message.id)}">
+        /* One "Today" pill per day rather than a date on every line — the public
+           page did this and the hub must not lose it. */
+        const day = String(message.createdAt || "").slice(0, 10);
+        const pill =
+          day && day !== lastDay
+            ? `<div class="hub-day">${esc(dayLabel(message.createdAt))}</div>`
+            : "";
+        lastDay = day || lastDay;
+        return `${pill}<div class="bubble-row${mine ? " is-mine" : ""}" data-message="${esc(message.id)}">
           ${showWho && !mine ? `<span class="bubble-avatar">${initials(message.authorName || "Member")}</span>` : ""}
           <div class="bubble${mine ? " bubble-mine" : ""}">
             ${mine || !showWho ? "" : `<div class="bubble-who">${esc(message.authorName || "Member")}</div>`}
@@ -855,7 +875,8 @@ function insertAtCaret(field, text, start, end) {
   /* ------------------------------------------------------------------- send */
   on(formEl, "submit", async (event) => {
     event.preventDefault();
-    if (!active) return;
+    /* A public room has no group id, so the guard is "nothing open at all". */
+    if (!active && !activeChannel) return;
     const body = bodyEl.value.trim();
     if (!body && !pending.length) return;
     const send = qs("#grp-send", wrap);
@@ -1751,6 +1772,13 @@ function insertAtCaret(field, text, start, end) {
     const wantedChannel = options.channel && channels.find((row) => row.slug === options.channel);
     if (wantedChannel) {
       await openChannel(wantedChannel.slug);
+      return { open, openChannel, refresh: loadList };
+    }
+    /* Community asks for a room first: that page is about the public rooms, and
+       landing a visitor on their most recent group instead would be a different
+       page. */
+    if (options.preferChannel && channels.length) {
+      await openChannel(channels[0].slug);
       return { open, openChannel, refresh: loadList };
     }
     const wanted = options.groupId && groups.find((group) => group.id === options.groupId);

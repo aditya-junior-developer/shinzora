@@ -143,7 +143,7 @@ const MESSAGES = [
     id: "m1",
     body: "Hello everyone",
     createdAt: new Date(Date.now() - 60_000).toISOString(),
-    authorId: "agent-1",
+    authorId: "someone-else",
     authorName: "Asha",
     username: "asha",
     avatarUrl: null
@@ -164,7 +164,11 @@ async function bundle(entry, extraTables = {}) {
               order: async () => ({ data: globalThis.__table(table), error: null })
             })
           }),
-          auth: { getSession: async () => ({ data: { session: { user: { id: "agent-1" } } } }) },
+          auth: {
+            getSession: async () => ({ data: { session: globalThis.__session } }),
+            /* The hub reads the signed-in id the way the app does. */
+            getUser: async () => ({ data: { user: globalThis.__session?.user || null } })
+          },
           channel: () => {
             const api = { on: () => api, subscribe: () => api };
             return api;
@@ -203,8 +207,9 @@ async function bundle(entry, extraTables = {}) {
   return import(url);
 }
 
-function makeWorld() {
+function makeWorld({ session = { user: { id: "agent-1" } } } = {}) {
   const { window, document } = parseHTML("<!doctype html><html><body><div id='view-root'></div></body></html>");
+  globalThis.__session = session;
   const calls = [];
   const toasts = [];
   globalThis.window = window;
@@ -216,6 +221,10 @@ function makeWorld() {
   globalThis.CustomEvent = window.CustomEvent;
   globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   globalThis.__toast = (message, kind) => toasts.push({ message, kind });
+  globalThis.location = new URL("https://shinzora.test/app/?view=community");
+  window.location = globalThis.location;
+  globalThis.history = { replaceState: () => {}, pushState: () => {} };
+  globalThis.navigator = { userAgent: "shinzora-test" };
 
   const answers = {
     team_my_invitations: INVITATIONS,
@@ -244,6 +253,9 @@ function makeWorld() {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+/* The hub paints in several awaited steps (groups, channels, the room, the
+   details column), so the community tests wait a little longer than the rest. */
+const settleHub = () => new Promise((resolve) => setTimeout(resolve, 200));
 const count = (calls, name) => calls.filter((call) => call.name === name).length;
 const lastArgs = (calls, name) => calls.filter((call) => call.name === name).at(-1)?.args;
 const click = (window, node) => node.dispatchEvent(new window.Event("click", { bubbles: true }));
@@ -438,51 +450,66 @@ test("opening a card fetches the full profile, including CV and portfolio", asyn
   assert.ok(cellText.some((t) => /^Experience\s*5 years$/.test(t)), "experience reads as prose, not a number alone");
 });
 
-test("Community renders channels and messages, and sends text", async () => {
+test("Community renders the same hub every signed-in account gets, and sends text", async () => {
   const { window, root, calls } = makeWorld();
   const view = await bundle(path.join(viewsDir, "community.js"));
   await view.default(root);
-  await settle();
+  await settleHub();
 
-  assert.equal(root.querySelectorAll("[data-channel]").length, 2, "every channel is listed");
-  assert.equal(count(calls, "community_messages_list"), 1, "the open channel loads its messages");
+  /* The three columns: rooms, the thread, the details panel. */
+  assert.ok(root.querySelector("#grp-channels"), "the rail lists the public rooms");
+  assert.equal(root.querySelectorAll("[data-channel]").length, 2, "every room is listed");
+  assert.ok(root.querySelector(".chat-pane-thread"), "the middle column is a thread");
+  assert.ok(root.querySelector("#grp-info-col"), "the details column is present");
+
+  assert.equal(count(calls, "community_messages_list"), 1, "the open room loads its messages");
+  assert.deepEqual(lastArgs(calls, "community_messages_list"), { p_channel: "general", p_limit: 80 });
+  assert.match(root.querySelector(".chat-thread-title").textContent, /#General/, "the open room is named");
   assert.match(root.textContent, /Hello everyone/, "messages render");
-  assert.equal(root.querySelectorAll(".cm-msg-author").length, 1, "each message has an author line");
-  assert.match(root.querySelector(".cm-msg-author").textContent, /Asha/, "the author name renders bold beside the body");
-  assert.ok(root.querySelector(".cm-msg-time"), "and a timestamp sits beside the name");
-  assert.ok(root.querySelector(".cm-day"), "the day is announced once, as a pill");
-  assert.match(root.querySelector(".cm-day").textContent, /Today/, "today's messages sit under a Today pill");
-  assert.ok(root.querySelector(".cm-rail-item.is-active"), "the open channel is marked in the rail");
+  assert.ok(root.querySelector(".bubble-who"), "each message carries its author");
+  assert.ok(root.querySelector(".hub-day"), "and the day is announced once");
 
-  /* Text only: there must be no upload control anywhere in the room. */
-  assert.equal(root.querySelectorAll("input[type=file]").length, 0, "no file input in the community");
+  /* Text only, enforced by the schema — so the control is not offered. */
+  assert.equal(root.querySelector("#grp-files").disabled, true, "attachments are off in a public room");
+  assert.equal(root.querySelector('label[for="grp-files"]').hidden, true, "the attach control is not shown");
   assert.match(root.textContent, /Text only/, "the limitation is stated up front");
 
-  const field = root.querySelector("#cm-body");
+  const field = root.querySelector("#grp-body");
   field.value = "First post!";
-  root.querySelector("#cm-form").dispatchEvent(new window.Event("submit", { bubbles: true }));
+  root.querySelector("#grp-compose").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
   await settle();
 
   assert.equal(count(calls, "community_send"), 1);
   assert.deepEqual(lastArgs(calls, "community_send"), { p_channel: "general", p_body: "First post!" });
 });
 
-test("switching channels reloads that channel's messages", async () => {
+test("switching rooms in the hub reloads that room's messages", async () => {
   const { window, root, calls } = makeWorld();
   const view = await bundle(path.join(viewsDir, "community.js"));
   await view.default(root);
-  await settle();
+  await settleHub();
 
   const wins = [...root.querySelectorAll("[data-channel]")].find((b) => b.dataset.channel === "wins");
   click(window, wins);
-  await settle();
+  await settleHub();
 
-  assert.equal(count(calls, "community_messages_list"), 2, "a second load for the new channel");
+  assert.equal(count(calls, "community_messages_list"), 2, "a second load for the new room");
   assert.deepEqual(lastArgs(calls, "community_messages_list"), {
     p_channel: "wins",
-    p_before: null,
     p_limit: 80
   });
+});
+
+test("a signed-out visitor keeps the read-only room page", async () => {
+  /* No account means no groups: the hub's rail would be half empty. These
+     visitors get the plainer page, which needs no membership at all. */
+  const { root } = makeWorld({ session: null });
+  const view = await bundle(path.join(viewsDir, "community.js"));
+  await view.default(root);
+  await settleHub();
+
+  assert.equal(root.querySelector("#grp-channels"), null, "no hub for a visitor");
+  assert.ok(root.querySelector("#cm-body"), "the public composer is there");
 });
 
 /* ------------------------------------------------------- schema guarantees */
@@ -569,19 +596,23 @@ test("consecutive messages from one person group under a single author line", as
   const { root } = makeWorld();
   const now = Date.now();
   globalThis.__rpc = (name) => {
-    if (name !== "community_messages_list") return null;
-    return [
-      { id: "m1", body: "Hello everyone", createdAt: new Date(now - 90_000).toISOString(), authorId: "agent-1", authorName: "Asha", username: "asha" },
-      { id: "m2", body: "Second thought", createdAt: new Date(now - 80_000).toISOString(), authorId: "agent-1", authorName: "Asha", username: "asha" },
-      { id: "m3", body: "Different voice", createdAt: new Date(now - 70_000).toISOString(), authorId: "owner-1", authorName: "Aditya", username: "aditya" }
-    ];
+    if (name === "community_messages_list") {
+      return [
+        { id: "m1", body: "Hello everyone", createdAt: new Date(now - 90_000).toISOString(), authorId: "someone-else", authorName: "Asha", username: "asha" },
+        { id: "m2", body: "Second thought", createdAt: new Date(now - 80_000).toISOString(), authorId: "someone-else", authorName: "Asha", username: "asha" },
+        { id: "m3", body: "Different voice", createdAt: new Date(now - 70_000).toISOString(), authorId: "owner-2", authorName: "Aditya", username: "aditya" }
+      ];
+    }
+    if (name === "group_my_groups") return [];
+    return null;
   };
   const view = await bundle(path.join(viewsDir, "community.js"));
   await view.default(root);
-  await settle();
+  await settleHub();
 
-  assert.equal(root.querySelectorAll(".cm-msg").length, 3, "all three messages render");
-  assert.equal(root.querySelectorAll(".cm-msg-author").length, 2, "the repeated author line is dropped");
-  assert.equal(root.querySelectorAll(".cm-msg.is-continuation").length, 1, "only the repeat is compacted");
-  assert.match(root.textContent, /Second thought/, "the grouped message still shows its body");
+  assert.equal(root.querySelectorAll("[data-message]").length, 3, "all three messages render");
+  assert.equal(root.querySelectorAll(".bubble-who").length, 2, "the repeated author line is dropped");
+  assert.match(root.querySelector("[data-message=\"m2\"]").textContent, /Second thought/);
+  assert.match(root.querySelector("[data-message=\"m3\"]").textContent, /Aditya/, "the new voice is named again");
+  assert.equal(root.querySelectorAll(".hub-day").length, 1, "one day pill for one day");
 });

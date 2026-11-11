@@ -266,8 +266,10 @@ belong to this group."*
 
 ## 20. The messaging hub — one surface for everybody
 
-Messages → **Groups** is now three columns, the same layout for an owner, a
-plain member and a freelancer account. Nothing about the shape changes with
+**Messages → Groups** and **Community** are now the same three-column page for
+an owner, a plain member and a freelancer account. Community opens on its first
+public room; a signed-out visitor still gets the plainer read-only room page,
+because a visitor has no groups to put in the rail — that is the only branch. Nothing about the shape changes with
 role; only the rows the database would refuse are left out.
 
 **Left rail** — public **Channels** (# General, # Projects, # Wins,

@@ -3749,3 +3749,16 @@ html {
 .bubble { position: relative; }
 .bubble-row:hover .bubble-pin { display: grid; }
 .bubble-pin:hover { color: var(--lavender); border-color: var(--line-violet); }
+
+/* A day pill, once per calendar day in a room or a thread. */
+.hub-day {
+  align-self: center;
+  margin: 10px auto 2px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-3);
+  font-size: var(--fs-2xs);
+  width: max-content;
+}
