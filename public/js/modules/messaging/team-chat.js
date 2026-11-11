@@ -22,6 +22,8 @@ import { sb, normalizeError } from "../../lib/supabase.js";
 import { state } from "../../lib/store.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { presenceDot, presenceState, presenceLabel } from "../../ui/presence.js";
+import { createCall, callTopics, turnConfigured } from "./webrtc.js";
+import { openCallSurface, watchForCalls, showRingBanner } from "./call-ui.js";
 
 const BUCKET = "team-chat-files";
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -75,7 +77,12 @@ export default async function mountInbox(root, options = {}) {
           <div class="chat-thread-title">Messages</div>
           <div class="chat-thread-sub">Search a username to start, or pick a conversation.</div>
         </div>
-        <div class="dm-head-status" id="dm-head-status"></div>
+        <div class="dm-head-actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="dm-call" hidden>
+            ${icon("phone", { size: 13 })}<span>Call</span>
+          </button>
+          <div class="dm-head-status" id="dm-head-status"></div>
+        </div>
       </div>
 
       <div class="chat-messages" id="dm-messages">
@@ -102,6 +109,15 @@ export default async function mountInbox(root, options = {}) {
   const formEl = qs("#dm-compose", wrap);
   const searchInput = qs("#dm-search-input", wrap);
   const searchResults = qs("#dm-search-results", wrap);
+  const callButton = qs("#dm-call", wrap);
+
+  /* One call per tab, and only for a one-to-one conversation: a "call" between
+     five people in a team room is a meeting, and that lives in Groups. */
+  let currentCall = null;
+  let stopWatching = () => {};
+  let watchedTopic = null;
+  let ringDismiss = null;
+  let activeMeta = null;
 
   let me = null;
   let conversations = [];
@@ -232,6 +248,10 @@ export default async function mountInbox(root, options = {}) {
           : people.map((person) => person.name).filter(Boolean).join(" · ") || "Team conversation";
       statusEl.innerHTML =
         thread.kind === "personal" ? presenceDot(other.lastSeenAt, { size: 10 }) : "";
+      /* A call makes sense in a one-to-one conversation, not in a team room. */
+      activeMeta = { peerName: title, peerId: other.userId || null, personal: thread.kind === "personal" };
+      callButton.hidden = thread.kind !== "personal";
+      if (thread.kind === "personal") watchConversation(id, title);
       await paintMessages(thread);
       await loadList();
     } catch (error) {
@@ -276,6 +296,73 @@ export default async function mountInbox(root, options = {}) {
     messagesEl.scrollTop = messagesEl.scrollHeight;
     formEl.hidden = false;
   }
+
+  /* ----------------------------------------------------------------- calls */
+
+  function startCall(conversationId, peerName) {
+    const call = createCall({
+      kind: "voice",
+      topic: callTopics.dm(conversationId),
+      title: peerName || "Call",
+      self: { userId: me, name: "You" }
+    });
+    currentCall = call;
+    openCallSurface({
+      call,
+      self: { userId: me, name: "You" },
+      subtitle: "Direct call",
+      onClose: () => {
+        if (currentCall === call) currentCall = null;
+      }
+    });
+    call.join({ audioOnly: true }).catch((error) => {
+      const message = String(error?.message || "");
+      if (!turnConfigured() && /connect|failed|network/i.test(message)) {
+        toastError(
+          new Error(
+            `${message} This is usually a network between the two of you — a TURN relay is not configured on this deployment.`
+          )
+        );
+        return;
+      }
+      toastError(error);
+    });
+  }
+
+  function watchConversation(conversationId, peerName) {
+    const topic = callTopics.dm(conversationId);
+    if (watchedTopic === topic) return;
+    stopWatching();
+    watchedTopic = topic;
+    stopWatching = watchForCalls(sb, {
+      topics: [topic],
+      onRing: ({ ended, from, name }) => {
+        if (ended) {
+          ringDismiss?.();
+          return;
+        }
+        if (currentCall) return;
+        ringDismiss?.();
+        ringDismiss = showRingBanner({
+          name: name || peerName || "Somebody",
+          kind: "voice",
+          groupName: "Direct call",
+          onJoin: () => {
+            ringDismiss = null;
+            startCall(conversationId, peerName);
+          },
+          onDismiss: () => {
+            ringDismiss = null;
+          }
+        });
+      }
+    });
+  }
+
+  on(callButton, "click", () => {
+    if (!active || !activeMeta?.peerName) return;
+    startCall(active, activeMeta.peerName);
+  });
 
   /* ---------------------------------------------------------------- events */
   delegate(listEl, "click", "[data-conversation]", (_event, button) => open(button.getAttribute("data-conversation")));

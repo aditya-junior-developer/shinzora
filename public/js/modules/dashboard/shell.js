@@ -538,7 +538,9 @@ export function subscribeNotifications() {
         }
         const list = qs("#notif-list");
         if (list && !qs("#notification-drawer").hidden) list.insertAdjacentHTML("afterbegin", notifMarkup(row));
-        if (shown && row.type === "group" && row.meta?.groupId && row.meta?.messageId) {
+        /* A mention is stored with type `group_mention`; keying off the meta
+           rather than the type means both kinds refresh the open thread. */
+        if (shown && row.meta?.groupId && row.meta?.messageId) {
           document.dispatchEvent(new CustomEvent("shinzora:group-message", { detail: row.meta }));
         }
       }

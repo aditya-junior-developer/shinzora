@@ -8,5 +8,6 @@ window.__SHINZORA_ENV__ = {
   "APP_NAME": "Shinzora",
   "ENVIRONMENT": "production",
   "RAZORPAY_KEY_ID": "",
-  "PRELAUNCH_API": false
+  "PRELAUNCH_API": false,
+  "PUSH_VAPID_PUBLIC_KEY": "BHyWfB8QKY5UHnw0MKP-IdF5bJ4wIc7aeYTkKlgB2xxAtX4_nMMQQkUva0EN3WkbLTbaAzw3SEcKKGH2INEDn_E"
 };

@@ -78,7 +78,11 @@ const config = {
   PRELAUNCH_API: get("SHINZORA_PRELAUNCH_API") === "1",
   /* PUBLIC half of the Web Push (VAPID) key pair. The private half is a secret
      held only by the `push` Edge Function. */
-  PUSH_VAPID_PUBLIC_KEY: firstOf("SHINZORA_PUSH_VAPID_PUBLIC_KEY", "VITE_PUSH_VAPID_PUBLIC_KEY")
+  PUSH_VAPID_PUBLIC_KEY: firstOf("SHINZORA_PUSH_VAPID_PUBLIC_KEY", "VITE_PUSH_VAPID_PUBLIC_KEY"),
+  /* Optional TURN relay for calls. Format:-turn:host:port?transport=udp,turn:host:port?transport=tcp */
+  TURN_URL: firstOf("SHINZORA_TURN_URL", "VITE_TURN_URL"),
+  TURN_USER: firstOf("SHINZORA_TURN_USER", "VITE_TURN_USER"),
+  TURN_CREDENTIAL: firstOf("SHINZORA_TURN_CREDENTIAL", "VITE_TURN_CREDENTIAL")
 };
 
 /* Refuse to write anything that looks like a secret. */

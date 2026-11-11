@@ -3106,3 +3106,280 @@ html {
 .grp-empty-title { margin: 0; font-size: var(--fs-base); font-weight: 650; color: var(--text); }
 .grp-empty-desc { margin: 0; font-size: var(--fs-xs); line-height: 1.65; color: var(--text-3); }
 .grp-empty-foot { margin: 0; font-size: var(--fs-2xs); color: var(--text-4); }
+
+/* ==========================================================================
+   Group attachments
+   --------------------------------------------------------------------------
+   Pictures are shown as pictures; a group where a photo is a filename is a
+   group nobody uses. Files are signed per view and never public.
+   ========================================================================== */
+.grp-pending {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.grp-pending[hidden] { display: none; }
+.grp-pending-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 9px;
+  border: 1px solid var(--line-violet-soft);
+  border-radius: 999px;
+  background: var(--panel-3);
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+  max-width: 260px;
+}
+.grp-pending-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.grp-pending-size { color: var(--text-4); }
+.grp-pending-x {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-4);
+  cursor: pointer;
+}
+.grp-pending-x:hover { background: rgba(248, 113, 113, 0.16); color: #fca5a5; }
+.grp-file-count { font-size: var(--fs-2xs); color: var(--lavender); align-self: center; }
+
+.chat-messages.is-drop-target {
+  outline: 2px dashed var(--line-violet);
+  outline-offset: -8px;
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.grp-attachments { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.grp-attach-image {
+  display: block;
+  max-width: min(320px, 100%);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.grp-attach-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: cover;
+}
+.grp-attach { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); color: var(--text-3); }
+.grp-attach.is-broken { color: #fca5a5; }
+
+/* ==========================================================================
+   Calls — voice and video
+   --------------------------------------------------------------------------
+   A floating panel rather than a full-screen takeover: a meeting you cannot
+   read the chat during is worse than no meeting. Minimising leaves the audio
+   running and keeps a way back.
+   ========================================================================== */
+.call-surface {
+  position: fixed;
+  right: var(--s-4);
+  bottom: var(--s-4);
+  z-index: 9200;
+  width: min(560px, calc(100vw - 2 * var(--s-4)));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-violet);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.call-surface.is-minimised .call-stage,
+.call-surface.is-minimised .call-notice { display: none; }
+
+.call-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px var(--s-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.call-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; }
+.call-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18);
+}
+.call-title { font-size: var(--fs-sm); font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-sub { font-size: var(--fs-2xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-timer { font-size: var(--fs-2xs); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.call-close {
+  display: grid;
+  place-items: center;
+  padding: 5px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.call-close:hover { background: var(--panel-3); color: var(--text); }
+
+.call-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  padding: var(--s-3);
+  max-height: min(58vh, 460px);
+  overflow-y: auto;
+  background: #0b0910;
+}
+.call-surface.is-voice .call-stage { grid-template-columns: 1fr; max-height: 300px; }
+
+.call-tile {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--panel-2);
+  display: grid;
+  place-items: center;
+}
+.call-surface.is-voice .call-tile { aspect-ratio: auto; height: 190px; }
+.call-tile.is-self { border-color: var(--line-violet-soft); }
+.call-tile.is-failed { border-color: rgba(248, 113, 113, 0.5); }
+.call-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+.call-tile.is-self .call-video { transform: scaleX(-1); }
+
+.call-avatar {
+  --level: 0;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--grad-brand);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 calc(var(--level) * 10px) rgba(124, 58, 237, 0.22);
+  transition: box-shadow 120ms linear;
+}
+.call-avatar .avatar { --av: 72px; font-size: 26px; }
+.call-avatar.is-speaking { box-shadow: 0 0 0 calc(4px + var(--level) * 14px) rgba(52, 211, 153, 0.28); }
+
+.call-name {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+  background: rgba(8, 6, 14, 0.72);
+  border-radius: var(--r-sm);
+  padding: 3px 6px;
+  backdrop-filter: blur(6px);
+}
+.call-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-badge {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  color: var(--text-2);
+}
+.call-badge.is-bad { background: rgba(248, 113, 113, 0.2); color: #fca5a5; }
+
+.call-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px var(--s-3);
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+.call-notice[hidden] { display: none; }
+.call-notice.is-bad { color: #fca5a5; background: rgba(248, 113, 113, 0.08); }
+
+.call-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px var(--s-3);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.call-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-2);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.call-btn:hover { background: var(--panel-3); color: var(--text); }
+.call-btn[aria-pressed="true"] { border-color: var(--line-violet); color: var(--lavender); }
+.call-btn.is-danger { border-color: rgba(248, 113, 113, 0.4); color: #fca5a5; background: rgba(248, 113, 113, 0.08); }
+.call-btn.is-danger:hover { background: rgba(248, 113, 113, 0.16); color: #fecaca; }
+
+.ring-banner {
+  position: fixed;
+  top: var(--s-4);
+  right: var(--s-4);
+  z-index: 9300;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  width: min(360px, calc(100vw - 2 * var(--s-4)));
+  border: 1px solid var(--line-violet);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  animation: ring-in 200ms ease both;
+}
+@keyframes ring-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ring-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--grad-brand-soft);
+  color: var(--lavender);
+  animation: ring-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(124, 58, 237, 0); }
+}
+.ring-copy { flex: 1 1 auto; min-width: 0; }
+.ring-title { font-size: var(--fs-xs); font-weight: 650; color: var(--text); }
+.ring-sub { font-size: var(--fs-2xs); color: var(--text-3); }
+
+.dm-head-actions { display: inline-flex; align-items: center; gap: 8px; }
+
+@media (max-width: 640px) {
+  .call-surface { right: var(--s-2); left: var(--s-2); bottom: var(--s-2); width: auto; }
+  .call-stage { grid-template-columns: 1fr 1fr; }
+  .ring-banner { top: var(--s-2); right: var(--s-2); left: var(--s-2); width: auto; }
+}

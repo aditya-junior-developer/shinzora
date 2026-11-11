@@ -47,6 +47,15 @@ export const env = Object.freeze({
   prelaunchApi: merged.PRELAUNCH_API === true,
   vapidPublicKey: merged.PUSH_VAPID_PUBLIC_KEY || "",
 
+  /* TURN relay, for calls between two networks that cannot reach each other
+     directly. Optional: without it calls still work on most home and office
+     networks, and the UI says so instead of pretending. A TURN username and
+     credential are handed to the browser by design — they are time-limited
+     relay credentials, not account secrets. */
+  turnUrl: merged.TURN_URL || "",
+  turnUser: merged.TURN_USER || "",
+  turnCredential: merged.TURN_CREDENTIAL || "",
+
   /* --- Derived ----------------------------------------------------------- */
   siteUrl: trimSlash(merged.SITE_URL) || (typeof location !== "undefined" ? location.origin : ""),
   isConfigured: Boolean(merged.SUPABASE_URL && merged.SUPABASE_PUBLISHABLE_KEY)

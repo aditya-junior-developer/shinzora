@@ -70,6 +70,19 @@ const THREAD = [
   { id: "m3", body: "@nobody this is not a real handle", createdAt: new Date(Date.now() - 300_000).toISOString(), authorId: "user-c", authorName: "Chirag", mentions: [] }
 ];
 
+const THREAD_WITH_IMAGE = [
+  {
+    id: "m9",
+    body: "",
+    createdAt: new Date().toISOString(),
+    authorId: "user-b",
+    authorName: "Asha",
+    mentions: [],
+    attachments: [{ path: `${GROUP.id}/user-b/uuid-banner.png`, name: "banner.png", mime: "image/png", size: 12000 }]
+  },
+  ...THREAD
+];
+
 async function bundle(entry) {
   const stub = {
     name: "groups-view-stubs",
@@ -82,7 +95,11 @@ async function bundle(entry) {
                   getUser: async () => ({ data: { user: { id: "user-a" } } }) },
           channel: () => { const api = { on: () => api, subscribe: () => api }; return api; },
           removeChannel: () => {},
-          storage: { from: () => ({ upload: async () => ({ error: null }), getPublicUrl: () => ({ data: { publicUrl: "" } }) }) }
+          storage: { from: () => ({
+            upload: async (path) => { globalThis.__uploads.push(path); return { error: null }; },
+            getPublicUrl: () => ({ data: { publicUrl: "" } }),
+            createSignedUrl: async (path) => ({ data: { signedUrl: "https://files.test/" + path }, error: null })
+          }) }
         };
         export const normalizeError = (error) => (error instanceof Error ? error : new Error(String(error?.message || error)));
       `;
@@ -137,6 +154,7 @@ function makeWorld({ groups = [GROUP], detail = DETAIL, thread = THREAD, candida
      check for a service worker, which this harness deliberately lacks. */
   globalThis.navigator = { userAgent: "shinzora-test" };
   globalThis.__toast = (message, kind) => toasts.push({ message, kind });
+  globalThis.__uploads = [];
 
   const answers = {
     group_my_groups: groups,
@@ -268,7 +286,11 @@ test("sending calls group_send with what was typed", async () => {
   await settle();
 
   assert.equal(count(world.calls, "group_send"), 1, "group_send called once");
-  assert.deepEqual(lastArgs(world.calls, "group_send"), { p_group: GROUP.id, p_body: "@chirag look at this" });
+  assert.deepEqual(lastArgs(world.calls, "group_send"), {
+    p_group: GROUP.id,
+    p_body: "@chirag look at this",
+    p_attachments: []
+  });
 });
 
 test("the composer is hidden until a group is open", async () => {
@@ -277,6 +299,70 @@ test("the composer is hidden until a group is open", async () => {
   const form = world.root.querySelector("#grp-compose");
   assert.ok(form, "the composer element exists");
   assert.equal(form.hidden, true, "an empty inbox shows no compose box");
+});
+
+test("a picture on a message is shown as a picture, not a filename", async () => {
+  const world = makeWorld({ thread: THREAD_WITH_IMAGE });
+  await openGroupsTab(world);
+
+  const image = world.root.querySelector(".grp-attach-image img");
+  assert.ok(image, "the picture must render");
+  assert.match(image.getAttribute("src"), /files\.test/, "through a signed URL, never a public path");
+  assert.equal(image.getAttribute("alt"), "banner.png", "with alt text");
+});
+
+test("choosing a file shows it before sending, and it can be removed", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  const input = world.root.querySelector("#grp-files");
+  assert.ok(input, "the group composer has an attach control");
+  const file = new File([new Uint8Array(1024)], "diagram.png", { type: "image/png" });
+  Object.defineProperty(input, "files", { value: [file], configurable: true });
+  input.dispatchEvent(new world.window.Event("change", { bubbles: true }));
+  await settle();
+
+  const pending = world.root.querySelector("#grp-pending");
+  assert.equal(pending.hidden, false, "the pending row must be visible");
+  assert.match(pending.textContent, /diagram\.png/, "the chosen file is named");
+
+  const drop = world.root.querySelector("[data-drop-pending]");
+  drop.dispatchEvent(new world.window.Event("click", { bubbles: true }));
+  await settle();
+  assert.equal(world.root.querySelector("#grp-pending").hidden, true, "removing it clears the row");
+});
+
+test("a file-only message uploads under the group and sends its path", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  const input = world.root.querySelector("#grp-files");
+  const file = new File([new Uint8Array(2048)], "photo.jpg", { type: "image/jpeg" });
+  Object.defineProperty(input, "files", { value: [file], configurable: true });
+  input.dispatchEvent(new world.window.Event("change", { bubbles: true }));
+  await settle();
+
+  world.root
+    .querySelector("#grp-compose")
+    .dispatchEvent(new world.window.Event("submit", { bubbles: true, cancelable: true }));
+  await settle(120);
+
+  assert.equal(globalThis.__uploads.length, 1, "exactly one upload");
+  assert.match(globalThis.__uploads[0], new RegExp(`^${GROUP.id}/`), "the path must start with the group id");
+
+  const args = lastArgs(world.calls, "group_send");
+  assert.equal(args.p_body, "", "a picture-only message sends an empty body");
+  assert.equal(args.p_attachments.length, 1, "and one attachment");
+  assert.equal(args.p_attachments[0].mime, "image/jpeg");
+});
+
+test("the group header offers a meeting button once a group is open", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+  const meet = world.root.querySelector("#grp-call");
+  assert.ok(meet, "the Meet button exists");
+  assert.equal(meet.hidden, false, "and is visible with a group open");
+  assert.match(meet.textContent, /Meet/);
 });
 
 test("an account with no groups gets a real empty state with a create button", async () => {

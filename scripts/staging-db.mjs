@@ -116,6 +116,24 @@ const SCAFFOLD = `
     insert into vault.secrets (secret, name, description) values (secret, name, description) returning id
   $$;
 
+  -- Realtime: the table Supabase authorizes broadcast on. 0039 puts an RLS
+  -- policy here, so a database replay needs the table to exist and to have the
+  -- same shape it has in production.
+  create schema if not exists realtime;
+  create or replace function realtime.topic() returns text
+  language sql stable as $$ select coalesce(current_setting('realtime.topic', true), '') $$;
+  create table if not exists realtime.messages (
+    id bigserial primary key,
+    topic text not null default realtime.topic(),
+    extension text not null default 'broadcast',
+    payload jsonb,
+    event text,
+    private boolean not null default false,
+    inserted_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+  alter table realtime.messages enable row level security;
+
   -- pg_net: the outbound HTTP queue. The real extension performs the request;
   -- this one records it, so a test can assert *what would have been sent* —
   -- which is the part the trigger owns. Nothing is fetched either way.

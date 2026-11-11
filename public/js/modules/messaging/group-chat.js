@@ -27,10 +27,16 @@ import { avatarMarkup, paintAvatar } from "../../lib/avatar.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { openModal, confirmDialog, formDialog } from "../../ui/modal.js";
 import { openProfile } from "../dashboard/views/find-team.js";
+import { createCall, callTopics, turnConfigured } from "./webrtc.js";
+import { openCallSurface, watchForCalls, showRingBanner } from "./call-ui.js";
 
 const ROLE_LABEL = { owner: "Owner", admin: "Group admin", member: "Member" };
 const AVATAR_BUCKET = "avatars";
 const MAX_PICTURE_BYTES = 4 * 1024 * 1024;
+const FILES_BUCKET = "group-chat-files";
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const ALLOWED_FILES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
+const QUICK_EMOJI = ["🙂", "👍", "🎉", "❤️", "🙏", "✨"];
 
 async function rpc(name, args = {}) {
   if (!sb) throw new Error("Groups are not available right now.");
@@ -117,6 +123,9 @@ export default async function mountGroups(root, options = {}) {
           </div>
         </div>
         <div class="pane-head-actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="grp-call" hidden>
+            ${icon("video", { size: 13 })}<span>Meet</span>
+          </button>
           <button class="btn btn-ghost btn-sm" type="button" id="grp-info" hidden>${icon("info", { size: 13 })}<span>Group info</span></button>
         </div>
       </div>
@@ -127,6 +136,19 @@ export default async function mountGroups(root, options = {}) {
 
       <form class="chat-compose" id="grp-compose" hidden>
         <div class="mention-pop" id="grp-mentions" role="listbox" aria-label="Mention somebody in this group" hidden></div>
+        <div class="team-compose-tools" aria-label="Message tools">
+          ${QUICK_EMOJI.map(
+            (emoji) =>
+              `<button class="btn btn-ghost btn-sm" type="button" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`
+          ).join("")}
+          <label class="btn btn-ghost btn-sm" for="grp-files" title="Attach a picture or PDF">
+            ${icon("paperclip", { size: 14 })}<span>Attach</span>
+          </label>
+          <input id="grp-files" type="file" hidden multiple
+                 accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" />
+          <span class="grp-file-count" id="grp-file-count" hidden></span>
+        </div>
+        <div class="grp-pending" id="grp-pending" hidden></div>
         <label class="sr-only" for="grp-body">Message</label>
         <textarea class="textarea chat-input" id="grp-body" rows="2" maxlength="4000"
           placeholder="Write a message… type @ to mention somebody"></textarea>
@@ -143,6 +165,9 @@ export default async function mountGroups(root, options = {}) {
   const formEl = qs("#grp-compose", wrap);
   const bodyEl = qs("#grp-body", wrap);
   const popEl = qs("#grp-mentions", wrap);
+  const filesInput = qs("#grp-files", wrap);
+  const pendingEl = qs("#grp-pending", wrap);
+  const fileCountEl = qs("#grp-file-count", wrap);
 
   let me = null;
   let groups = [];
@@ -153,6 +178,10 @@ export default async function mountGroups(root, options = {}) {
   let popIndex = 0;
   let popRange = null;
   let popSeq = 0;
+  /** Files chosen but not sent yet. Cleared on send, on group change and on leave. */
+  let pending = [];
+  /** Signed URLs for attachments already on screen, so a repaint does not re-sign. */
+  const signedCache = new Map();
 
   /* ------------------------------------------------------------------- list */
   function paintList() {
@@ -221,6 +250,7 @@ export default async function mountGroups(root, options = {}) {
       if (title) title.textContent = "Groups";
       if (sub) sub.textContent = "Pick a group, or start one. Only members can read what is posted here.";
       infoBtn.hidden = true;
+      qs("#grp-call", wrap).hidden = true;
       return;
     }
     avatarEl.hidden = false;
@@ -238,6 +268,7 @@ export default async function mountGroups(root, options = {}) {
       }`;
     }
     infoBtn.hidden = false;
+    qs("#grp-call", wrap).hidden = false;
   }
 
   async function open(id, focusMessageId = null) {
@@ -253,6 +284,7 @@ export default async function mountGroups(root, options = {}) {
       formEl.hidden = false;
       bodyEl.focus({ preventScroll: true });
       await rpc("group_mark_read", { p_group: id });
+      watchThisGroup();
       await loadList();
     } catch (error) {
       detail = null;
@@ -264,14 +296,140 @@ export default async function mountGroups(root, options = {}) {
     }
   }
 
-  function paintThread(rows, focusMessageId = null) {
+  /* ---------------------------------------------------------------- files */
+
+  function renderPending() {
+    pendingEl.hidden = pending.length === 0;
+    fileCountEl.hidden = pending.length === 0;
+    fileCountEl.textContent = pending.length ? `${pending.length} attached` : "";
+    pendingEl.innerHTML = pending
+      .map(
+        (file, index) => `<span class="grp-pending-item">
+            ${icon(file.type === "application/pdf" ? "file-text" : "image", { size: 12 })}
+            <span class="grp-pending-name">${esc(file.name)}</span>
+            <span class="grp-pending-size">${Math.round(file.size / 1024)} KB</span>
+            <button type="button" class="grp-pending-x" data-drop-pending="${index}" aria-label="Remove ${esc(
+              file.name
+            )}">${icon("x", { size: 11 })}</button>
+          </span>`
+      )
+      .join("");
+  }
+
+  function acceptFiles(list) {
+    const incoming = [...list];
+    if (!incoming.length) return;
+    for (const file of incoming) {
+      if (!ALLOWED_FILES.has(file.type)) {
+        toastError(new Error(`${file.name} is not a JPEG, PNG, WebP, GIF or PDF.`));
+        continue;
+      }
+      if (!file.size || file.size > MAX_FILE_BYTES) {
+        toastError(new Error(`${file.name} is over 20 MB.`));
+        continue;
+      }
+      if (pending.length >= 5) {
+        toastError(new Error("Five files at most in one message."));
+        break;
+      }
+      pending.push(file);
+    }
+    renderPending();
+  }
+
+  on(filesInput, "change", () => {
+    acceptFiles(filesInput.files || []);
+    filesInput.value = "";
+  });
+
+  delegate(pendingEl, "click", "[data-drop-pending]", (_event, button) => {
+    pending.splice(Number(button.getAttribute("data-drop-pending")), 1);
+    renderPending();
+  });
+
+  /* Dragging a picture onto the thread is how most people attach one. */
+  on(messagesEl, "dragover", (event) => {
+    if (!detail) return;
+    event.preventDefault();
+    messagesEl.classList.add("is-drop-target");
+  });
+  on(messagesEl, "dragleave", () => messagesEl.classList.remove("is-drop-target"));
+  on(messagesEl, "drop", (event) => {
+    if (!detail) return;
+    event.preventDefault();
+    messagesEl.classList.remove("is-drop-target");
+    acceptFiles(event.dataTransfer?.files || []);
+  });
+
+  /** Upload everything pending, in order, and return the attachment objects. */
+  async function uploadPending() {
+    const uploaded = [];
+    for (const file of pending) {
+      const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "file";
+      /* The path starts with the group id and then the uploader's id: the
+         storage policies in 0039 read both straight out of it. */
+      const path = `${active}/${me}/${crypto.randomUUID()}-${cleanName}`;
+      const { error } = await sb.storage
+        .from(FILES_BUCKET)
+        .upload(path, file, { upsert: false, contentType: file.type });
+      if (error) throw normalizeError(error);
+      uploaded.push({ path, name: file.name, mime: file.type, size: file.size });
+    }
+    return uploaded;
+  }
+
+  async function attachmentUrl(path) {
+    if (signedCache.has(path)) return signedCache.get(path);
+    const { data, error } = await sb.storage.from(FILES_BUCKET).createSignedUrl(path, 3600);
+    const url = error ? "" : data?.signedUrl || "";
+    signedCache.set(path, url);
+    return url;
+  }
+
+  /**
+   * An attachment as markup.
+   *
+   * Pictures are shown as pictures — a group where you have to click a filename
+   * to see a photo is not a group people will use. Everything else is a link,
+   * and a link that could not be signed says so instead of looking broken.
+   */
+  async function attachmentMarkup(file) {
+    const isImage = String(file.mime || "").startsWith("image/");
+    const url = await attachmentUrl(file.path);
+    if (!url) {
+      return `<span class="grp-attach is-broken">${icon("triangle-alert", { size: 12 })}${esc(
+        file.name || "Attachment"
+      )} · could not be opened</span>`;
+    }
+    if (isImage) {
+      return `<a class="grp-attach-image" href="${esc(url)}" target="_blank" rel="noopener noreferrer">
+          <img src="${esc(url)}" alt="${esc(file.name || "Attached picture")}" loading="lazy" decoding="async" />
+        </a>`;
+    }
+    return `<a class="team-attachment" href="${esc(url)}" target="_blank" rel="noopener noreferrer">
+        ${icon("file-text", { size: 13 })}${esc(file.name || "Attachment")}
+      </a>`;
+  }
+
+  async function paintThread(rows, focusMessageId = null) {
     if (!rows.length) {
       messagesEl.innerHTML = `<div class="chat-empty-line">Nothing here yet. Say hello — the others will see it in their notifications.</div>`;
       return;
     }
+    /* Sign every attachment before painting: a signed URL needs an await, and a
+       bubble that renders before its picture is ready would flash broken. */
+    const painted = await Promise.all(
+      rows.map(async (message) => ({
+        message,
+        attachments: (message.attachments || []).length
+          ? (await Promise.all(message.attachments.map(attachmentMarkup))).join("")
+          : ""
+      }))
+    );
+
     let lastAuthor = null;
-    messagesEl.innerHTML = rows
-      .map((message) => {
+    messagesEl.innerHTML = painted
+      .map(({ message, attachments }) => {
         const mine = message.authorId === me;
         const showWho = message.authorId !== lastAuthor;
         lastAuthor = message.authorId;
@@ -283,6 +441,7 @@ export default async function mountGroups(root, options = {}) {
           <div class="bubble${mine ? " bubble-mine" : ""}">
             ${mine || !showWho ? "" : `<div class="bubble-who">${esc(message.authorName || "Member")}</div>`}
             ${message.body ? `<div class="bubble-text">${paintBody(message.body, message.mentions)}</div>` : ""}
+            ${attachments ? `<div class="grp-attachments">${attachments}</div>` : ""}
             <div class="bubble-time" title="${esc(dateTime(message.createdAt))}">${esc(timeAgo(message.createdAt))}</div>
           </div>
         </div>`;
@@ -478,22 +637,146 @@ function insertAtCaret(field, text, start, end) {
     event.preventDefault();
     if (!active) return;
     const body = bodyEl.value.trim();
-    if (!body) return;
+    if (!body && !pending.length) return;
     const send = qs("#grp-send", wrap);
+    const label = qs("span", send);
     send.disabled = true;
+    if (label && pending.length) label.textContent = "Sending…";
     try {
-      await rpc("group_send", { p_group: active, p_body: body });
+      const attachments = pending.length ? await uploadPending() : [];
+      await rpc("group_send", { p_group: active, p_body: body, p_attachments: attachments });
       bodyEl.value = "";
+      pending = [];
+      renderPending();
       hidePop();
       await open(active);
     } catch (error) {
-      /* A refused `@everyone`, or a mention of somebody who is not a member,
-         arrives here as the database's own words. */
+      /* A refused `@everyone`, a non-member mention or a rejected file arrives
+         here as the database's own words. The pending files stay put so nothing
+         the member chose is lost. */
       toastError(error);
     } finally {
       send.disabled = false;
+      if (label) label.textContent = "Send";
     }
   });
+
+  delegate(formEl, "click", "[data-emoji]", (_event, button) => {
+    const start = bodyEl.selectionStart ?? bodyEl.value.length;
+    insertAtCaret(bodyEl, button.dataset.emoji, start, bodyEl.selectionEnd ?? start);
+    bodyEl.focus();
+  });
+
+  /* ---------------------------------------------------------------- calls */
+
+  /* One meeting at a time per tab. Starting a second would open a second
+     microphone stream and confuse the level meter. */
+  let currentCall = null;
+  let stopWatching = () => {};
+  let ringDismiss = null;
+  let watchedTopic = null;
+
+  function closeCall() {
+    currentCall?.leave("The call ended.");
+    currentCall = null;
+  }
+
+  async function joinMeeting({ ringing = false } = {}) {
+    if (!detail) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toastError(
+        new Error("This browser cannot capture audio or video. Calls need an https address and a modern browser.")
+      );
+      return;
+    }
+
+    const call = createCall({
+      kind: "video",
+      topic: callTopics.group(detail.id),
+      title: detail.name,
+      self: { userId: me, name: selfName() }
+    });
+    currentCall = call;
+
+    openCallSurface({
+      call,
+      self: { userId: me, name: selfName() },
+      subtitle: `${detail.name} · ${(detail.members || []).length} members`,
+      onClose: () => {
+        if (currentCall === call) currentCall = null;
+      }
+    });
+
+    try {
+      /* Somebody already in the room may not have a camera (they joined voice
+         only), so falling back to audio is better than refusing to join. */
+      await call.join({ audioOnly: false });
+    } catch (error) {
+      const message = String(error?.message || "");
+      if (/camera|video/i.test(message)) {
+        try {
+          await call.join({ audioOnly: true });
+          toastError(new Error("Joined with the microphone only — no camera was available."));
+          return;
+        } catch (second) {
+          toastError(second);
+          return;
+        }
+      }
+      if (/refused|channel|member/i.test(message)) {
+        toastError(new Error(`${message} Meeting links only work for members.`));
+        return;
+      }
+      if (!turnConfigured()) {
+        toastError(
+          new Error(
+            `${message} If this happens on a mobile network, a TURN relay is required — it is not configured on this deployment yet.`
+          )
+        );
+        return;
+      }
+      toastError(error);
+    }
+  }
+
+  function selfName() {
+    const mine = (detail?.members || []).find((row) => row.userId === me);
+    return mine?.name || "You";
+  }
+
+  /** Watch this group's call topic so a ring can be shown while it is open. */
+  function watchThisGroup() {
+    if (!detail) return;
+    const topic = callTopics.group(detail.id);
+    if (watchedTopic === topic) return;
+    stopWatching();
+    watchedTopic = topic;
+    stopWatching = watchForCalls(sb, {
+      topics: [topic],
+      onRing: ({ ended, from, name }) => {
+        if (ended) {
+          ringDismiss?.();
+          return;
+        }
+        if (currentCall) return; // already in the meeting
+        ringDismiss?.();
+        ringDismiss = showRingBanner({
+          name: name || "Somebody",
+          kind: "video",
+          groupName: detail.name,
+          onJoin: () => {
+            ringDismiss = null;
+            joinMeeting({ ringing: true });
+          },
+          onDismiss: () => {
+            ringDismiss = null;
+          }
+        });
+      }
+    });
+  }
+
+  on(qs("#grp-call", wrap), "click", () => joinMeeting());
 
   /* ------------------------------------------------------------- group info */
   function memberRow(member) {
@@ -895,7 +1178,13 @@ function insertAtCaret(field, text, start, end) {
         .catch(() => {});
     };
     document.addEventListener("shinzora:group-message", liveHandler);
-    mountGroups.__detach = () => document.removeEventListener("shinzora:group-message", liveHandler);
+    mountGroups.__detach = () => {
+      document.removeEventListener("shinzora:group-message", liveHandler);
+      /* A navigated-away page must not keep the microphone open. */
+      closeCall();
+      stopWatching();
+      ringDismiss?.();
+    };
 
     const wanted = options.groupId && groups.find((group) => group.id === options.groupId);
     if (wanted) await open(wanted.id, options.messageId || null);
