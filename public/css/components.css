@@ -98,7 +98,7 @@
 .btn-violet-outline:hover {
   background: rgba(124, 58, 237, 0.2);
   border-color: rgba(168, 85, 247, 0.55);
-  color: #fff;
+  color: var(--white);
 }
 
 .btn-danger {
@@ -108,7 +108,7 @@
 }
 .btn-danger:hover {
   background: rgba(251, 113, 133, 0.22);
-  color: #fff;
+  color: var(--white);
 }
 
 .btn-success {
@@ -118,7 +118,7 @@
 }
 .btn-success:hover {
   background: rgba(52, 211, 153, 0.22);
-  color: #fff;
+  color: var(--white);
 }
 
 .btn-sm {
@@ -708,7 +708,7 @@
 }
 .chip[aria-pressed="true"],
 .chip.is-active {
-  color: #fff;
+  color: var(--white);
   background: rgba(124, 58, 237, 0.26);
   border-color: rgba(168, 85, 247, 0.55);
 }
@@ -909,7 +909,7 @@
 }
 .segmented button[aria-pressed="true"] {
   background: rgba(124, 58, 237, 0.3);
-  color: #fff;
+  color: var(--white);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset;
 }
 .segmented button:hover {
@@ -966,7 +966,7 @@
 }
 .menu-item-danger:hover {
   background: rgba(251, 113, 133, 0.14);
-  color: #fff;
+  color: var(--white);
 }
 .menu-sep {
   height: 1px;
@@ -1064,7 +1064,7 @@
 }
 .modal-close:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--white);
 }
 
 /* --------------------------------------------------------------------------
@@ -1119,7 +1119,7 @@
   padding: 2px;
   border-radius: 4px;
 }
-.toast-close:hover { color: #fff; }
+.toast-close:hover { color: var(--white); }
 
 /* --------------------------------------------------------------------------
    Alerts / inline notices
@@ -1309,13 +1309,13 @@
 }
 .page-btn:hover:not([disabled]) {
   border-color: var(--line-violet);
-  color: #fff;
+  color: var(--white);
   background: rgba(124, 58, 237, 0.12);
 }
 .page-btn[aria-current="page"] {
   background: rgba(124, 58, 237, 0.28);
   border-color: rgba(168, 85, 247, 0.5);
-  color: #fff;
+  color: var(--white);
 }
 .page-btn[disabled] {
   opacity: 0.4;
@@ -1403,7 +1403,7 @@ img.brand-mark,
   text-indent: 0.06em;
 }
 .nav-brand:hover .brand-word {
-  color: #fff;
+  color: var(--white);
 }
 
 /* --------------------------------------------------------------------------

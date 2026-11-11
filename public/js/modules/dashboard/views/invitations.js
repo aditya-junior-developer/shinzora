@@ -58,7 +58,7 @@ function paint(root, error) {
       icon: "inbox",
       title: "No invitations waiting",
       desc: "When a business owner invites the email you signed in with, it appears here and you can accept or decline it.",
-      action: `<a class="btn btn-secondary btn-sm" href="#/app/?view=marketplace">${icon("package", { size: 14 })}Browse projects</a>`
+      action: `<a class="btn btn-secondary btn-sm" href="/app/?view=marketplace">${icon("package", { size: 14 })}Browse projects</a>`
     })}`;
     return;
   }

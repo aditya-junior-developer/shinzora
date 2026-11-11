@@ -110,7 +110,7 @@
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.16);
 }
 .ob-step.is-active .obs-label {
-  color: #fff;
+  color: var(--white);
 }
 .ob-step.is-done .obs-marker {
   background: rgba(52, 211, 153, 0.18);
@@ -302,7 +302,7 @@
 .goal-chip:hover {
   border-color: var(--line-violet);
   background: rgba(124, 58, 237, 0.08);
-  color: #fff;
+  color: var(--white);
 }
 .goal-chip .ico {
   width: 16px;
@@ -328,7 +328,7 @@
 .goal-chip[aria-pressed="true"] {
   border-color: rgba(168, 85, 247, 0.55);
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.06));
-  color: #fff;
+  color: var(--white);
 }
 .goal-chip[aria-pressed="true"] .ico {
   color: var(--violet-soft);
@@ -412,7 +412,7 @@
 .plan-pick .pp-name {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -420,7 +420,7 @@
 .plan-pick .pp-price {
   font-size: 1.15rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
   letter-spacing: -0.02em;
 }
 .plan-pick .pp-price span {

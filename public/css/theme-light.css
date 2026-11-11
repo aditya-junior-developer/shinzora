@@ -517,7 +517,7 @@
   --info: #1d4ed8;
   --info-dim: rgba(29, 78, 216, 0.08);
 
-  --grad-brand: linear-gradient(135deg, #6366f1 0%, #4f46e5 45%, #3730a3 100%);
+  --grad-brand: linear-gradient(135deg, #6063f1 0%, #4f46e5 45%, #3730a3 100%);
   --grad-brand-soft: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(55, 48, 163, 0.08));
   --grad-sheen: linear-gradient(180deg, rgba(27, 33, 56, 0.045), rgba(27, 33, 56, 0) 62%);
   --grad-panel: linear-gradient(168deg, #ffffff 0%, #f8fafd 58%, #f2f6fc 100%);

@@ -19,8 +19,8 @@ import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { avatarMarkup } from "../../lib/avatar.js";
 import { toastError } from "../../ui/toast.js";
-import { joinRingtone, connectedTone, endedTone } from "./ringtone.js";
-import { stopCallRinging } from "../../ui/notify.js";
+import { connectedTone, endedTone } from "./ringtone.js";
+import { stopCallRinging, setActiveCallTopic } from "../../ui/notify.js";
 
 let active = null;
 
@@ -45,6 +45,9 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
      notification that arrived while the tab was in the background. */
   try {
     stopCallRinging();
+    /* Tells the notification path "we are in this call" — a ring for the call
+       we are already in is the definition of unnecessary sound. */
+    setActiveCallTopic(call.state.topic);
   } catch {
     /* notifications not initialised on this page — nothing to stop */
   }
@@ -286,6 +289,11 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
     call.setListener(null);
     call.leave("The call ended.");
     wrap.remove();
+    try {
+      setActiveCallTopic(null);
+    } catch {
+      /* notifications not initialised on this page */
+    }
     if (active && active.destroy === destroy) active = null;
     onClose();
   }
@@ -294,76 +302,3 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
   return { destroy, element: wrap };
 }
 
-/**
- * Listen for somebody else's call on one topic and offer a Join banner.
- *
- * The listener is a private Realtime channel, so the database checks membership
- * before it will deliver a single ring. It only runs while the surface that
- * cares about that topic is on screen — closing the tab stops the ringing,
- * which is the honest behaviour until push-based ringing exists.
- *
- * @returns {() => void} unsubscribe
- */
-export function watchForCalls(sb, { topics, onRing }) {
-  if (!sb || !topics?.length) return () => {};
-  const channels = [];
-
-  for (const topic of topics) {
-    const channel = sb.channel(topic, { config: { private: true, broadcast: { self: false } } });
-    channel.on("broadcast", { event: "hello" }, (message) => {
-      const payload = message?.payload || {};
-      if (!payload.from) return;
-      onRing({ topic, kind: payload.kind || "voice", from: payload.from, name: payload.name || "Someone" });
-    });
-    channel.on("broadcast", { event: "bye" }, () => onRing({ topic, ended: true }));
-    channel.subscribe();
-    channels.push(channel);
-  }
-
-  return () => {
-    for (const channel of channels) {
-      try {
-        sb.removeChannel(channel);
-      } catch {
-        /* already gone */
-      }
-    }
-  };
-}
-
-/** The ringing banner. Returns a dismiss function. */
-export function showRingBanner({ name, kind, groupName, onJoin, onDismiss, withSound = true }) {
-  const node = document.createElement("div");
-  node.className = "ring-banner";
-  node.setAttribute("role", "alert");
-  node.innerHTML = `
-    <span class="ring-mark">${icon(kind === "video" ? "video" : "phone", { size: 16 })}</span>
-    <div class="ring-copy">
-      <div class="ring-title">${esc(name)} is calling</div>
-      <div class="ring-sub">${esc(groupName || (kind === "video" ? "Video meeting" : "Voice call"))}</div>
-    </div>
-    <button class="btn btn-primary btn-sm" type="button" data-ring-join>Join</button>
-    <button class="btn btn-ghost btn-sm" type="button" data-ring-dismiss aria-label="Dismiss">${icon("x", { size: 13 })}</button>`;
-  document.body.append(node);
-
-  const stopTone = withSound ? joinRingtone() : () => {};
-  const close = () => {
-    stopTone();
-    node.remove();
-    onDismiss?.();
-  };
-
-  on(qs("[data-ring-join]", node), "click", () => {
-    stopTone();
-    node.remove();
-    onJoin?.();
-  });
-  on(qs("[data-ring-dismiss]", node), "click", close);
-
-  /* Ringing forever is a nuisance; after 45 seconds it stops and says so. */
-  const timeout = setTimeout(close, 45000);
-  return () => {
-    clearTimeout(timeout);
-    close();
-  };
-}

@@ -29,7 +29,8 @@ import { openModal, confirmDialog, formDialog } from "../../ui/modal.js";
 import { openProfile } from "../dashboard/views/find-team.js";
 import { createCall, callTopics, turnConfigured } from "./webrtc.js";
 import { composerPopsMarkup, composerToolsBar, bindComposerTools, ATTACH_KINDS } from "./composer-tools.js";
-import { openCallSurface, watchForCalls, showRingBanner } from "./call-ui.js";
+import { openCallSurface } from "./call-ui.js";
+import { openLiveChannel } from "../../lib/live-channel.js";
 
 const ROLE_LABEL = { owner: "Owner", admin: "Group admin", member: "Member" };
 const AVATAR_BUCKET = "avatars";
@@ -393,8 +394,7 @@ export default async function mountGroups(root, options = {}) {
     paintList();
     paintHead(null);
     closeCall();
-    stopWatching();
-    watchedTopic = null;
+    stopLiveMessages();
     const title = qs(".chat-thread-title", headEl);
     const sub = qs(".chat-thread-sub", headEl);
     if (title) title.textContent = `#${channel.name}`;
@@ -1213,16 +1213,13 @@ function insertAtCaret(field, text, start, end) {
   /* One meeting at a time per tab. Starting a second would open a second
      microphone stream and confuse the level meter. */
   let currentCall = null;
-  let stopWatching = () => {};
-  let ringDismiss = null;
-  let watchedTopic = null;
 
   function closeCall() {
     currentCall?.leave("The call ended.");
     currentCall = null;
   }
 
-  async function joinMeeting({ ringing = false, audioOnly = false } = {}) {
+  async function joinMeeting({ audioOnly = false } = {}) {
     if (!detail) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       toastError(
@@ -1314,43 +1311,40 @@ function insertAtCaret(field, text, start, end) {
      written for it — right for alerts, wrong as the only way a message can
      arrive, because it made "did I get a notification" decide "did the thread
      refresh". This listens to the group's own messages. */
-  let liveChannel = null;
+  let liveHandle = null;
   let liveGroup = null;
 
   function stopLiveMessages() {
-    if (liveChannel && sb) {
-      try {
-        sb.removeChannel(liveChannel);
-      } catch {
-        /* already gone */
-      }
-    }
-    liveChannel = null;
+    liveHandle?.close();
+    liveHandle = null;
     liveGroup = null;
   }
 
   function watchLiveMessages(groupId) {
     if (!sb || !groupId) return;
-    if (liveGroup === groupId && liveChannel) return;
+    if (liveGroup === groupId && liveHandle) return;
     stopLiveMessages();
     liveGroup = groupId;
-    liveChannel = sb
-      .channel(`group-live:${groupId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "community_messages",
-          filter: `group_id=eq.${groupId}`
-        },
-        (payload) => {
-          const row = payload.new;
-          if (!row || row.author_id === me) return;
-          void refreshThreadInPlace(groupId);
-        }
-      )
-      .subscribe();
+    /* Re-opening a group replaces the channel instead of re-binding a
+       subscribed one — see lib/live-channel.js for why that ordering matters. */
+    liveHandle = openLiveChannel(sb, "group-live", {
+      topic: `group-live:${groupId}`,
+      bind: (channel) =>
+        channel.on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "community_messages",
+            filter: `group_id=eq.${groupId}`
+          },
+          (payload) => {
+            const row = payload.new;
+            if (!row || row.author_id === me) return;
+            void refreshThreadInPlace(groupId);
+          }
+        )
+    });
   }
 
   /** Re-read the thread without moving the reader who is scrolled up. */
@@ -1373,33 +1367,12 @@ function insertAtCaret(field, text, start, end) {
   function watchThisGroup() {
     if (!detail) return;
     watchLiveMessages(detail.id);
-    const topic = callTopics.group(detail.id);
-    if (watchedTopic === topic) return;
-    stopWatching();
-    watchedTopic = topic;
-    stopWatching = watchForCalls(sb, {
-      topics: [topic],
-      onRing: ({ ended, from, name }) => {
-        if (ended) {
-          ringDismiss?.();
-          return;
-        }
-        if (currentCall) return; // already in the meeting
-        ringDismiss?.();
-        ringDismiss = showRingBanner({
-          name: name || "Somebody",
-          kind: "video",
-          groupName: detail.name,
-          onJoin: () => {
-            ringDismiss = null;
-            joinMeeting({ ringing: true });
-          },
-          onDismiss: () => {
-            ringDismiss = null;
-          }
-        });
-      }
-    });
+    /* The ring itself arrives as a `call` notification (0044), which is the
+       path that also reaches a closed tab. This page used to open a second
+       Realtime channel on the *same* topic as the call to listen for it, and a
+       socket cannot join one topic twice: the call's own channel then never
+       reached SUBSCRIBED and every attempt ended in "The call channel did not
+       open." The call owns its topic; nothing else subscribes to it. */
   }
 
   on(qs("#grp-call", wrap), "click", () => joinMeeting());
@@ -2148,8 +2121,7 @@ function insertAtCaret(field, text, start, end) {
       document.removeEventListener("shinzora:group-message", liveHandler);
       /* A navigated-away page must not keep the microphone open. */
       closeCall();
-      stopWatching();
-      ringDismiss?.();
+      stopLiveMessages();
     };
 
     const wantedChannel = options.channel && channels.find((row) => row.slug === options.channel);

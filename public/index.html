@@ -15,11 +15,12 @@
 <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="stylesheet" href="/css/tokens.css?v=20261106a" />
-<link rel="stylesheet" href="/css/components.css?v=20261106a" />
-<link rel="stylesheet" href="/css/marketing.css?v=20261106a" />
-<link rel="stylesheet" href="/css/marketing-sections.css?v=20261106a" />
-<link rel="stylesheet" href="/css/fx.css?v=20261106a" />
+<link rel="preload" as="font" type="font/woff2" href="/assets/fonts/inter-latin.woff2" crossorigin />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107a" />
+<link rel="stylesheet" href="/css/components.css?v=20261107a" />
+<link rel="stylesheet" href="/css/marketing.css?v=20261107a" />
+<link rel="stylesheet" href="/css/marketing-sections.css?v=20261107a" />
+<link rel="stylesheet" href="/css/fx.css?v=20261107a" />
 <script src="/js/config/runtime.js"></script>
 </head>
 <body>
@@ -30,7 +31,7 @@
 <header class="site-nav" id="site-nav">
   <div class="container nav-inner">
     <a href="/" class="nav-brand" aria-label="Shinzora home">
-      <span class="brand-mark" aria-hidden="true"><img src="/assets/icons/mark.png" alt="" width="30" height="30" decoding="async" /></span>
+      <span class="brand-mark" aria-hidden="true"><img src="/assets/icons/mark-96.png" alt="" width="30" height="30" decoding="async" /></span>
       <span class="brand-word">SHINZORA</span>
     </a>
 
@@ -159,7 +160,7 @@
           <div class="device-body">
             <aside class="pv-side" aria-hidden="true">
               <div class="pv-brand">
-                <img src="/assets/icons/mark.png" alt="" width="16" height="16" decoding="async" />
+                <img src="/assets/icons/mark-96.png" alt="" width="16" height="16" decoding="async" />
                 SHINZORA
               </div>
               <div class="pv-nav-item is-active"><i data-icon="house" data-size="12"></i>Overview</div>
@@ -1034,8 +1035,8 @@
   </div>
 </div>
 
-<script src="/js/vendor/supabase-js.js"></script>
-<script type="module" src="/js/boot/site-auth.js?v=20261106a"></script>
-<script type="module" src="/js/boot/landing.js?v=20261106a"></script>
+<script src="/js/vendor/supabase-js.js" defer></script>
+<script type="module" src="/js/boot/site-auth.js?v=20261107a"></script>
+<script type="module" src="/js/boot/landing.js?v=20261107a"></script>
 </body>
 </html>

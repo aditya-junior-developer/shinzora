@@ -143,6 +143,68 @@ export function stopCallRinging() {
   stopRinging = null;
 }
 
+/* ------------------------------------------------------------ the ring banner */
+
+/* A call is the one notification worth interrupting for, so it gets its own
+   surface: who is calling, where, and two real buttons. Two things must never
+   make it ring, and both used to: your own outbound call (the old listener sat
+   on the call's own Realtime topic and heard you join it) and a call this tab is
+   already in. */
+let activeCallTopic = null;
+
+/** Called by the call surface when a call opens or ends. */
+export function setActiveCallTopic(topic) {
+  activeCallTopic = topic || null;
+}
+
+let ringBanner = null;
+
+/** Is there a ring on screen for this topic already? */
+function ringShowing(topic) {
+  return ringBanner && ringBanner.topic === topic && document.body.contains(ringBanner.node);
+}
+
+function dropRingBanner() {
+  if (!ringBanner) return;
+  ringBanner.close();
+  ringBanner = null;
+}
+
+/**
+ * Show “X is calling” with Join and Dismiss, and keep the ringtone going until
+ * one of them is pressed, the invite expires, or a call opens.
+ */
+function showRingBanner({ row, meta, name, kind, expiresAt }) {
+  dropRingBanner();
+  const node = document.createElement("div");
+  node.className = "ring-banner";
+  node.setAttribute("role", "alert");
+  node.innerHTML = `
+    <span class="ring-mark">${icon(kind === "video" ? "video" : "phone", { size: 16 })}</span>
+    <div class="ring-copy">
+      <div class="ring-title">${esc(name)} is calling</div>
+      <div class="ring-sub">${esc(meta.groupName || (kind === "video" ? "Video meeting" : "Voice call"))}</div>
+    </div>
+    <button class="btn btn-primary btn-sm" type="button" data-ring-join>Join</button>
+    <button class="btn btn-ghost btn-sm" type="button" data-ring-dismiss aria-label="Dismiss">${icon("x", { size: 13 })}</button>`;
+  document.body.append(node);
+  requestAnimationFrame(() => node.classList.add("is-in"));
+
+  const stopTone = ringForCall(expiresAt);
+  const close = () => {
+    stopTone();
+    node.remove();
+    if (ringBanner?.node === node) ringBanner = null;
+  };
+  ringBanner = { node, topic: meta.callTopic, close };
+
+  on(qs("[data-ring-join]", node), "click", () => {
+    close();
+    if (row.link) location.assign(row.link);
+  });
+  on(qs("[data-ring-dismiss]", node), "click", close);
+}
+
 /* ------------------------------------------------------------- in-app notice */
 
 /**
@@ -387,9 +449,17 @@ export function presentNotification(row, { playSound = true } = {}) {
   if (row?.type === "call" && meta.callTopic) {
     const expires = meta.expiresAt ? new Date(meta.expiresAt).getTime() : Date.now() + 90000;
     if (expires > Date.now()) {
-      showNotice(row);
+      /* Already in this call, or already ringing for it: nothing new to say. */
+      if (activeCallTopic && activeCallTopic === meta.callTopic) return false;
+      if (ringShowing(meta.callTopic)) return true;
+      showRingBanner({
+        row,
+        meta,
+        expiresAt: expires,
+        name: meta.senderName || row.title || "Somebody",
+        kind: meta.callKind || "voice"
+      });
       if (document.hidden) showDesktopAlert(row);
-      ringForCall(expires);
       return true;
     }
   }

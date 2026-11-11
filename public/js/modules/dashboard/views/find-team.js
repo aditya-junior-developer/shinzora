@@ -328,6 +328,6 @@ export async function openProfile(username) {
   if (person.isSelf) return;
   const foot = document.createElement("div");
   foot.className = "modal-foot";
-  foot.innerHTML = `<a class="btn btn-secondary btn-sm" href="#/app/?view=team">${icon("user-plus", { size: 14 })}Invite from Team</a>`;
+  foot.innerHTML = `<a class="btn btn-secondary btn-sm" href="/app/?view=team">${icon("user-plus", { size: 14 })}Invite from Team</a>`;
   qs(".modal", modal.root)?.append(foot);
 }

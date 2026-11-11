@@ -26,6 +26,7 @@
 
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { env } from "../../config/env.js";
+import { releaseTopic } from "../../lib/live-channel.js";
 
 const MAX_PEERS = 6;
 
@@ -399,11 +400,24 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       await getMedia({ video: !audioOnly });
 
       if (!sb) throw new Error("Calls are not available right now.");
+      /* A previous call on this topic may still be closing: supabase-js hands
+         back the channel it already stores under a topic, and adding handlers
+         to that one throws (or never subscribes). */
+      await releaseTopic(sb, topic);
       channel = sb.channel(topic, { config: { private: true, broadcast: { self: false } } });
       bindChannel(channel);
 
       await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("The call channel did not open.")), 15000);
+        /* The ring-and-wait is over: a join that has not opened in ten seconds
+           is not going to, and making somebody stare at "connecting" for
+           fifteen is not patience, it is a bug with a delay. */
+        const timer = setTimeout(() => {
+          reject(
+            new Error(
+              "The call channel did not open within ten seconds. Realtime could not join this room — check your connection, then try again."
+            )
+          );
+        }, 10000);
         channel.subscribe((status) => {
           if (status === "SUBSCRIBED") {
             clearTimeout(timer);

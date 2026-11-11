@@ -261,7 +261,7 @@ hr {
 
 ::selection {
   background: rgba(168, 85, 247, 0.36);
-  color: #fff;
+  color: var(--white);
 }
 
 /* Focus: visible, branded, never removed */
@@ -672,7 +672,7 @@ figcaption a:hover {
   --info: #60a5fa;
   --info-dim: rgba(96, 165, 250, 0.12);
 
-  --grad-brand: linear-gradient(135deg, #6d84ff 0%, #4f63e8 38%, #2f3fb0 78%, #1c2a7a 100%);
+  --grad-brand: linear-gradient(135deg, #4864ff 0%, #4f63e8 38%, #2f3fb0 78%, #1c2a7a 100%);
   --grad-brand-soft: linear-gradient(135deg, rgba(109, 132, 255, 0.24), rgba(38, 60, 160, 0.16));
   --grad-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 62%);
   --grad-panel: linear-gradient(168deg, rgba(21, 33, 58, 0.92) 0%, rgba(11, 18, 33, 0.94) 58%, rgba(7, 11, 20, 0.97) 100%);
@@ -746,7 +746,7 @@ figcaption a:hover {
   --info: #67e8f9;
   --info-dim: rgba(103, 232, 249, 0.12);
 
-  --grad-brand: linear-gradient(135deg, #2fc088 0%, #159a63 38%, #0f7149 78%, #08402b 100%);
+  --grad-brand: linear-gradient(135deg, #20845e 0%, #128556 38%, #0f7149 78%, #08402b 100%);
   --grad-brand-soft: linear-gradient(135deg, rgba(47, 192, 136, 0.22), rgba(12, 90, 60, 0.16));
   --grad-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 62%);
   --grad-panel: linear-gradient(168deg, rgba(21, 37, 28, 0.92) 0%, rgba(12, 24, 18, 0.94) 58%, rgba(7, 13, 9, 0.97) 100%);

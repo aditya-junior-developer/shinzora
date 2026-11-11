@@ -57,7 +57,7 @@ export default async function render(root) {
     root.innerHTML = `${pageHead({ title: "Team", desc: "The people who work in your business workspace." })}
       ${loadError
         ? `<div class="card"><div class="card-body"><p class="muted">${esc(loadError.message)}</p></div></div>`
-        : emptyState({ icon: "users", title: "No business yet", desc: "Finish business setup to build a team.", action: `<a class="btn btn-primary btn-sm" href="#/app/?view=settings">Open settings</a>` })}`;
+        : emptyState({ icon: "users", title: "No business yet", desc: "Finish business setup to build a team.", action: `<a class="btn btn-primary btn-sm" href="/app/?view=settings">Open settings</a>` })}`;
     return;
   }
   if (!activeId || !businesses.some((b) => b.id === activeId)) activeId = businesses[0].id;

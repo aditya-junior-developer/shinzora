@@ -76,7 +76,7 @@ export default async function render(root) {
                 ? `<div class="stack gap-4">${notices
                     .map(
                       (n) => `<div>
-                        <div style="font-size:var(--fs-sm);font-weight:600;color:#fff">${esc(n.title)}</div>
+                        <div style="font-size:var(--fs-sm);font-weight:600;color:var(--white)">${esc(n.title)}</div>
                         <div class="dim" style="font-size:var(--fs-2xs);margin:3px 0 6px">${esc(dateTime(n.created_at))}</div>
                         <p class="muted" style="font-size:var(--fs-xs);line-height:1.6;white-space:pre-wrap">${esc(n.body)}</p>
                       </div>`

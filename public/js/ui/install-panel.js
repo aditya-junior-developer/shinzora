@@ -26,7 +26,7 @@
    this modal.
    ========================================================================== */
 
-import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261106a";
+import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261107a";
 import { icon } from "../lib/icons.js";
 import { platformMark } from "../lib/platform-icons.js?v=20261110b";
 
@@ -270,7 +270,7 @@ export function openInstallPanel(options = {}) {
 
       <div class="ip-head">
         <span class="ip-mark" aria-hidden="true">
-          <img src="/assets/icons/mark.svg" alt="" width="34" height="34" />
+          <img src="/assets/icons/mark-96.png" alt="" width="34" height="34" />
         </span>
         <div>
           <h2 class="ip-title" id="ip-title">Get Shinzora</h2>

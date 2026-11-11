@@ -86,7 +86,7 @@ function paint(root) {
       badge: published
         ? `<span class="mk-status mk-positive">Published</span>`
         : `<span class="mk-status mk-muted">Not published</span>`,
-      actions: `<a class="btn btn-ghost btn-sm" href="#/app/?view=freelancer">${icon("arrow-left", { size: 14 })}Dashboard</a>`
+      actions: `<a class="btn btn-ghost btn-sm" href="/app/?view=freelancer">${icon("arrow-left", { size: 14 })}Dashboard</a>`
     })}
 
     <section class="card">

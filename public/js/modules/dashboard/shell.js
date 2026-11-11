@@ -17,6 +17,7 @@ import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 import { initNotifications, presentNotification } from "../../ui/notify.js";
+import { openLiveChannel, closeLiveChannel } from "../../lib/live-channel.js";
 
 export const NAV = [
   {
@@ -103,6 +104,8 @@ export const AGENT_NAV = [
 /** Which navigation a signed-in account should see. */
 export const navFor = () => (state.profile?.account_type === "agent" ? AGENT_NAV : NAV);
 
+/* One key for this page's notification channel — see lib/live-channel.js. */
+const NOTIFICATION_KEY = "notifications";
 let realtimeChannel = null;
 /* The navigation sidebar, created by bindChrome(). */
 let navSidebar = null;
@@ -590,13 +593,7 @@ function bindNotificationDrawer() {
 
 /** Stop every long-lived subscription this shell owns. */
 export function stopBackgroundWork() {
-  if (realtimeChannel && sb) {
-    try {
-      sb.removeChannel(realtimeChannel);
-    } catch {
-      /* already gone */
-    }
-  }
+  closeLiveChannel(NOTIFICATION_KEY);
   realtimeChannel = null;
 }
 
@@ -608,34 +605,37 @@ export function subscribeNotifications() {
      when somebody presses "Turn on" in settings. */
   initNotifications({ onChange: () => refreshNotificationBadge() }).catch(() => {});
   listenForServiceWorkerMessages();
-  if (realtimeChannel) sb.removeChannel(realtimeChannel);
-
-  realtimeChannel = sb
-    .channel(`notifications:${uid()}`)
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid()}` },
-      (payload) => {
-        const row = payload.new;
-        refreshNotificationBadge();
-        /* One path for every notification: preferences decide whether it is
-           shown and sounded, and a group message gets the richer notice with
-           the sender, the group and a preview. */
-        const shown = presentNotification(row);
-        if (!shown) {
-          /* Muted, or this member asked for mentions only. The row is still
-             stored and still counted in the badge — it is their inbox. */
+  /* Opening this twice (a re-mount, a reconnect) used to race the asynchronous
+     removal of the previous channel and throw "cannot add postgres_changes
+     callbacks ... after subscribe()". lib/live-channel.js closes first, then
+     binds, then subscribes. */
+  realtimeChannel = openLiveChannel(sb, NOTIFICATION_KEY, {
+    topic: `notifications:${uid()}`,
+    bind: (channel) =>
+      channel.on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid()}` },
+        (payload) => {
+          const row = payload.new;
+          refreshNotificationBadge();
+          /* One path for every notification: preferences decide whether it is
+             shown and sounded, and a group message gets the richer notice with
+             the sender, the group and a preview. */
+          const shown = presentNotification(row);
+          if (!shown) {
+            /* Muted, or this member asked for mentions only. The row is still
+               stored and still counted in the badge — it is their inbox. */
+          }
+          const list = qs("#notif-list");
+          if (list && !qs("#notification-drawer").hidden) list.insertAdjacentHTML("afterbegin", notifMarkup(row));
+          /* A mention is stored with type `group_mention`; keying off the meta
+             rather than the type means both kinds refresh the open thread. */
+          if (shown && row.meta?.groupId && row.meta?.messageId) {
+            document.dispatchEvent(new CustomEvent("shinzora:group-message", { detail: row.meta }));
+          }
         }
-        const list = qs("#notif-list");
-        if (list && !qs("#notification-drawer").hidden) list.insertAdjacentHTML("afterbegin", notifMarkup(row));
-        /* A mention is stored with type `group_mention`; keying off the meta
-           rather than the type means both kinds refresh the open thread. */
-        if (shown && row.meta?.groupId && row.meta?.messageId) {
-          document.dispatchEvent(new CustomEvent("shinzora:group-message", { detail: row.meta }));
-        }
-      }
-    )
-    .subscribe();
+      )
+  });
 }
 
 /**

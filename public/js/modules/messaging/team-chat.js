@@ -24,7 +24,8 @@ import { state } from "../../lib/store.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { presenceDot, presenceState, presenceLabel } from "../../ui/presence.js";
 import { createCall, callTopics, turnConfigured } from "./webrtc.js";
-import { openCallSurface, watchForCalls, showRingBanner } from "./call-ui.js";
+import { openCallSurface } from "./call-ui.js";
+import { openLiveChannel } from "../../lib/live-channel.js";
 
 const BUCKET = "team-chat-files";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
@@ -129,9 +130,6 @@ export default async function mountInbox(root, options = {}) {
   /* One call per tab, and only for a one-to-one conversation: a "call" between
      five people in a team room is a meeting, and that lives in Groups. */
   let currentCall = null;
-  let stopWatching = () => {};
-  let watchedTopic = null;
-  let ringDismiss = null;
   let activeMeta = null;
 
   let me = null;
@@ -266,7 +264,6 @@ export default async function mountInbox(root, options = {}) {
       /* A call makes sense in a one-to-one conversation, not in a team room. */
       activeMeta = { peerName: title, peerId: other.userId || null, personal: thread.kind === "personal" };
       callButton.hidden = thread.kind !== "personal";
-      if (thread.kind === "personal") watchConversation(id, title);
       watchMessages(id);
       await paintMessages(thread);
       await loadList();
@@ -383,43 +380,42 @@ export default async function mountInbox(root, options = {}) {
    * RLS still applies: Realtime only delivers rows this member is allowed to
    * select, so a stranger's message cannot leak through a filtered channel.
    */
-  let messageChannel = null;
+  let messageHandle = null;
   let watchingConversation = null;
 
   function stopWatchingMessages() {
-    if (messageChannel && sb) {
-      try {
-        sb.removeChannel(messageChannel);
-      } catch {
-        /* already gone */
-      }
-    }
-    messageChannel = null;
+    messageHandle?.close();
+    messageHandle = null;
     watchingConversation = null;
   }
 
   function watchMessages(conversationId) {
     if (!sb || !conversationId) return;
-    if (watchingConversation === conversationId && messageChannel) return;
+    if (watchingConversation === conversationId && messageHandle) return;
     stopWatchingMessages();
     watchingConversation = conversationId;
-    messageChannel = sb
-      .channel(`dm-live:${conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "team_chat_messages",
-          filter: `conversation_id=eq.${conversationId}`
-        },
-        (payload) => {
-          const row = payload.new;
-          if (!row || row.sender_id === me) return; // ours is already painted on send
-          void loadThreadInPlace(conversationId);
-        }
-      )
-      .subscribe();
+    /* A new conversation replaces the channel rather than re-binding a
+       subscribed one: supabase-js hands back the channel still stored under a
+       topic until its asynchronous removal finishes, and adding a callback to
+       it throws. lib/live-channel.js owns that ordering. */
+    messageHandle = openLiveChannel(sb, "dm-live", {
+      topic: `dm-live:${conversationId}`,
+      bind: (channel) =>
+        channel.on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "team_chat_messages",
+            filter: `conversation_id=eq.${conversationId}`
+          },
+          (payload) => {
+            const row = payload.new;
+            if (!row || row.sender_id === me) return; // ours is already painted on send
+            void loadThreadInPlace(conversationId);
+          }
+        )
+    });
   }
 
   /** Re-read the open thread and put the reader back where they were. */
@@ -438,35 +434,6 @@ export default async function mountInbox(root, options = {}) {
     }
   }
 
-  function watchConversation(conversationId, peerName) {
-    const topic = callTopics.dm(conversationId);
-    if (watchedTopic === topic) return;
-    stopWatching();
-    watchedTopic = topic;
-    stopWatching = watchForCalls(sb, {
-      topics: [topic],
-      onRing: ({ ended, from, name }) => {
-        if (ended) {
-          ringDismiss?.();
-          return;
-        }
-        if (currentCall) return;
-        ringDismiss?.();
-        ringDismiss = showRingBanner({
-          name: name || peerName || "Somebody",
-          kind: "voice",
-          groupName: "Direct call",
-          onJoin: () => {
-            ringDismiss = null;
-            startCall(conversationId, peerName);
-          },
-          onDismiss: () => {
-            ringDismiss = null;
-          }
-        });
-      }
-    });
-  }
 
   on(callButton, "click", () => {
     if (!active || !activeMeta?.peerName) return;

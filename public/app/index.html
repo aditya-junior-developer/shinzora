@@ -10,11 +10,19 @@
 <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="stylesheet" href="/css/tokens.css?v=20261106a" />
-<link rel="stylesheet" href="/css/components.css?v=20261106a" />
-<link rel="stylesheet" href="/css/app.css?v=20261106a" />
-<link rel="stylesheet" href="/css/views.css?v=20261106a" />
-<link rel="stylesheet" href="/css/theme-light.css?v=20261106a" />
+<link rel="preconnect" href="https://zmkgfmlcpzjfgxdmbtvi.supabase.co" crossorigin />
+<link rel="dns-prefetch" href="https://zmkgfmlcpzjfgxdmbtvi.supabase.co" />
+<link rel="preload" as="font" type="font/woff2" href="/assets/fonts/inter-latin.woff2" crossorigin />
+<link rel="modulepreload" href="/js/boot/dashboard.js?v=20261107a" />
+<link rel="modulepreload" href="/js/lib/icons.js?v=20261107a" />
+<link rel="modulepreload" href="/js/lib/store.js?v=20261107a" />
+<link rel="modulepreload" href="/js/lib/supabase.js?v=20261107a" />
+<link rel="modulepreload" href="/js/modules/dashboard/shell.js?v=20261107a" />
+<link rel="stylesheet" href="/css/tokens.css?v=20261107a" />
+<link rel="stylesheet" href="/css/components.css?v=20261107a" />
+<link rel="stylesheet" href="/css/app.css?v=20261107a" />
+<link rel="stylesheet" href="/css/views.css?v=20261107a" />
+<link rel="stylesheet" href="/css/theme-light.css?v=20261107a" />
 <script>
 /* The sidebar keeps its width between visits. Set here, before the first frame,
    so a remembered icon-rail does not flash a full-width column and then snap. */
@@ -56,7 +64,7 @@
   <aside class="app-sidebar" id="app-sidebar" aria-label="Workspace navigation">
     <div class="sidebar-head">
       <a class="nav-brand" href="/app/" aria-label="Shinzora dashboard">
-        <img src="/assets/icons/mark.svg" alt="" width="26" height="26" />
+        <img src="/assets/icons/mark-96.png" alt="" width="26" height="26" />
         <span class="brand-word">SHINZORA</span>
       </a>
       <button class="sidebar-close" data-sidebar-close data-drawer-close aria-label="Close navigation">
@@ -196,7 +204,7 @@
   </div>
 </div>
 
-<script src="/js/vendor/supabase-js.js"></script>
-<script type="module" src="/js/boot/dashboard.js?v=20261106a"></script>
+<script src="/js/vendor/supabase-js.js" defer></script>
+<script type="module" src="/js/boot/dashboard.js?v=20261107a"></script>
 </body>
 </html>

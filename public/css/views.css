@@ -229,7 +229,7 @@ html {
 .msg-user .msg-bubble {
   background: linear-gradient(150deg, rgba(124, 58, 237, 0.3), rgba(124, 58, 237, 0.14));
   border-color: rgba(168, 85, 247, 0.32);
-  color: #fff;
+  color: var(--white);
 }
 .msg-bubble code {
   font-family: var(--font-mono);
@@ -503,7 +503,7 @@ html {
 .trace-step.active .ts-dot {
   border-color: rgba(168, 85, 247, 0.7);
   background: rgba(124, 58, 237, 0.28);
-  color: #fff;
+  color: var(--white);
   animation: pulse-soft 1.5s infinite;
 }
 .trace-step.done {
@@ -541,7 +541,7 @@ html {
 .version-item.is-current {
   border-color: var(--line-violet);
   background: rgba(124, 58, 237, 0.12);
-  color: #fff;
+  color: var(--white);
 }
 .version-item .vi-num {
   font-family: var(--font-mono);
@@ -597,7 +597,7 @@ html {
 .project-name {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
   letter-spacing: -0.01em;
 }
 .project-desc {
@@ -673,7 +673,7 @@ html {
   font-size: 1.6rem;
   font-weight: 600;
   letter-spacing: -0.03em;
-  color: #fff;
+  color: var(--white);
   font-variant-numeric: tabular-nums;
 }
 .pay-steps {
@@ -742,7 +742,7 @@ html {
 .domain-name {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  color: #fff;
+  color: var(--white);
 }
 .domain-meta {
   font-size: var(--fs-2xs);
@@ -780,7 +780,7 @@ html {
 .chart-title {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
 }
 .chart-sub {
   font-size: var(--fs-2xs);
@@ -971,7 +971,7 @@ html {
 .integration .int-name {
   font-size: var(--fs-sm);
   font-weight: 550;
-  color: #fff;
+  color: var(--white);
 }
 .integration .int-desc {
   font-size: var(--fs-2xs);
@@ -2053,7 +2053,7 @@ html {
 .mk-proposal { border-top:1px solid var(--border); padding-top:10px; display:flex; flex-direction:column; gap:6px; }
 .mk-proposal p { margin:0; font-size:var(--fs-sm); color:var(--text-dim); }
 .mk-note { display:flex; align-items:center; gap:6px; margin:0; font-size:var(--fs-2xs); color:var(--text-dim); }
-.mk-link { font-size:var(--fs-sm); color:var(--accent, #7C3AED); text-decoration:none; }
+.mk-link { font-size:var(--fs-sm); color:var(--link, var(--violet, #7c3aed)); text-decoration:none; }
 .mk-link:hover { text-decoration:underline; }
 .mk-dialog-backdrop {
   position:fixed; inset:0; background:rgba(2,1,6,.74); display:grid; place-items:center;

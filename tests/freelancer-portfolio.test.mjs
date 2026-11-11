@@ -277,9 +277,14 @@ test("an agent can reach their applications from the dashboard", async () => {
   /* The applications list is a tab inside Marketplace. Without a link the only
      way to find it is to guess that the tab exists, which is how a shipped
      feature becomes invisible. */
+  /* This used to assert `#/app/?view=marketplace&tab=work` — the hash route the
+     router never handled, which is why "no button is working" on this dashboard.
+     The link has to be a real path, so the assertion is the real path. */
   const links = [...root.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-  assert.ok(links.some((href) => href === "#/app/?view=marketplace&tab=work"),
+  assert.ok(links.some((href) => href === "/app/?view=marketplace&tab=work"),
     "the dashboard links to the applications tab");
+  assert.equal(links.some((href) => String(href).startsWith("#/app/")), false,
+    "no link on this dashboard uses a hash route");
   assert.ok(root.querySelector(".stat-link"), "the work figures are themselves links");
   assert.equal(root.querySelectorAll(".stat-link").length, 2, "pitches and contracts only");
 });

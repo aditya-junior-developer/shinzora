@@ -50,7 +50,7 @@ export default async function render(root, ctx) {
       <div class="chat-head">
         <span class="avatar avatar-sm" style="background:linear-gradient(150deg,#a855f7,#4c1d95)">${icon("sparkles", { size: 13 })}</span>
         <div>
-          <div style="font-size:var(--fs-sm);font-weight:600;color:#fff">Shinzora Assistant</div>
+          <div style="font-size:var(--fs-sm);font-weight:600;color:var(--white)">Shinzora Assistant</div>
           <div class="chat-model">${aiReady ? "Gemini · server-side · conversation saved" : "Offline — service not configured"}</div>
         </div>
         <button class="btn btn-ghost btn-sm" id="history-toggle" style="margin-left:auto">${icon("clock", { size: 14 })}History</button>

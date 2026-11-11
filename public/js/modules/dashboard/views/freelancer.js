@@ -94,13 +94,13 @@ function paint(root) {
       title: `Welcome back, ${name}`,
       desc: "Your work, your pitches and what is waiting on you.",
       badge: handle ? `<span class="mk-status mk-info">${esc(handle)}</span>` : "",
-      actions: `<a class="btn btn-primary btn-sm" href="#/app/?view=marketplace&tab=browse">${icon("search", { size: 14 })}Find projects</a>`
+      actions: `<a class="btn btn-primary btn-sm" href="/app/?view=marketplace&tab=browse">${icon("search", { size: 14 })}Find projects</a>`
     })}
 
     <div class="stat-grid">
       ${statCard({ label: "Open projects", value: String(board.length), foot: "live on the board", iconName: "package" })}
-      ${statCard({ label: "Pitches sent", value: String(openPitches.length), foot: `${pitches.length} total`, iconName: "send", href: "#/app/?view=marketplace&tab=work" })}
-      ${statCard({ label: "Active contracts", value: String(active.length), foot: `${completed.length} completed`, iconName: "briefcase", href: "#/app/?view=marketplace&tab=work" })}
+      ${statCard({ label: "Pitches sent", value: String(openPitches.length), foot: `${pitches.length} total`, iconName: "send", href: "/app/?view=marketplace&tab=work" })}
+      ${statCard({ label: "Active contracts", value: String(active.length), foot: `${completed.length} completed`, iconName: "briefcase", href: "/app/?view=marketplace&tab=work" })}
       ${statCard({ label: "Invitations", value: String(invitations.length), foot: invitations.length ? "waiting for an answer" : "none waiting", iconName: "inbox" })}
     </div>
 
@@ -113,7 +113,7 @@ function paint(root) {
               ${todo.map((item) => `<li>
                 <span class="fl-todo-mark">${icon(item.done ? "check" : "dot", { size: 13 })}</span>
                 <span class="fl-todo-text ${item.done ? "is-done" : ""}">${esc(item.label)}</span>
-                ${item.done ? "" : `<a class="mk-link" href="#/app/?view=${esc(item.view)}">${esc(item.action)}</a>`}
+                ${item.done ? "" : `<a class="mk-link" href="/app/?view=${esc(item.view)}">${esc(item.action)}</a>`}
               </li>`).join("")}
             </ul>
           </div>
@@ -134,11 +134,11 @@ function paint(root) {
                   </div>
                   <div class="fl-project-side">
                     <div class="fl-project-budget">${esc(amount(job.budgetMax || job.budgetMin, job.currency) || "Open")}</div>
-                    <a class="btn btn-secondary btn-sm" href="#/app/?view=marketplace&tab=browse">View</a>
+                    <a class="btn btn-secondary btn-sm" href="/app/?view=marketplace&tab=browse">View</a>
                   </div>
                 </li>`).join("")}</ul>`
             : emptyState({ icon: "package", title: "No open projects yet", desc: "When a business posts work, it appears here and on the board." })}
-          <a class="btn btn-ghost btn-sm fl-more" href="#/app/?view=marketplace&tab=browse">See all ${board.length} projects</a>
+          <a class="btn btn-ghost btn-sm fl-more" href="/app/?view=marketplace&tab=browse">See all ${board.length} projects</a>
         </div>
       </section>
 
@@ -160,10 +160,10 @@ function paint(root) {
               </ul>`
             : `<p class="muted">Nothing yet. Pitch on a project and it shows up here.</p>`}
           <div class="fl-quick">
-            <a class="btn btn-ghost btn-sm" href="#/app/?view=portfolio">${icon("id-card", { size: 14 })}Edit profile</a>
-            <a class="btn btn-ghost btn-sm" href="#/app/?view=invitations">${icon("inbox", { size: 14 })}Invitations</a>
-            <a class="btn btn-ghost btn-sm" href="#/app/?view=marketplace&tab=work">${icon("send", { size: 14 })}My applications</a>
-            <a class="btn btn-ghost btn-sm" href="#/app/?view=find-team">${icon("users-round", { size: 14 })}Find team</a>
+            <a class="btn btn-ghost btn-sm" href="/app/?view=portfolio">${icon("id-card", { size: 14 })}Edit profile</a>
+            <a class="btn btn-ghost btn-sm" href="/app/?view=invitations">${icon("inbox", { size: 14 })}Invitations</a>
+            <a class="btn btn-ghost btn-sm" href="/app/?view=marketplace&tab=work">${icon("send", { size: 14 })}My applications</a>
+            <a class="btn btn-ghost btn-sm" href="/app/?view=find-team">${icon("users-round", { size: 14 })}Find team</a>
           </div>
         </div>
       </aside>
