@@ -4,13 +4,14 @@
 
 import { qs, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, date, dateTime, timeAgo, initials, statusLabel } from "../../../lib/format.js";
+import { money, date, dateTime, timeAgo, statusLabel } from "../../../lib/format.js";
 import { adminApi, peopleMeta } from "../api.js";
 import { adminState } from "../shell.js";
 import { emptyState } from "../../dashboard/components.js";
 import { openModal, formDialog, confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { presenceDot, presenceLabel, presenceState } from "../../../ui/presence.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 const PLAN_FILTERS = ["all", "free", "pro", "enterprise"];
 
@@ -115,7 +116,7 @@ export default async function render(root, { state }) {
                 <td>
                   <div class="customer-cell">
                     <span class="customer-avatar">
-                      <span class="avatar">${esc(initials(row.name || row.email))}</span>
+                      ${avatarMarkup({ name: row.name, email: row.email, avatarUrl: row.avatar_url })}
                       ${presenceDot(row.last_seen_at, { size: 10 })}
                     </span>
                     <div><strong>${esc(row.name || "Unnamed")}</strong><span>${esc(row.email || "")}${

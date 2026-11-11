@@ -72,10 +72,11 @@ test("the modal surfaces share one drawer controller", () => {
   const drawer = read("public/js/ui/drawer.js");
   assert.match(drawer, /export function createDrawer/);
 
-  /* The admin console and the marketing menu are drawers: they cover the page,
-     lock it, and go away when a destination is picked. */
+  /* The marketing menu is a modal drawer: it covers the page, locks it, and goes
+     away when a destination is picked. The admin console used to be one too, at
+     every width, which dimmed its own content on a desktop monitor — it now uses
+     the dashboard's sidebar controller and is asserted separately below. */
   for (const file of [
-    "public/js/modules/admin/shell.js",
     "public/js/ui/reveal.js"
   ]) {
     const source = read(file);
@@ -203,14 +204,16 @@ test("admin: the drawer button is offered at every width", () => {
   assert.match(css, /\.admin-menu-toggle\s*\{[^}]*display:\s*inline-flex/);
 });
 
-test("admin: the sidebar is off canvas until it is opened", () => {
+test("admin: the sidebar is a column on a desktop and a drawer on a phone", () => {
   const css = read("public/css/admin.css");
+  /* Desktop: docked, and the content is offset by its width. */
   assert.match(css, /\.admin-sidebar\s*\{[^}]*position:\s*fixed/);
-  assert.match(css, /\.admin-sidebar\s*\{[^}]*transform:\s*translateX\(-102%\)/);
-  assert.match(css, /\.admin-sidebar\.is-open\s*\{[^}]*transform:\s*none/);
-  /* No width-based exception puts it back in the grid. */
-  assert.doesNotMatch(css, /grid-template-columns:\s*248px/);
-  assert.match(css, /\.admin-shell\s*\{[^}]*grid-template-columns:\s*1fr/);
+  assert.match(css, /\.admin-sidebar\s*\{[^}]*width:\s*var\(--shell-nav\)/);
+  assert.match(css, /\.admin-main\s*\{[^}]*margin-left:\s*var\(--shell-nav\)/);
+  /* Phone: the same panel, off canvas, opened by the controller's body class. */
+  const phone = css.slice(css.indexOf("@media (max-width: 1023px) {\n  /* No column"));
+  assert.match(phone, /transform:\s*translateX\(-102%\)/);
+  assert.match(phone, /body\.sidebar-open \.admin-sidebar\s*\{[^}]*transform:\s*none/);
 });
 
 test("admin: there is a scrim to click and no page scroll behind it", () => {
@@ -219,9 +222,9 @@ test("admin: there is a scrim to click and no page scroll behind it", () => {
   assert.match(html, /id="admin-sidebar"/);
   const css = read("public/css/admin.css");
   assert.match(css, /\.admin-scrim\.is-visible\s*\{[^}]*opacity:\s*1/);
-  assert.match(css, /body\.drawer-open\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(css, /body\.sidebar-open\s*\{[^}]*overflow:\s*hidden/);
   /* The panel needs its own way out for anyone who cannot hit a 30px target. */
-  assert.match(html, /class="admin-drawer-close"[^>]*data-drawer-close/);
+  assert.match(html, /class="admin-drawer-close"[^>]*data-sidebar-close/);
 });
 
 test("admin: navigating closes the drawer", () => {

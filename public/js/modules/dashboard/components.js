@@ -6,7 +6,8 @@
 
 import { esc, raw } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
-import { statusLabel, statusTone, timeAgo, date, money, initials } from "../../lib/format.js";
+import { statusLabel, statusTone, timeAgo, date, money } from "../../lib/format.js";
+import { avatarMarkup } from "../../lib/avatar.js";
 
 /* --------------------------------------------------------------- page head */
 export function pageHead({ title, desc = "", actions = "", badge = "" }) {
@@ -127,12 +128,15 @@ export function skeletonView(rows = 4) {
     </div>`;
 }
 
-export function avatar(name, email, size = "") {
-  // The stylesheet defines .avatar-sm/.avatar-lg/.avatar-xl, so "sm" has to
-  // become "avatar-sm". Passing an already-prefixed class still works.
-  const variant = !size ? "" : size.startsWith("avatar-") ? size : `avatar-${size}`;
-  const cls = variant ? `avatar ${variant}` : "avatar";
-  return `<span class="${cls}">${esc(initials(name || email || "SZ"))}</span>`;
+/**
+ * A person (or a business) as a picture when one is stored, initials otherwise.
+ *
+ * The fourth argument is new: uploads have always been saved to
+ * `profiles.avatar_url`, but the renderer only ever knew how to draw initials,
+ * so three screens disagreed about what a person looked like.
+ */
+export function avatar(name, email, size = "", avatarUrl = null) {
+  return avatarMarkup({ name, email, avatarUrl, size });
 }
 
 export function metaRow(parts) {

@@ -6,9 +6,11 @@ import { qs, qsa, esc, on, debounce } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { skeletonView, setupNotice } from "../dashboard/components.js";
-import { createDrawer } from "../../ui/drawer.js";
+import { createSidebar } from "../../ui/sidebar.js";
+import { avatarMarkup } from "../../lib/avatar.js";
+import { peopleMeta } from "./api.js";
 
-/* The navigation drawer, created by bindShell(). */
+/* The navigation column, created by bindShell(). */
 let adminDrawer = null;
 
 export const closeAdminDrawer = () => adminDrawer?.close();
@@ -154,21 +156,34 @@ export function bindShell({ user, role }) {
   qs("#admin-email-label").textContent = user?.email || "—";
   qs("#admin-role").textContent = role || "admin";
 
+  /* The console shows the operator's own photo, so the person who uploaded one
+     in Settings sees it here rather than initials next to their email. */
+  void (async () => {
+    const host = qs("#admin-avatar");
+    if (!host || !user?.id) return;
+    const row = (await peopleMeta([user.id])).get(user.id);
+    host.innerHTML = avatarMarkup({
+      name: row?.full_name || user?.email,
+      email: user?.email,
+      avatarUrl: row?.avatar_url,
+      size: "sm"
+    });
+  })();
+
   on(qs("#admin-nav"), "click", (event) => {
     const button = event.target.closest("[data-view]");
     if (button) navigate(button.getAttribute("data-view"));
   });
 
-  /* The admin console gets the same drawer as the dashboard: it slides over the
-     content at every width, locks the page while it is open, and closes on
-     Escape, on the scrim, on its own close button and on navigation. Before
-     this the sidebar was a permanent column on a desktop and a half-wired
-     drawer on a phone. */
-  adminDrawer = createDrawer({
+  /* The admin console uses the same sidebar controller as the dashboard, so the
+     two shells behave identically: a column on a desktop that the ☰ collapses to
+     a rail, and an overlay drawer below 1024px where there is no room for a
+     column. It used to be the modal drawer at every width, which dimmed the
+     console's own content behind a scrim on a desktop monitor. */
+  adminDrawer = createSidebar({
     panel: qs("#admin-sidebar"),
     scrim: qs("#admin-scrim"),
-    toggles: "#admin-menu-toggle",
-    activeSelector: ".admin-nav-link.is-active, .is-active"
+    toggles: "#admin-menu-toggle"
   });
 
   const search = qs("#admin-search");

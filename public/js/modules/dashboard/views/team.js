@@ -82,7 +82,7 @@ function paint(root) {
     })}
     <div class="team-head card">
       <div class="card-body team-head-body">
-        ${avatar(business.name, null, "lg")}
+        ${avatar(business.name, undefined, "lg", business.logo_url || business.logoUrl)}
         <div>
           <div class="team-head-name">${esc(business.name || "Business")}</div>
           <div class="mk-note"><span id="team-count">${members.length} ${members.length === 1 ? "member" : "members"}</span> · you are the ${esc(business.role || "member")}</div>
@@ -188,7 +188,7 @@ function paintMembers(root) {
     .map(
       (member) => `<li class="team-row">
         <span class="team-avatar-wrap">
-          ${avatar(member.fullName, member.avatarUrl || null, "sm")}
+          ${avatar(member.fullName, member.email, "sm", member.avatarUrl)}
           ${presenceDot(member.lastSeenAt, { size: 9 })}
         </span>
         <div class="team-row-main">
@@ -216,7 +216,7 @@ function paintPending(root) {
   box.innerHTML = `<ul class="team-list">${pending
     .map(
       (invite) => `<li class="team-row">
-        ${avatar(invite.fullName || invite.email, null, "sm")}
+        ${avatar(invite.fullName || invite.email, invite.email, "sm")}
         <div class="team-row-main">
           <div class="team-row-name">${esc(invite.fullName || invite.email)}</div>
           <div class="mk-note">${esc(invite.email)} · ${esc(invite.memberType)} · sent ${esc(timeAgo(invite.createdAt))}${invite.userExists ? "" : " · not registered yet"}</div>
@@ -256,7 +256,7 @@ function paintResults(root) {
     box.innerHTML = `<ul class="team-list">${results
       .map(
         (person) => `<li class="team-row">
-          ${avatar(person.fullName, null, "sm")}
+          ${avatar(person.fullName, person.email, "sm", person.avatarUrl)}
           <div class="team-row-main">
             <div class="team-row-name">${esc(person.fullName || "Member")}</div>
             <div class="mk-note">${person.username ? `@${esc(person.username)} · ` : ""}${esc(person.email || "")}${person.accountType ? ` · ${esc(person.accountType)}` : ""}</div>

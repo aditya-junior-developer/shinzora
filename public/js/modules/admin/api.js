@@ -85,14 +85,15 @@ export const adminApi = {
    Read directly from `profiles` rather than through the admin function: the
    admins' RLS policy already allows selecting every profile, and the alternative
    is redeploying a 500-line Edge Function to add two columns to one response.
-   Only three columns are asked for, and only for ids the console is already
-   showing.
+   Only a few columns are asked for, and only for ids the console is already
+   showing — including `avatar_url`, so the console can show the photo a
+   customer uploaded instead of two initials.
    -------------------------------------------------------------------------- */
 export async function peopleMeta(ids = []) {
   if (!sb || !ids.length) return new Map();
   const { data, error } = await sb
     .from("profiles")
-    .select("id, username, account_type, last_seen_at")
+    .select("id, username, account_type, last_seen_at, avatar_url")
     .in("id", ids.slice(0, 200));
   if (error) return new Map();
   return new Map((data || []).map((row) => [row.id, row]));

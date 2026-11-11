@@ -4,10 +4,11 @@
 
 import { esc, qs } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, timeAgo, initials, statusLabel } from "../../../lib/format.js";
+import { money, timeAgo, statusLabel } from "../../../lib/format.js";
 import { adminApi } from "../api.js";
 import { setCounts, navigate } from "../shell.js";
 import { emptyState } from "../../dashboard/components.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 export default async function render(root, { state }) {
   const data = await adminApi.overview();
@@ -82,7 +83,7 @@ export default async function render(root, { state }) {
                 ? `<div class="stack gap-3">${data.recent_customers
                     .map(
                       (row) => `<div class="row gap-3">
-                        <span class="avatar avatar-sm">${esc(initials(row.full_name || row.email))}</span>
+                        ${avatarMarkup({ name: row.full_name, email: row.email, avatarUrl: row.avatar_url, size: "sm" })}
                         <div class="grow">
                           <div style="font-size:var(--fs-xs);color:var(--text)">${esc(row.full_name || "Unnamed")}</div>
                           <div style="font-size:var(--fs-2xs);color:var(--text-4)">${esc(row.email || "")}</div>

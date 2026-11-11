@@ -17,6 +17,7 @@ import { confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
 import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: "user" },
@@ -111,11 +112,15 @@ export default async function render(root) {
       <div class="card-body">
         <form class="stack gap-4" id="profile-form" novalidate>
           <div class="row gap-4 wrap" style="align-items:center">
-            <span class="avatar avatar-lg">${esc((profile.full_name || state.user?.email || "U").slice(0, 2).toUpperCase())}</span>
+            <span id="avatar-slot">${avatarMarkup({ name: profile.full_name, email: state.user?.email, avatarUrl: profile.avatar_url, size: "xl" })}</span>
             <div class="grow">
               <label class="field-label" for="avatar">Profile photo</label>
               <input class="input" id="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
-              <div class="field-hint">PNG, JPEG or WebP under 2 MB. Stored in the <span class="mono">avatars</span> bucket.</div>
+              <div class="field-hint">PNG, JPEG or WebP under 2 MB. The photo replaces your initials everywhere — here, the topbar, the admin console and the team directory.</div>
+              <div class="row gap-2" style="margin-top:var(--s-2)">
+                <button class="btn btn-ghost btn-sm" type="button" id="avatar-clear" ${profile.avatar_url ? "" : "disabled"}>${icon("trash-2", { size: 13 })}Remove photo</button>
+              </div>
+              <div id="avatar-status"></div>
             </div>
           </div>
           <div class="field" data-field="full_name">
@@ -203,21 +208,69 @@ export default async function render(root) {
       }
     });
 
-    qs("#avatar").addEventListener("change", async (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      if (file.size > 2 * 1024 * 1024) return toast({ title: "File too large", message: "Maximum 2 MB." }, { tone: "warning" });
+    /* The photo goes into the `avatars` bucket under the caller's own folder — the
+       storage policy only accepts a write there — and the public URL is saved on
+       the profile. Every screen reads that one column, so one upload changes the
+       photo in the topbar, the admin console and the team directory. */
+    const sayAvatar = (html) => {
+      const host = qs("#avatar-status");
+      if (host) host.innerHTML = html;
+    };
+
+    const uploadAvatar = async (file) => {
+      if (!/^image\//.test(file.type)) {
+        sayAvatar(`<div class="alert alert-warning" style="margin-top:var(--s-2)"><span>That file is not an image. Use PNG, JPEG or WebP.</span></div>`);
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        sayAvatar(`<div class="alert alert-warning" style="margin-top:var(--s-2)"><span>That photo is over 2 MB. Choose a smaller one.</span></div>`);
+        return;
+      }
+      const slot = qs("#avatar-slot");
+      sayAvatar(`<p class="field-hint" style="margin-top:var(--s-2)">Uploading…</p>`);
       try {
-        const path = `${state.user.id}/avatar-${Date.now()}.${file.name.split(".").pop()}`;
+        const extension = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+        const path = `${state.user.id}/avatar-${Date.now()}.${extension}`;
         const { error } = await sb.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
         if (error) throw normalizeError(error);
         const { data } = sb.storage.from("avatars").getPublicUrl(path);
         await updateProfile({ avatar_url: data.publicUrl });
         await loadIdentity({ force: true });
+        /* Painted immediately as well as after the reload: the round trip to
+           loadIdentity() is a second of looking at the old picture. */
+        if (slot) slot.innerHTML = avatarMarkup({ name: state.profile?.full_name, email: state.user?.email, avatarUrl: data.publicUrl, size: "xl" });
+        const clear = qs("#avatar-clear");
+        if (clear) clear.disabled = false;
+        sayAvatar(`<div class="alert alert-ok" style="margin-top:var(--s-2)"><span>Photo saved. It now shows wherever your name did.</span></div>`);
         toast({ title: "Photo updated" }, { tone: "success" });
         paint();
       } catch (error) {
+        const normalized = normalizeError(error);
+        sayAvatar(`<div class="alert alert-warning" style="margin-top:var(--s-2)"><span>${esc(
+          /bucket|not found/i.test(normalized.message)
+            ? "The avatars storage bucket is not provisioned. Apply migration 0003 and retry."
+            : normalized.message
+        )}</span></div>`);
+        toastError(normalized);
+      }
+    };
+
+    qs("#avatar")?.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (file) await uploadAvatar(file);
+      event.target.value = "";
+    });
+
+    qs("#avatar-clear")?.addEventListener("click", async (event) => {
+      event.currentTarget.disabled = true;
+      try {
+        await updateProfile({ avatar_url: null });
+        await loadIdentity({ force: true });
+        toast({ title: "Photo removed", message: "Your initials are shown again." }, { tone: "success" });
+        paint();
+      } catch (error) {
         toastError(normalizeError(error));
+        event.currentTarget.disabled = false;
       }
     });
   }
@@ -359,7 +412,15 @@ export default async function render(root) {
       say(`<p class="field-hint">Uploading…</p>`);
       try {
         const url = await uploadPublic("brand-assets", state.user.id, file, "logo");
-        await updateBusiness({ logo_url: url });
+        /* A logo attaches to a business row, and the row cannot exist without a
+           name. If the profile has not been saved yet, the name typed in the form
+           below is used, so uploading a logo first is not a dead end. */
+        const patch = { logo_url: url };
+        if (!state.business?.id) {
+          const typed = qs("#biz-name")?.value?.trim();
+          if (typed) patch.name = typed;
+        }
+        await updateBusiness(patch);
         await loadIdentity({ force: true });
         say(`<div class="alert alert-ok"><span>Logo saved to your business profile.</span></div>`);
         toast({ title: "Logo saved" }, { tone: "success" });

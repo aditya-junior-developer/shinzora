@@ -146,7 +146,7 @@ async function overview() {
     count("contact_messages", (q) => q.eq("status", "new")),
     db.from("payments").select("amount, status, created_at").eq("status", "verified").limit(1000),
     db.from("customer_activity").select("user_id, action, entity_type, created_at, meta").order("created_at", { ascending: false }).limit(12),
-    db.from("profiles").select("id, full_name, email, created_at").order("created_at", { ascending: false }).limit(6)
+    db.from("profiles").select("id, full_name, email, created_at, avatar_url").order("created_at", { ascending: false }).limit(6)
   ]);
 
   const revenue = (revenueRows.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
@@ -177,7 +177,7 @@ async function customers(body: Record<string, unknown>) {
 
   let query = admin()
     .from("profiles")
-    .select("id, full_name, email, phone, role, created_at, last_sign_in_at", { count: "exact" })
+    .select("id, full_name, email, phone, role, created_at, last_sign_in_at, avatar_url", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -222,6 +222,9 @@ async function customers(body: Record<string, unknown>) {
         name: profile.full_name,
         email: profile.email,
         phone: profile.phone,
+        /* The photo the customer uploaded, so the console's own list can show a
+           face instead of initials. */
+        avatar_url: profile.avatar_url ?? null,
         joined: profile.created_at,
         last_sign_in: profile.last_sign_in_at,
         business_name: business?.name ?? null,
@@ -285,7 +288,7 @@ async function payments(body: Record<string, unknown>) {
 
   const ownerIds = [...new Set((data ?? []).map((row) => row.owner_id))];
   const { data: profiles } = ownerIds.length
-    ? await admin().from("profiles").select("id, full_name, email, phone").in("id", ownerIds)
+    ? await admin().from("profiles").select("id, full_name, email, phone, avatar_url").in("id", ownerIds)
     : { data: [] };
 
   const owners = new Map((profiles ?? []).map((row) => [row.id, row]));
@@ -436,7 +439,7 @@ async function serviceRequests(body: Record<string, unknown>) {
 
   const ownerIds = [...new Set((data ?? []).map((row) => row.owner_id))];
   const { data: profiles } = ownerIds.length
-    ? await admin().from("profiles").select("id, full_name, email, phone").in("id", ownerIds)
+    ? await admin().from("profiles").select("id, full_name, email, phone, avatar_url").in("id", ownerIds)
     : { data: [] };
   const owners = new Map((profiles ?? []).map((row) => [row.id, row]));
 
@@ -490,7 +493,7 @@ async function subscriptions(body: Record<string, unknown>) {
   if (error) return fail(500, "admin_error", error.message);
 
   const ids = (data ?? []).map((row) => row.user_id);
-  const { data: profiles } = ids.length ? await admin().from("profiles").select("id, full_name, email").in("id", ids) : { data: [] };
+  const { data: profiles } = ids.length ? await admin().from("profiles").select("id, full_name, email, avatar_url").in("id", ids) : { data: [] };
   const owners = new Map((profiles ?? []).map((row) => [row.id, row]));
 
   return json({ subscriptions: (data ?? []).map((row) => ({ ...row, customer: owners.get(row.user_id) ?? null })) });
@@ -551,7 +554,7 @@ async function projects(body: Record<string, unknown>) {
   if (error) return fail(500, "admin_error", error.message);
 
   const ids = [...new Set((data ?? []).map((row) => row.owner_id))];
-  const { data: profiles } = ids.length ? await admin().from("profiles").select("id, full_name, email").in("id", ids) : { data: [] };
+  const { data: profiles } = ids.length ? await admin().from("profiles").select("id, full_name, email, avatar_url").in("id", ids) : { data: [] };
   const owners = new Map((profiles ?? []).map((row) => [row.id, row]));
 
   return json({ projects: (data ?? []).map((row) => ({ ...row, customer: owners.get(row.owner_id) ?? null })) });
@@ -578,7 +581,7 @@ async function tickets(body: Record<string, unknown>) {
 
   const ids = [...new Set((data ?? []).map((row) => row.owner_id))];
   const [{ data: profiles }, { data: replies }] = await Promise.all([
-    ids.length ? admin().from("profiles").select("id, full_name, email").in("id", ids) : Promise.resolve({ data: [] }),
+    ids.length ? admin().from("profiles").select("id, full_name, email, avatar_url").in("id", ids) : Promise.resolve({ data: [] }),
     (data ?? []).length ? admin().from("support_replies").select("ticket_id, body, author_role, created_at").in("ticket_id", (data ?? []).map((row) => row.id)).order("created_at") : Promise.resolve({ data: [] })
   ]);
 
@@ -684,7 +687,7 @@ async function activity(body: Record<string, unknown>) {
   if (error) return fail(500, "admin_error", error.message);
 
   const ids = [...new Set((data ?? []).map((row) => row.user_id))];
-  const { data: profiles } = ids.length ? await admin().from("profiles").select("id, full_name, email").in("id", ids) : { data: [] };
+  const { data: profiles } = ids.length ? await admin().from("profiles").select("id, full_name, email, avatar_url").in("id", ids) : { data: [] };
   const owners = new Map((profiles ?? []).map((row) => [row.id, row]));
 
   return json({ activity: (data ?? []).map((row) => ({ ...row, customer: owners.get(row.user_id) ?? null })) });

@@ -7,13 +7,14 @@
 import { qs, qsa, delegate, on, debounce, esc } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { state, aiCredits, plan, hasCompletedOnboarding } from "../../lib/store.js";
-import { initials, timeAgo } from "../../lib/format.js";
+import { timeAgo } from "../../lib/format.js";
 import { logoutEverywhere } from "../../lib/guard.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { sb, normalizeError, getSession } from "../../lib/supabase.js";
 import { markAllNotificationsRead, markNotificationRead, notifications as fetchNotifications, uid } from "./data.js";
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
 import { createSidebar } from "../../ui/sidebar.js";
+import { avatarMarkup } from "../../lib/avatar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 
 export const NAV = [
@@ -219,11 +220,24 @@ export function paintIdentity() {
 
   if (wsName) wsName.textContent = name;
   if (wsPlan) wsPlan.textContent = state.isAdmin ? "Administrator" : `${plan().name} plan`;
-  if (wsAvatar) wsAvatar.textContent = initials(name);
+  if (wsAvatar) {
+    /* The workspace badge is the business: its logo when one is uploaded, its
+       initials otherwise. The account badge beside it is the person. */
+    wsAvatar.innerHTML = avatarMarkup({
+      name,
+      email: state.user?.email,
+      avatarUrl: state.business?.logo_url,
+      alt: state.business?.name || "Workspace"
+    });
+  }
   if (accName) accName.textContent = state.profile?.full_name || "Account";
   if (accAvatar) {
-    if (state.profile?.avatar_url) accAvatar.innerHTML = `<img src="${esc(state.profile.avatar_url)}" alt="" />`;
-    else accAvatar.textContent = initials(state.profile?.full_name || state.user?.email);
+    accAvatar.innerHTML = avatarMarkup({
+      name: state.profile?.full_name,
+      email: state.user?.email,
+      avatarUrl: state.profile?.avatar_url,
+      alt: "Your profile photo"
+    });
   }
   if (accEmail) accEmail.textContent = state.user?.email || "";
   if (adminLink) adminLink.hidden = !state.isAdmin;

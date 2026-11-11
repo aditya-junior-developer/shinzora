@@ -5,12 +5,13 @@
 
 import { qs, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, timeAgo, dateTime, initials, statusLabel } from "../../../lib/format.js";
+import { money, timeAgo, dateTime, statusLabel } from "../../../lib/format.js";
 import { adminApi } from "../api.js";
 import { adminState } from "../shell.js";
 import { emptyState } from "../../dashboard/components.js";
 import { openModal, confirmDialog, formDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 const PAYMENT_TABS = [
   { id: "awaiting_verification", label: "Awaiting verification" },
@@ -147,7 +148,7 @@ async function renderPayments(root) {
                 <td class="mono" style="font-size:var(--fs-2xs)">${esc(row.reference)}</td>
                 <td>
                   <div class="customer-cell">
-                    <span class="avatar">${esc(initials(row.customer?.full_name || row.customer?.email))}</span>
+                    ${avatarMarkup({ name: row.customer?.full_name, email: row.customer?.email, avatarUrl: row.customer?.avatar_url })}
                     <div><strong>${esc(row.customer?.full_name || "Unknown")}</strong><span>${esc(row.customer?.email || (row.owner_id ? row.owner_id.slice(0, 8) : "—"))}</span></div>
                   </div>
                 </td>
@@ -471,5 +472,4 @@ async function renderServices(root) {
     return { requested: "approved", approved: "in_progress", in_progress: "completed", completed: "completed", rejected: "approved", cancelled: "approved" }[status] || "in_progress";
   }
 
-  void initials;
 }

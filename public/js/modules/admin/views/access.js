@@ -18,12 +18,13 @@
 
 import { qs, qsa, esc, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { timeAgo, date, initials } from "../../../lib/format.js";
+import { timeAgo, date } from "../../../lib/format.js";
 import { state } from "../../../lib/store.js";
 import { adminApi } from "../api.js";
 import { openModal, formDialog, confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { emptyState, skeletonView, statusBadge } from "../../dashboard/components.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 const TABS = [
   { id: "all", label: "All accounts" },
@@ -193,7 +194,7 @@ function paintTable() {
             if (myRole === "superadmin" && row.plan) actions.push(`<button class="btn btn-ghost btn-sm" data-credits="${esc(row.user_id)}">Reset AI credits</button>`);
 
             return `<tr>
-              <td><div class="customer-cell"><span class="avatar">${esc(initials(row.full_name || row.email))}</span>
+              <td><div class="customer-cell">${avatarMarkup({ name: row.full_name, email: row.email, avatarUrl: row.avatar_url })}
                 <div><strong>${esc(row.full_name || "—")}${isMe ? ' <span class="badge badge-neutral">you</span>' : ""}</strong>
                 <span>${esc(row.email || "")}</span></div></div></td>
               <td>${roleBadge(row.role)}</td>

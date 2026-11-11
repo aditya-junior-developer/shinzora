@@ -5,11 +5,12 @@
 
 import { qs, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, timeAgo, dateTime, date, initials, statusLabel } from "../../../lib/format.js";
+import { money, timeAgo, dateTime, date, statusLabel } from "../../../lib/format.js";
 import { adminApi } from "../api.js";
 import { emptyState } from "../../dashboard/components.js";
 import { openModal, formDialog, confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 export default async function render(root, { view }) {
   if (view === "subscriptions") return renderSubscriptions(root);
@@ -50,7 +51,7 @@ async function renderSubscriptions(root) {
           <tbody>${rows
             .map(
               (row) => `<tr>
-                <td><div class="customer-cell"><span class="avatar">${esc(initials(row.customer?.full_name || row.customer?.email))}</span>
+                <td><div class="customer-cell">${avatarMarkup({ name: row.customer?.full_name, email: row.customer?.email, avatarUrl: row.customer?.avatar_url })}
                   <div><strong>${esc(row.customer?.full_name || "—")}</strong><span>${esc(row.customer?.email || "")}</span></div></div></td>
                 <td><span class="badge badge-${row.plan === "enterprise" ? "brand" : row.plan === "pro" ? "ok" : "neutral"}">${esc(row.plan)}</span></td>
                 <td>${esc(row.status)}</td>
@@ -287,7 +288,7 @@ async function renderSupport(root) {
       body: `
         <div class="stack gap-3" style="margin-bottom:var(--s-4)">
           <div class="msg msg-user">
-            <span class="msg-avatar">${esc(initials(ticket.customer?.full_name || ticket.customer?.email))}</span>
+            <span class="msg-avatar">${avatarMarkup({ name: ticket.customer?.full_name, email: ticket.customer?.email, avatarUrl: ticket.customer?.avatar_url })}</span>
             <div><div class="msg-bubble">${esc(ticket.message)}</div><div class="msg-meta">${esc(ticket.customer?.email || "customer")} · ${esc(timeAgo(ticket.created_at))}</div></div>
           </div>
           ${replies

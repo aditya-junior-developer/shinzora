@@ -14,12 +14,13 @@
 
 import { qs, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { timeAgo, initials } from "../../../lib/format.js";
+import { timeAgo } from "../../../lib/format.js";
 import { adminApi, peopleMeta } from "../api.js";
 import { adminState } from "../shell.js";
 import { emptyState } from "../../dashboard/components.js";
 import { openModal } from "../../../ui/modal.js";
 import { presenceDot, presenceLabel, presenceState } from "../../../ui/presence.js";
+import { avatarMarkup } from "../../../lib/avatar.js";
 
 export default async function render(root) {
   let search = adminState.search || "";
@@ -105,7 +106,7 @@ export default async function render(root) {
                   <td>
                     <div class="customer-cell">
                       <span class="customer-avatar">
-                        <span class="avatar">${esc(initials(row.name || row.email))}</span>
+                        ${avatarMarkup({ name: row.name, email: row.email, avatarUrl: row.avatar_url })}
                         ${presenceDot(row.last_seen_at, { size: 10 })}
                       </span>
                       <div><strong>${esc(row.name || "Unnamed")}</strong><span>${esc(row.email || "")}</span></div>

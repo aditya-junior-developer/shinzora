@@ -14,8 +14,9 @@ beside it stays live in both.
 
 `public/js/ui/drawer.js` is a **modal**: it locks page scroll, traps focus, and
 closes on Escape or a scrim click. Every one of those behaviours is wrong for a
-column the user keeps open while they work. The admin console and the marketing
-menu are genuinely modal, so they keep using it unchanged.
+column the user keeps open while they work. The marketing menu is genuinely
+modal, so it keeps using `createDrawer` unchanged. The admin console used it too
+until the two shells were made to match — see "The admin console" below.
 
 The dashboard has its own small controller, `public/js/ui/sidebar.js`, which owns
 the two-state column and the phone overlay. It reuses the same markup, the same
@@ -91,22 +92,38 @@ cannot keep a scrim over a desktop layout.
 
 ## The admin console
 
-The admin drawer is the shared `createDrawer`, not this controller — the console
-is genuinely modal on every width. It has the same four exits (its ✕, the scrim,
-Escape, and the menu button) and all four are now covered by
-`tests/admin-drawer.test.mjs`, which drives the real controller against the real
-`public/admin/index.html`.
+The admin console uses **the same controller as the dashboard** (`createSidebar`),
+because it is the same product: a column of navigation on a desktop, an icon rail
+when collapsed, and an overlay drawer below 1024px where there is no room for a
+column.
 
-Three changes were needed there:
+It used to use `createDrawer` at every width, which meant a desktop monitor
+showed the console with its own content dimmed and blurred behind a scrim — a
+menu that covered the page while offering nothing the page did not already have.
+`tests/admin-drawer.test.mjs` drives the real controller against the real
+`public/admin/index.html` at both widths, and `tests/drawer-surfaces.test.mjs`
+pins the stylesheet split.
 
-* **the panel now starts below the topbar** (`inset: var(--nav-h) auto 0 0`) and
-  the topbar is the topmost layer (70 > panel 60 > scrim 55). This was the actual
-  complaint: the ☰ sits at the far left of the bar, which is exactly the strip a
+What that requires, and why:
+
+* **the content is offset, not covered** — `.admin-main { margin-left:
+  var(--shell-nav) }` beside `.admin-sidebar { width: var(--shell-nav) }`, with
+  `--shell-nav` shrinking from 280px to 76px on `[data-sidebar="rail"]`.
+* **no scrim on a desktop** (`display: none` in `@media (min-width: 1024px)`)
+  and no `backdrop-filter`, so nothing is darkened or blurred while the menu is
+  in the layout.
+* **the phone drawer starts below the topbar** (`inset: var(--nav-h) auto 0 0`)
+  with the bar on top (topbar 70 > panel 60 > scrim 55). This was the original
+  complaint: the ☰ sits at the far left of the bar, exactly the strip a
   full-height panel covers, so the click landed on the panel and nothing
   happened. A `z-index` on the button could never fix it — the bar is its own
   stacking context, so every child is painted at the bar's level.
-* the scrim also starts below the bar, so the bar is neither dimmed nor blocked
-  while the drawer is open.
+* **open is driven by the controller's body class** (`body.sidebar-open`), not by
+  an `.is-open` class nobody sets. The ✕ carries `data-sidebar-close`, which is
+  what the shared controller binds.
+* **the rail preference is applied before the first frame** by an inline script in
+  `public/admin/index.html`, the same `shinzora:sidebar` key the dashboard uses,
+  so a collapsed menu does not flash open and then snap.
 * the console **registers the service worker itself** (`registerServiceWorker()`
   in `public/js/boot/admin.js`). Before, only the marketing site and the dashboard
   registered one, so a browser that went straight to `/admin/` kept running

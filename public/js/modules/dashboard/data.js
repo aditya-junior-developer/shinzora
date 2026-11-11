@@ -54,9 +54,23 @@ export async function updateBusiness(patch) {
     return data;
   }
 
+  /* Creating the row is only allowed with a name.
+     `businesses.name` is NOT NULL, and the logo card used to call this with
+     `{ logo_url }` alone — so uploading a logo on an account that had no
+     business row yet came back as the raw constraint text
+     `null value in column "name" of relation "businesses" violates not-null
+     constraint`. A database sentence is not a message; the caller now gets told
+     what to do, and nothing is half-created. */
+  const name = String(patch.name ?? state.business?.name ?? "").trim();
+  if (!name) {
+    throw new AppError("Add a business name below and save it first — a logo attaches to that business.", {
+      code: "business_name_required"
+    });
+  }
+
   const { data, error } = await db()
     .from("businesses")
-    .insert({ owner_id: uid(), ...patch })
+    .insert({ owner_id: uid(), ...patch, name })
     .select("*")
     .maybeSingle();
   if (error) throw normalizeError(error);
