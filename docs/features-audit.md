@@ -98,9 +98,30 @@ mutation nobody asked for. The checks that were run instead:
   every new screen,
 - 19 new client assertions in `tests/store-operations.test.mjs`.
 
-The first signed-in use of **Analyse with AI**, a **command** and **automatic
-reply** is therefore the remaining acceptance step. If any of them misbehaves,
-the failure will be visible in the UI and in `ai_usage_log`, not silent.
+**Command** has since run signed in, against the deployed function:
+
+| request | answer |
+| --- | --- |
+| `add a product in my inventory named KYLO and i have 64 only` | `understood: true`, `create_product`, `{name: "KYLO", price: 0, stock: 64}` — offered for confirmation, nothing written until Confirm |
+| `mark my last order as shipped` (empty order list) | `understood: false`, `missing: ["orderId"]` — asks instead of inventing an order |
+
+Both were made with a real session token against production; `handleCommand`
+only logs usage, so the probe changed no store data. What is still unproven is
+the **Confirm** button writing through `assistant_command_apply`, and the first
+signed-in use of **Analyse with AI** and **automatic reply**. If any of them
+misbehaves, the failure will be visible in the UI and in `ai_usage_log`, not
+silent.
+
+### Why the command path first failed with "malformed JSON"
+
+`handleCommand` capped the answer at 500 output tokens, and on a thinking model
+those tokens are shared with reasoning: the JSON arrived cut off mid-property.
+`geminiJson` then sliced from the first `{` to the last `}`, found nothing
+balanced, and reported a syntax problem that no retry could fix. The answer now
+gets a 1600-token budget with `thinkingBudget: 0` and a `responseSchema`, and
+`_shared/json-repair.ts` reads fences, prose, curly quotes and trailing commas
+while refusing a truncated object instead of half-parsing it. `tests/json-repair.test.mjs`
+holds 37 assertions for that, including truncate-then-succeed.
 
 ### One repository fix made during the deploy
 
