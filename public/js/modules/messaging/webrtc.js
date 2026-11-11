@@ -183,6 +183,16 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
   }
 
   async function callPeer(userId, name) {
+    /* A mesh is not a conference server. Six is what a browser and a home
+       connection hold up under; past that every tile degrades for everyone, so
+       the seventh person is told the room is full instead of being let in to
+       ruin it for the other six. */
+    if (state.peers.size >= MAX_PEERS) {
+      state.limitReached = true;
+      send("full", { to: userId });
+      emit();
+      return;
+    }
     const connection = newConnection(userId, name);
     const offer = await connection.createOffer();
     await connection.setLocalDescription(offer);
@@ -253,6 +263,13 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
       if (message.event === "bye") {
         leavePeer(from);
+        return;
+      }
+
+      if (message.event === "full") {
+        state.limitReached = true;
+        state.error = `This meeting is full — ${MAX_PEERS} people is the limit for a peer-to-peer call.`;
+        emit();
         return;
       }
 

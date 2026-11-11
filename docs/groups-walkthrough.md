@@ -205,3 +205,61 @@ notification.
 | the push function refuses callers without the secret | `node scripts/smoke-functions.mjs --remote` — 401 |
 | the trigger reaches the function in production | one live trip through `pg_net` recorded in `net._http_response` |
 | **delivery to a real closed browser** | **not yet proven — that is step 13** |
+
+---
+
+## 17. Pictures and files in a group
+
+**A** → Groups → open the group → **Attach** → choose a photo → **Send**.
+
+- [ ] The photo appears in the thread **as a picture**, not a filename.
+- [ ] Clicking it opens the full-size image in a new tab (a signed link that
+      expires; nothing is public).
+- [ ] A PDF shows as a named link instead.
+- [ ] Choosing a file shows a chip above the composer with its size, and the
+      **×** on the chip removes it before sending.
+- [ ] Dragging a picture onto the thread does the same thing.
+- [ ] The emoji buttons insert into the message box at the cursor.
+- [ ] `@` still works alongside a file: the mention chip renders after send.
+
+What the database did, and will not be talked out of: the file must be filed
+under this group's own folder, be a JPEG/PNG/WebP/GIF/PDF, and be under 20 MB.
+Sending a path that points at another group is refused with *"That file does not
+belong to this group."*
+
+## 18. Voice call, one to one
+
+**A** and **B** both in a **Direct** conversation. **A** presses **Call**.
+
+- [ ] The browser asks for the microphone (once; the answer is remembered).
+- [ ] A call panel opens with both names and a **level meter** that moves when
+      you speak — that is the fastest proof the microphone works.
+- [ ] B, with the same conversation open, sees **"A is calling"** and hears a
+      ring; pressing **Join** connects them.
+- [ ] Mute silences you for the other person (the track is disabled, not just
+      the icon), and the tile shows *muted*.
+- [ ] Leaving stops the microphone — check the browser's tab indicator.
+
+## 19. Video meeting in a group
+
+**A** → Groups → open the group → **Meet**.
+
+- [ ] A panel opens with your own camera, mirrored, and *"You are the only one
+      here"* until somebody joins.
+- [ ] **B**, with the same group open, sees the ring banner and joins. Both see
+      two tiles.
+- [ ] Camera on/off, mute, **Share** (screen), and **Leave** all do what they say.
+- [ ] Minimising the panel keeps the call running.
+- [ ] A seventh person is told the meeting is full rather than being let in to
+      degrade it for everyone.
+
+### The two honest limits here
+
+- **Ringing needs the app open on that screen.** There is no push-based ring
+  yet, so a group member who is not on the Messages screen will not be rung.
+- **No TURN relay is configured.** Two peers on ordinary home/office networks
+  connect directly; two peers behind strict carrier-grade NAT (some mobile
+  networks, some corporate firewalls) cannot. The panel says *network* on the
+  affected tile rather than spinning forever. To fix it, set
+  `SHINZORA_TURN_URL`, `SHINZORA_TURN_USER` and `SHINZORA_TURN_CREDENTIAL` in the
+  build environment — the engine picks them up with no code change.

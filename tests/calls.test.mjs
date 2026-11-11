@@ -300,6 +300,32 @@ test("a missing microphone is explained in words a person can act on", async () 
   await assert.rejects(() => call.join({ audioOnly: true }), /permission was refused/i);
 });
 
+test("the seventh peer is told the meeting is full instead of degrading it", async () => {
+  const { log } = installBrowser();
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "video", topic: "call-group:full", title: "Room", self: { userId: "user-a", name: "A" } });
+  await call.join({ audioOnly: false });
+  await settle();
+  const channel = log.channels[0];
+
+  /* Six people say hello: each gets a connection, taking the room to its cap. */
+  for (let index = 0; index < 6; index += 1) {
+    channel.deliver("hello", { from: `peer-${index}`, name: `Peer ${index}` });
+    await settle(5);
+  }
+  const offersSoFar = log.offers;
+  channel.deliver("hello", { from: "peer-7", name: "Seventh" });
+  await settle();
+
+  assert.equal(log.offers, offersSoFar, "the seventh peer must not get a connection");
+  assert.equal(
+    channel.sent.some((message) => message.event === "full" && message.payload.to === "peer-7"),
+    true,
+    "and must be told why"
+  );
+  call.leave();
+});
+
 test("ICE servers include STUN, and TURN only when configured", async () => {
   installBrowser();
   const { iceServers } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
