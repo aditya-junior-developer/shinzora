@@ -196,7 +196,12 @@ async function search(root, value) {
   return results;
 }
 
-async function openProfile(username) {
+/**
+ * The profile sheet, exported so any surface that shows a person — a mention
+ * chip in a group, a member row — opens the same sheet instead of growing a
+ * second, thinner copy of it.
+ */
+export async function openProfile(username) {
   if (!username) return;
   const modal = openModal({
     title: `@${username}`,

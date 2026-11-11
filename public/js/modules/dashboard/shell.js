@@ -16,6 +16,7 @@ import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.
 import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
+import { initNotifications, presentNotification } from "../../ui/notify.js";
 
 export const NAV = [
   {
@@ -512,6 +513,11 @@ export function stopBackgroundWork() {
 /** Stream new notifications over Supabase Realtime. */
 export function subscribeNotifications() {
   if (!sb || !uid()) return;
+  /* Preferences, the audio unlock and a re-check of any existing push
+     subscription. Nothing here asks for browser permission — that only happens
+     when somebody presses "Turn on" in settings. */
+  initNotifications({ onChange: () => refreshNotificationBadge() }).catch(() => {});
+  listenForServiceWorkerMessages();
   if (realtimeChannel) sb.removeChannel(realtimeChannel);
 
   realtimeChannel = sb
@@ -522,12 +528,43 @@ export function subscribeNotifications() {
       (payload) => {
         const row = payload.new;
         refreshNotificationBadge();
-        toast({ title: row.title || "New notification", message: row.body || "" }, { tone: "info" });
+        /* One path for every notification: preferences decide whether it is
+           shown and sounded, and a group message gets the richer notice with
+           the sender, the group and a preview. */
+        const shown = presentNotification(row);
+        if (!shown) {
+          /* Muted, or this member asked for mentions only. The row is still
+             stored and still counted in the badge — it is their inbox. */
+        }
         const list = qs("#notif-list");
         if (list && !qs("#notification-drawer").hidden) list.insertAdjacentHTML("afterbegin", notifMarkup(row));
+        if (shown && row.type === "group" && row.meta?.groupId && row.meta?.messageId) {
+          document.dispatchEvent(new CustomEvent("shinzora:group-message", { detail: row.meta }));
+        }
       }
     )
     .subscribe();
+}
+
+/**
+ * A closed-tab notification was tapped.
+ *
+ * The service worker focuses this window and posts the target instead of
+ * opening a second tab. If the inbox is already on screen it handles the jump
+ * itself (and scrolls to the message); otherwise the whole page navigates.
+ */
+function listenForServiceWorkerMessages() {
+  if (!("serviceWorker" in navigator)) return;
+  if (navigator.serviceWorker.__shinzoraBound) return;
+  navigator.serviceWorker.__shinzoraBound = true;
+
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const data = event.data || {};
+    if (data.type !== "shinzora:open-group") return;
+    const onInbox = new URLSearchParams(location.search).get("view") === "messages";
+    if (onInbox) return; // views/messages.js owns it from here
+    location.assign(data.url || `/app/?view=messages&tab=groups&group=${data.groupId || ""}`);
+  });
 }
 
 /* --------------------------------------------------------- view public site */

@@ -17,7 +17,7 @@
    Bump VERSION when shipping breaking asset changes.
    ========================================================================== */
 
-const VERSION = "shinzora-v40";
+const VERSION = "shinzora-v41";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 
@@ -138,4 +138,77 @@ self.addEventListener("fetch", (event) => {
 /* Allow the page to trigger an immediate update after a deploy. */
 self.addEventListener("message", (event) => {
   if (event.data === "skip-waiting") self.skipWaiting();
+});
+
+/* ==========================================================================
+   Web Push
+   --------------------------------------------------------------------------
+   A message that arrives here was sent by the `push` Edge Function after the
+   database already stored the notification row. The worker does not decide
+   anything: it shows what it was given and opens the link it was given, so a
+   push tap lands on the same group and message the in-app notice would.
+
+   Nothing in this file claims delivery: if the browser never subscribed, or the
+   function has no VAPID keys, this handler is simply never called.
+   ========================================================================== */
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { title: "Shinzora", body: event.data ? event.data.text() : "" };
+  }
+
+  const isMention = payload.kind === "mention" || payload.kind === "everyone";
+  const title = payload.title || (payload.groupName ? `${payload.senderName || "Someone"} · ${payload.groupName}` : "Shinzora");
+  const body = payload.body || "You have a new message.";
+  /* A stable tag per group would collapse separate mentions; per message keeps
+     every unread mention visible until it is opened or dismissed. */
+  const tag = payload.messageId ? `group-${payload.groupId}-${payload.messageId}` : payload.groupId ? `group-${payload.groupId}` : "shinzora";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      renotify: Boolean(isMention),
+      icon: "/assets/icons/icon-192.png",
+      badge: "/assets/icons/icon-192.png",
+      data: {
+        url: payload.url || "/app/?view=groups",
+        groupId: payload.groupId || null,
+        messageId: payload.messageId || null,
+        kind: payload.kind || "message"
+      }
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  let target = data.url || "/app/?view=groups";
+  try {
+    /* Absolute so it can be compared with existing client windows. */
+    target = new URL(target, self.location.origin).href;
+  } catch {
+    target = `${self.location.origin}/app/?view=groups`;
+  }
+
+  event.waitUntil(
+    (async () => {
+      const clientList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const sameOrigin = clientList.filter((client) => client.url.startsWith(self.location.origin));
+      /* Focus an existing Shinzora window and tell it where to go: opening a new
+         tab every time would pile up duplicate inboxes. */
+      for (const client of sameOrigin) {
+        if ("focus" in client) {
+          await client.focus();
+          client.postMessage({ type: "shinzora:open-group", url: target, groupId: data.groupId, messageId: data.messageId });
+          return;
+        }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(target);
+    })()
+  );
 });

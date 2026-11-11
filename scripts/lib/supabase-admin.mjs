@@ -135,7 +135,13 @@ export const APPLICATION_TABLES = [
   "referrals",
   /* 0035 — store operations: visits for conversion, order timeline, low-stock
      alerts and the assistant's command log. */
-  "store_visits", "store_order_events", "product_alerts", "assistant_commands"
+  "store_visits", "store_order_events", "product_alerts", "assistant_commands",
+  /* 0037 — groups with roles, mentions, notification preferences and the push
+     subscriptions that make a closed-browser notification possible. Without
+     these in the backup a restore would lose everybody's group membership and
+     their notification settings. */
+  "community_groups", "community_group_members", "community_mentions",
+  "notification_preferences", "push_subscriptions"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

@@ -20,7 +20,12 @@ const FALLBACK = {
   ENVIRONMENT: "production",
   /* A static host has no /api/prelaunch route; only a server that mounts it
      (scripts/dev-server.mjs) sets this true. */
-  PRELAUNCH_API: false
+  PRELAUNCH_API: false,
+  /* Web Push public key. The matching private half lives only in the `push`
+     Edge Function's environment — a VAPID public key is meant to be public:
+     the browser hands it to the push service so it can verify who sent a
+     message. Empty means "not configured", and the settings card says so. */
+  PUSH_VAPID_PUBLIC_KEY: "BHyWfB8QKY5UHnw0MKP-IdF5bJ4wIc7aeYTkKlgB2xxAtX4_nMMQQkUva0EN3WkbLTbaAzw3SEcKKGH2INEDn_E"
 };
 
 const runtime = typeof window !== "undefined" && window.__SHINZORA_ENV__ ? window.__SHINZORA_ENV__ : {};
@@ -40,6 +45,7 @@ export const env = Object.freeze({
   supportEmail: merged.SUPPORT_EMAIL,
   environment: merged.ENVIRONMENT,
   prelaunchApi: merged.PRELAUNCH_API === true,
+  vapidPublicKey: merged.PUSH_VAPID_PUBLIC_KEY || "",
 
   /* --- Derived ----------------------------------------------------------- */
   siteUrl: trimSlash(merged.SITE_URL) || (typeof location !== "undefined" ? location.origin : ""),

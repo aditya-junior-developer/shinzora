@@ -15,6 +15,11 @@ import { updateProfile, updateBusiness, logActivity } from "../data.js";
 import { pageHead, setupNotice, skeletonView, statusBadge } from "../components.js";
 import { confirmDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
+import {
+  notificationSettingsMarkup,
+  bindNotificationSettings,
+  loadPrefs
+} from "../../../ui/notify.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
 import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
@@ -799,16 +804,48 @@ export default async function render(root) {
           <span>Preferences are stored on this device and applied to in-app routing. Email delivery follows your plan's support tier.</span>
         </div>
       </div>
+    </div>
+    <div id="notify-slot" style="margin-top:var(--s-4)">
+      <div class="card"><div class="card-body"><div class="dim" style="font-size:var(--fs-2xs)">Loading group notification settings…</div></div></div>
     </div>`;
   }
 
   function bindPreferences() {
+    hydrateNotificationSettings();
     delegate(qs("#settings-body"), "change", "[data-pref]", (event, node) => {
       const prefs = readPrefs();
       prefs[node.getAttribute("data-pref")] = node.checked;
       localStorage.setItem("shinzora:prefs", JSON.stringify(prefs));
       toast({ title: "Preference saved" }, { tone: "success", duration: 2000 });
     });
+  }
+
+  /**
+   * Group notifications are stored per account, not per device, so this card is
+   * filled from `notification_prefs_get` rather than from localStorage. If the
+   * migration is not applied the card says so instead of showing dead switches.
+   */
+  async function hydrateNotificationSettings() {
+    const slot = qs("#notify-slot");
+    if (!slot) return;
+    try {
+      await loadPrefs(true);
+      let groups = [];
+      try {
+        const { data } = await sb.rpc("group_my_groups");
+        groups = Array.isArray(data) ? data : [];
+      } catch {
+        groups = [];
+      }
+      slot.innerHTML = notificationSettingsMarkup(groups);
+      bindNotificationSettings(slot, {
+        refresh: () => hydrateNotificationSettings().catch(() => {})
+      });
+    } catch (error) {
+      slot.innerHTML = `<div class="card"><div class="card-body"><p class="muted" style="font-size:var(--fs-xs)">
+        ${esc(normalizeError(error).message || "Group notification settings could not be loaded.")}
+      </p></div></div>`;
+    }
   }
 
   /* -------------------------------------------------------- integrations */

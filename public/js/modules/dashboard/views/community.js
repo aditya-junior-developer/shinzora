@@ -32,12 +32,22 @@ let messages = [];
 let channel = null;
 let sending = false;
 let selfId = null;
+let groupCount = 0;
 
 export default async function render(root) {
   root.innerHTML = skeletonView(3);
   try {
     const { data: session } = await sb.auth.getSession();
     selfId = session?.session?.user?.id || null;
+    /* The group count is real data from the group RPC, so the bar below either
+       names a number it fetched or says nothing at all. A failure here must not
+       take the public room down with it. */
+    try {
+      const mine = await sb.rpc("group_my_groups");
+      groupCount = Array.isArray(mine.data) ? mine.data.length : 0;
+    } catch {
+      groupCount = 0;
+    }
     const { data, error } = await sb
       .from("community_channels")
       .select("id,slug,name,description,sort_order")
@@ -71,6 +81,17 @@ function paint(root) {
       desc: "One shared room for everyone on Shinzora. Text only — introductions, questions, and what you shipped.",
       badge: `<span class="badge badge-neutral">${icon("message-circle", { size: 12 })}Text only</span>`
     })}
+    <div class="cm-groups-bar">
+      <div class="cm-groups-copy">
+        ${icon("users", { size: 15 })}
+        <span>${
+          groupCount
+            ? `You are in ${groupCount} group${groupCount === 1 ? "" : "s"}. Mention somebody with @ inside a group.`
+            : "Groups are private rooms inside Messages — start one and invite the people you work with."
+        }</span>
+      </div>
+      <a class="btn btn-secondary btn-sm" href="/app/?view=messages&tab=groups">${icon("arrow-right", { size: 13 })}Open groups</a>
+    </div>
     <div class="cm-shell">
       <aside class="cm-rail" aria-label="Community channels">
         <label class="cm-rail-search">

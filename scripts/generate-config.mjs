@@ -75,7 +75,10 @@ const config = {
   /* True only when a deployment actually mounts the pre-launch router.
      A static host (Vercel) does not, and probing it produced a 404 in the
      console of every page that resolves identity. */
-  PRELAUNCH_API: get("SHINZORA_PRELAUNCH_API") === "1"
+  PRELAUNCH_API: get("SHINZORA_PRELAUNCH_API") === "1",
+  /* PUBLIC half of the Web Push (VAPID) key pair. The private half is a secret
+     held only by the `push` Edge Function. */
+  PUSH_VAPID_PUBLIC_KEY: firstOf("SHINZORA_PUSH_VAPID_PUBLIC_KEY", "VITE_PUSH_VAPID_PUBLIC_KEY")
 };
 
 /* Refuse to write anything that looks like a secret. */
