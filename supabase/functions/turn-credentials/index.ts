@@ -27,10 +27,12 @@ const KEY_ID = Deno.env.get("CLOUDFLARE_TURN_KEY_ID") ?? "";
 const API_TOKEN = Deno.env.get("CLOUDFLARE_TURN_API_TOKEN") ?? "";
 const TTL_SECONDS = Number(Deno.env.get("CLOUDFLARE_TURN_TTL") ?? "3600");
 
-/** Cloudflare Realtime TURN: one call to mint a short-lived credential. */
+/** Cloudflare Realtime TURN: one call to mint a short-lived credential.
+ *  The documented path is /credentials/generate-ice-servers and the answer is
+ *  { iceServers: [ { urls }, { urls, username, credential } ] }. */
 async function mintCloudflare() {
   const response = await fetch(
-    `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(KEY_ID)}/credentials/generate`,
+    `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(KEY_ID)}/credentials/generate-ice-servers`,
     {
       method: "POST",
       headers: {
