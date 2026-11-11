@@ -14,6 +14,18 @@ Every file is idempotent (`create table if not exists`, `add column if not exist
 All monetary columns are `numeric(12,2)` holding **paise** (minor units). ₹2,499 is `249900`. Prices are defined
 server-side in `functions/payments/index.ts`; the client's amount is ignored entirely.
 
+Paise is a storage detail, not something a shopkeeper should ever type. Every
+form that takes money — the product dialog and the order form — is labelled in
+rupees and converts at the boundary through `toMinor()` / `fromMinor()` in
+`public/js/lib/format.js`: `1.68` becomes `168`, and an existing `168` opens in
+the box as `1.68`. The assistant is told the same unit in its `create_product`
+prompt and response schema.
+
+The **CSV import/export is the exception**: the `price` column is raw paise, so a
+file exported from Shinzora re-imports exactly. A CSV written by hand in rupees
+will be 100× too large — divide those values by 100 first, or ask for the
+importer to be switched to rupees.
+
 ---
 
 ## Tables
