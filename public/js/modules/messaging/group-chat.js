@@ -195,6 +195,24 @@ export default async function mountGroups(root, options = {}) {
   }
 
   /* ----------------------------------------------------------------- thread */
+  /** The first thing a new member sees: one sentence and one button. */
+  function paintEmptyGroups() {
+    messagesEl.innerHTML = `<div class="grp-empty">
+        <span class="grp-empty-mark">${icon("users", { size: 22 })}</span>
+        <h3 class="grp-empty-title">No groups yet</h3>
+        <p class="grp-empty-desc">
+          A group is a private room: you choose who is in it, and only they can read
+          what is posted. Mentions work inside groups — type <strong>@</strong> to call
+          somebody out by handle.
+        </p>
+        <button class="btn btn-primary" type="button" data-new-group>
+          ${icon("plus", { size: 14 })}<span>Create your first group</span>
+        </button>
+        <p class="grp-empty-foot">You become the owner. Add people once it exists.</p>
+      </div>`;
+    formEl.hidden = true;
+  }
+
   function paintHead(group) {
     const title = qs(".chat-thread-title", headEl);
     const sub = qs(".chat-thread-sub", headEl);
@@ -290,7 +308,31 @@ export default async function mountGroups(root, options = {}) {
     popRange = null;
   }
 
-  /** The `@word` immediately before the caret, if the caret sits inside one. */
+  /**
+ * Put text where the caret is.
+ *
+ * `setRangeText` is the clean way and is what browsers use, but it is not
+ * universal (older Safari, some embedded webviews), and when it is missing the
+ * @ menu would silently insert nothing. The splice path is the fallback, and it
+ * restores the caret to just after the inserted text either way.
+ */
+function insertAtCaret(field, text, start, end) {
+  if (typeof field.setRangeText === "function") {
+    field.setRangeText(text, start, end, "end");
+    return;
+  }
+  const value = String(field.value || "");
+  field.value = `${value.slice(0, start)}${text}${value.slice(end)}`;
+  const caret = start + text.length;
+  try {
+    field.selectionStart = caret;
+    field.selectionEnd = caret;
+  } catch {
+    /* a field that cannot hold a selection simply keeps the text */
+  }
+}
+
+/** The `@word` immediately before the caret, if the caret sits inside one. */
   function mentionSpot() {
     const caret = bodyEl.selectionStart ?? 0;
     const before = bodyEl.value.slice(0, caret);
@@ -388,8 +430,7 @@ export default async function mountGroups(root, options = {}) {
 
   function insertMention(item) {
     if (!item || !popRange) return;
-    const text = `@${item.key} `;
-    bodyEl.setRangeText(text, popRange.start, popRange.end, "end");
+    insertAtCaret(bodyEl, `@${item.key} `, popRange.start, popRange.end);
     bodyEl.focus();
     hidePop();
   }
@@ -794,14 +835,20 @@ export default async function mountGroups(root, options = {}) {
     }
   });
 
-  on(qs("#grp-new", wrap), "click", async () => {
+  async function createGroup() {
     const values = await formDialog({
       title: "New group",
       desc: "You become the owner. Add people once it exists.",
       submitLabel: "Create group",
       fields: [
         { name: "name", label: "Group name", required: true, placeholder: "Design team" },
-        { name: "description", label: "What is it for?", type: "textarea", rows: 3, placeholder: "Weekly reviews, files and decisions." }
+        {
+          name: "description",
+          label: "What is it for?",
+          type: "textarea",
+          rows: 3,
+          placeholder: "Weekly reviews, files and decisions."
+        }
       ]
     });
     if (!values) return;
@@ -810,10 +857,16 @@ export default async function mountGroups(root, options = {}) {
       await loadList();
       await open(created.id);
       toast({ title: "Group created", message: "You are the owner of this group." }, { tone: "success" });
+      /* A group of one is not useful, so the next step is offered rather than
+         left to be discovered inside Group info. */
+      openInfo();
     } catch (error) {
       toastError(error);
     }
-  });
+  }
+
+  on(qs("#grp-new", wrap), "click", createGroup);
+  delegate(messagesEl, "click", "[data-new-group]", createGroup);
 
   /* Mention chips open the person's profile. `@everyone` has nobody to open. */
   delegate(messagesEl, "click", ".mention[data-mention]", (_event, chip) => {
@@ -847,7 +900,10 @@ export default async function mountGroups(root, options = {}) {
     const wanted = options.groupId && groups.find((group) => group.id === options.groupId);
     if (wanted) await open(wanted.id, options.messageId || null);
     else if (groups.length) await open(groups[0].id, options.messageId || null);
-    else paintHead(null);
+    else {
+      paintHead(null);
+      paintEmptyGroups();
+    }
   } catch (error) {
     listEl.innerHTML = `<div class="chat-empty-line">${esc(error.message || "Groups could not be loaded.")}</div>`;
   }
