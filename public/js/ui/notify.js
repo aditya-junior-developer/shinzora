@@ -26,6 +26,7 @@ import { env } from "../config/env.js";
 import { timeAgo } from "../lib/format.js";
 import { avatarMarkup } from "../lib/avatar.js";
 import { toast, toastError } from "./toast.js";
+import { joinRingtone } from "../modules/messaging/ringtone.js";
 
 async function rpc(name, args = {}) {
   if (!sb) throw new Error("Notifications are not available right now.");
@@ -107,6 +108,39 @@ export function playChime() {
   } catch {
     return false;
   }
+}
+
+/* --------------------------------------------------------------- the ring */
+
+/* One ring at a time: a second call notification while the first is still
+   ringing replaces it rather than layering two loops on top of each other. */
+let stopRinging = null;
+
+/**
+ * Ring until the invite expires, the person answers, or the tab is closed.
+ * Returns a function that stops it early (the call surface calls this).
+ */
+export function ringForCall(expiresAt) {
+  stopRinging?.();
+  if (prefs && prefs.sounds === false) return () => {};
+  const stop = joinRingtone();
+  const timer = setTimeout(() => {
+    stop();
+    if (stopRinging === stop) stopRinging = null;
+  }, Math.max(4000, Math.min(120000, expiresAt - Date.now())));
+  if (typeof timer?.unref === "function") timer.unref();
+  const wrapped = () => {
+    clearTimeout(timer);
+    stop();
+    if (stopRinging === wrapped) stopRinging = null;
+  };
+  stopRinging = wrapped;
+  return wrapped;
+}
+
+export function stopCallRinging() {
+  stopRinging?.();
+  stopRinging = null;
 }
 
 /* ------------------------------------------------------------- in-app notice */
@@ -345,6 +379,20 @@ function showDesktopAlert(row) {
 export function presentNotification(row, { playSound = true } = {}) {
   const meta = row?.meta || {};
   const isGroup = row?.type === "group" || Boolean(meta.groupId);
+
+  /* A call is not a chime: it is a ring that repeats until it is answered,
+     declined or expires, and it is the one notification worth interrupting for.
+     `call_invite_start` sets `expiresAt`; a stale invite from twenty minutes ago
+     must not start ringing when the app is opened. */
+  if (row?.type === "call" && meta.callTopic) {
+    const expires = meta.expiresAt ? new Date(meta.expiresAt).getTime() : Date.now() + 90000;
+    if (expires > Date.now()) {
+      showNotice(row);
+      if (document.hidden) showDesktopAlert(row);
+      ringForCall(expires);
+      return true;
+    }
+  }
 
   if (isGroup) {
     const mention = meta.kind === "mention" || meta.kind === "everyone";

@@ -267,6 +267,7 @@ export default async function mountInbox(root, options = {}) {
       activeMeta = { peerName: title, peerId: other.userId || null, personal: thread.kind === "personal" };
       callButton.hidden = thread.kind !== "personal";
       if (thread.kind === "personal") watchConversation(id, title);
+      watchMessages(id);
       await paintMessages(thread);
       await loadList();
     } catch (error) {
@@ -341,6 +342,15 @@ export default async function mountInbox(root, options = {}) {
       self: { userId: me, name: "You" }
     });
     currentCall = call;
+    /* Ring the other side through the notification pipeline: a closed tab or a
+       sleeping phone cannot hear a Realtime broadcast, but it can receive a
+       push about a stored invite. */
+    rpc("call_invite_start", {
+      p_topic: callTopics.dm(conversationId),
+      p_kind: "voice",
+      p_group: null,
+      p_conversation: conversationId
+    }).catch(() => {});
     openCallSurface({
       call,
       self: { userId: me, name: "You" },
@@ -361,6 +371,71 @@ export default async function mountInbox(root, options = {}) {
       }
       toastError(error);
     });
+  }
+
+  /* ------------------------------------------------------- live messages */
+  /*
+   * `team_chat_messages` was not on the realtime publication until 0045, so an
+   * open conversation only saw new messages after a reload. This listens to the
+   * table itself — the notification stream is for alerts, not for painting a
+   * thread, and it must not be the only way a message can arrive.
+   *
+   * RLS still applies: Realtime only delivers rows this member is allowed to
+   * select, so a stranger's message cannot leak through a filtered channel.
+   */
+  let messageChannel = null;
+  let watchingConversation = null;
+
+  function stopWatchingMessages() {
+    if (messageChannel && sb) {
+      try {
+        sb.removeChannel(messageChannel);
+      } catch {
+        /* already gone */
+      }
+    }
+    messageChannel = null;
+    watchingConversation = null;
+  }
+
+  function watchMessages(conversationId) {
+    if (!sb || !conversationId) return;
+    if (watchingConversation === conversationId && messageChannel) return;
+    stopWatchingMessages();
+    watchingConversation = conversationId;
+    messageChannel = sb
+      .channel(`dm-live:${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "team_chat_messages",
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const row = payload.new;
+          if (!row || row.sender_id === me) return; // ours is already painted on send
+          void loadThreadInPlace(conversationId);
+        }
+      )
+      .subscribe();
+  }
+
+  /** Re-read the open thread and put the reader back where they were. */
+  async function loadThreadInPlace(conversationId) {
+    if (active !== conversationId) return;
+    const atBottom =
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 60;
+    try {
+      const thread = await rpc("team_chat_thread", { p_conversation: conversationId, p_limit: 200 });
+      if (active !== conversationId) return;
+      await paintMessages(thread);
+      if (!atBottom) return;
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch {
+      /* the next open will catch up */
+    }
   }
 
   function watchConversation(conversationId, peerName) {
@@ -486,5 +561,5 @@ export default async function mountInbox(root, options = {}) {
     listEl.innerHTML = `<div class="chat-empty-line">${esc(error.message || "Messages could not be loaded.")}</div>`;
   }
 
-  return { open, refresh: loadList };
+  return { open, refresh: loadList, stop: () => stopWatchingMessages() };
 }

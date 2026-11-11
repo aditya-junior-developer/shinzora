@@ -317,10 +317,14 @@
   transform: translateY(-50%) translateX(-4px);
   padding: 5px 9px;
   border-radius: var(--r-sm);
-  background: #1a1426;
+  /* Themes, not a painted-on dark. The bubble used to hardcode #1a1426 and
+     colour the text `--white` — which in a light theme is *ink*, not paper — so
+     on Blossom, Daylight and Porcelain the label rendered dark-on-dark and the
+     rail showed an empty black box. Panel + text are a pair in every palette. */
+  background: var(--panel-3);
   border: 1px solid var(--line-strong);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  color: var(--white);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
   font-size: var(--fs-xs);
   font-weight: 500;
   line-height: 1.3;

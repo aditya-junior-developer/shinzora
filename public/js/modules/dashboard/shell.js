@@ -247,6 +247,96 @@ export function paintIdentity() {
   if (adminLink) adminLink.hidden = !state.isAdmin;
 
   renderSetupBanner();
+  void renderAlertsPrompt();
+}
+
+/* ==========================================================================
+   "Turn on alerts"
+   --------------------------------------------------------------------------
+   Web Push works on this deployment — the VAPID pair is set, the `push`
+   function is live and every notification row is fanned out to it. What was
+   missing was ever asking: the switch lives three levels into Settings, so the
+   subscription table was empty and every push had nowhere to go. That is why a
+   message, a call or a notice produced nothing once the tab was behind another
+   window.
+
+   So the ask is here, once, in plain words, with a real button. Dismissing it
+   is remembered; a browser that has already said no is not nagged.
+   ========================================================================== */
+const ALERTS_DISMISSED = "shinzora:alerts-dismissed";
+
+async function renderAlertsPrompt() {
+  const host = qs("#view-root");
+  document.querySelector("[data-alerts-prompt]")?.remove();
+  if (!host || state.isAdmin === undefined) return;
+
+  let reason;
+  try {
+    const { pushState, syncPush } = await import("../../ui/notify.js");
+    const current = pushState();
+    if (!current.ok && current.reason === "not-subscribed") {
+      /* Permission was granted earlier but this device is not registered —
+         registering needs no prompt, so it is done rather than asked about. */
+      const revived = await syncPush();
+      if (revived.ok) return;
+      reason = revived.reason;
+    } else if (!current.ok) {
+      reason = current.reason;
+    } else {
+      await syncPush();
+      return;
+    }
+  } catch {
+    return;
+  }
+
+  if (!["permission-required", "not-subscribed", "server"].includes(reason)) return;
+  try {
+    if (localStorage.getItem(ALERTS_DISMISSED) === "1") return;
+  } catch {
+    /* private mode: ask every time rather than never */
+  }
+
+  const card = document.createElement("div");
+  card.className = "alerts-prompt";
+  card.setAttribute("data-alerts-prompt", "");
+  card.innerHTML = `${icon("bell", { size: 16 })}
+    <div class="alerts-prompt-text">
+      <strong>Get messages, calls and notices when Shinzora is not on screen.</strong>
+      <span>One click turns on device alerts. Your browser asks once; nothing is sent until you allow it.</span>
+    </div>
+    <button class="btn btn-primary btn-sm" type="button" data-alerts-on>Turn on alerts</button>
+    <button class="btn btn-ghost btn-sm" type="button" data-alerts-later>Not now</button>`;
+  host.prepend(card);
+
+  const close = () => {
+    card.remove();
+    try {
+      localStorage.setItem(ALERTS_DISMISSED, "1");
+    } catch {
+      /* nothing to remember it with */
+    }
+  };
+
+  card.querySelector("[data-alerts-later]")?.addEventListener("click", close);
+  card.querySelector("[data-alerts-on]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "Turning on…";
+    try {
+      const { enablePush } = await import("../../ui/notify.js");
+      const result = await enablePush();
+      card.remove();
+      toast({
+        title: "Alerts are on",
+        message: `This device is registered${result?.devices ? ` (${result.devices} of your devices now)` : ""}. Calls, messages and notices will reach you with the tab closed.`
+      }, { tone: "success" });
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "Try again";
+      toastError(normalizeError(error));
+    }
+  });
 }
 
 function renderSetupBanner() {

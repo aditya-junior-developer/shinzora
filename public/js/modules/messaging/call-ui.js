@@ -20,6 +20,7 @@ import { icon } from "../../lib/icons.js";
 import { avatarMarkup } from "../../lib/avatar.js";
 import { toastError } from "../../ui/toast.js";
 import { joinRingtone, connectedTone, endedTone } from "./ringtone.js";
+import { stopCallRinging } from "../../ui/notify.js";
 
 let active = null;
 
@@ -40,6 +41,13 @@ function formatDuration(ms) {
  * @param {() => void} [options.onClose]
  */
 export function openCallSurface({ call, self, subtitle = "", onClose = () => {} }) {
+  /* Answering ends the ring, whichever path rang: the in-page banner or a call
+     notification that arrived while the tab was in the background. */
+  try {
+    stopCallRinging();
+  } catch {
+    /* notifications not initialised on this page — nothing to stop */
+  }
   if (active) active.destroy();
 
   const kind = call.state.kind;

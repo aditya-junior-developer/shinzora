@@ -1239,6 +1239,29 @@ function insertAtCaret(field, text, start, end) {
     });
     currentCall = call;
 
+    /* Ring everybody else through the ordinary notification pipeline. A call
+       used to exist only as a Realtime broadcast, which cannot reach a phone
+       whose screen is off; `call_invite_start` writes a row and a notification,
+       and the notification is what Web Push knows how to deliver. Best effort:
+       a failed invite must never stop the call from starting. */
+    rpc("call_invite_start", {
+      p_topic: callTopics.group(detail.id),
+      p_kind: audioOnly ? "voice" : "video",
+      p_group: detail.id,
+      p_conversation: null
+    })
+      .then((invite) => {
+        if (invite && Number(invite.rung) === 0) {
+          toast({
+            title: "Nobody to ring",
+            message: "Everyone else has muted this group or turned message alerts off."
+          }, { tone: "info" });
+        }
+      })
+      .catch(() => {
+        /* the call still works between open tabs */
+      });
+
     openCallSurface({
       call,
       self: { userId: me, name: selfName() },
@@ -1286,8 +1309,70 @@ function insertAtCaret(field, text, start, end) {
   }
 
   /** Watch this group's call topic so a ring can be shown while it is open. */
+  /* A second, independent live path: the message rows themselves.
+     The notification stream repaints a thread only when a notification row was
+     written for it — right for alerts, wrong as the only way a message can
+     arrive, because it made "did I get a notification" decide "did the thread
+     refresh". This listens to the group's own messages. */
+  let liveChannel = null;
+  let liveGroup = null;
+
+  function stopLiveMessages() {
+    if (liveChannel && sb) {
+      try {
+        sb.removeChannel(liveChannel);
+      } catch {
+        /* already gone */
+      }
+    }
+    liveChannel = null;
+    liveGroup = null;
+  }
+
+  function watchLiveMessages(groupId) {
+    if (!sb || !groupId) return;
+    if (liveGroup === groupId && liveChannel) return;
+    stopLiveMessages();
+    liveGroup = groupId;
+    liveChannel = sb
+      .channel(`group-live:${groupId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "community_messages",
+          filter: `group_id=eq.${groupId}`
+        },
+        (payload) => {
+          const row = payload.new;
+          if (!row || row.author_id === me) return;
+          void refreshThreadInPlace(groupId);
+        }
+      )
+      .subscribe();
+  }
+
+  /** Re-read the thread without moving the reader who is scrolled up. */
+  async function refreshThreadInPlace(groupId) {
+    if (view !== "group" || active !== groupId) return;
+    const atBottom =
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 60;
+    try {
+      const rows = await rpc("group_messages_list", { p_group: groupId, p_limit: 80 });
+      if (active !== groupId) return;
+      paintThread(Array.isArray(rows) ? rows : []);
+      await paintPolls();
+      if (atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+      await loadList();
+    } catch {
+      /* the next open will catch up */
+    }
+  }
+
   function watchThisGroup() {
     if (!detail) return;
+    watchLiveMessages(detail.id);
     const topic = callTopics.group(detail.id);
     if (watchedTopic === topic) return;
     stopWatching();

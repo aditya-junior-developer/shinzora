@@ -27,9 +27,9 @@ html {
   width: min(420px, 100vw);
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #12101c, #0a0812);
+  background: var(--panel);
   border-left: 1px solid var(--line-strong);
-  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-lg);
   transform: translateX(101%);
   transition: transform 0.3s var(--ease);
 }
@@ -158,7 +158,10 @@ html {
   min-height: 460px;
   border-radius: var(--r-lg);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(20, 17, 32, 0.7), rgba(10, 8, 17, 0.9));
+  /* The assistant panel is a surface like any other: it takes the theme's
+     panel, not a dark gradient that ignored the palette and left a black slab
+     in the middle of a light page. */
+  background: var(--panel);
   overflow: hidden;
 }
 .chat-head {
@@ -321,6 +324,18 @@ html {
 }
 .typing i:nth-child(2) { animation-delay: 0.16s; }
 .typing i:nth-child(3) { animation-delay: 0.32s; }
+/* The waiting bubble: dots, a clock, and a way out. A silent empty bubble for
+   two minutes is indistinguishable from a page that has stopped working. */
+.thinking-note {
+  margin-left: 8px;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.thinking-cancel {
+  margin-top: 6px;
+  font-size: var(--fs-2xs);
+}
 
 /* --------------------------------------------------------------------------
    Builder layout

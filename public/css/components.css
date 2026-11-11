@@ -2271,3 +2271,27 @@ body.ip-open {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* --------------------------------------------------------------------------
+   Alerts prompt
+   --------------------------------------------------------------------------
+   One line, one button. It is the only place that asks for notification
+   permission, and it is a card rather than a modal so it never blocks the page.
+   -------------------------------------------------------------------------- */
+.alerts-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  padding: 10px var(--s-3);
+  border: 1px solid var(--line-violet-soft);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+  color: var(--text-2);
+  flex-wrap: wrap;
+}
+.alerts-prompt > .ico { color: var(--lavender); flex: none; }
+.alerts-prompt-text { display: grid; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.alerts-prompt-text strong { font-size: var(--fs-xs); color: var(--text); font-weight: 650; }
+.alerts-prompt-text span { font-size: var(--fs-2xs); color: var(--text-3); }
+.alerts-prompt .btn { flex: none; }

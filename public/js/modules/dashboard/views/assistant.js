@@ -24,6 +24,15 @@ const SUGGESTIONS = [
 
 let conversationId = null;
 
+/* How long the assistant may sit silent before the UI says something.
+   The reply is written to Postgres before the function answers, so a request
+   that runs long has still produced an answer — the client just has not seen
+   it. That is exactly the state the screenshots came from: three dots spinning
+   for half an hour while `ai_messages` already held the reply. Generous on
+   purpose: 99th percentile here is about 90 seconds. */
+const ANSWER_WAIT_MS = 100000;
+const ANSWER_NUDGE_MS = 12000;
+
 export default async function render(root, ctx) {
   const config = await runtimeConfig();
   const aiReady = Boolean(config?.ai?.configured);
@@ -216,14 +225,49 @@ export default async function render(root, ctx) {
     return wrap;
   };
 
+  /**
+   * The waiting bubble.
+   *
+   * It counts, so a slow answer is visibly alive rather than indistinguishable
+   * from a hung page, and it offers a way out: `cancel()` stops waiting without
+   * throwing anything away — whatever the server ends up saving is picked up by
+   * `recoverReply()`.
+   */
   const thinking = () => {
     const wrap = document.createElement("div");
     wrap.className = "msg msg-ai";
     wrap.setAttribute("data-thinking", "");
     wrap.innerHTML = `<span class="msg-avatar">${icon("sparkles", { size: 14 })}</span>
-      <div class="msg-bubble"><span class="typing"><i></i><i></i><i></i></span></div>`;
+      <div class="msg-bubble">
+        <span class="typing"><i></i><i></i><i></i></span>
+        <span class="thinking-note" data-thinking-note></span>
+        <button class="btn btn-ghost btn-sm thinking-cancel" type="button" data-thinking-cancel hidden>Stop waiting</button>
+      </div>`;
     log.append(wrap);
     scrollDown();
+
+    const note = wrap.querySelector("[data-thinking-note]");
+    const cancelButton = wrap.querySelector("[data-thinking-cancel]");
+    const started = Date.now();
+    const tick = setInterval(() => {
+      const seconds = Math.round((Date.now() - started) / 1000);
+      if (note) note.textContent = seconds >= 2 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` : "";
+      if (cancelButton && seconds >= ANSWER_NUDGE_MS / 1000) cancelButton.hidden = false;
+    }, 1000);
+    if (typeof tick?.unref === "function") tick.unref();
+
+    /* `cancelled` resolves when the person presses Stop, so the send can stop
+       waiting immediately instead of waiting out the full clock. */
+    const cancelled = new Promise((resolve) => {
+      cancelButton?.addEventListener("click", () => {
+        clearInterval(tick);
+        if (note) note.textContent = "Stopped waiting — checking what was saved.";
+        resolve({ __cancelled: true });
+      });
+    });
+
+    wrap.stop = () => clearInterval(tick);
+    wrap.cancelled = cancelled;
     return wrap;
   };
 
@@ -305,6 +349,65 @@ export default async function render(root, ctx) {
     input.focus();
   }
 
+  /**
+   * Read back what the server actually saved.
+   *
+   * Called when the request failed, timed out, or was cancelled. The function
+   * writes the answer to `ai_messages` before it responds, so a lost response
+   * is not a lost answer — it is an answer the page never painted. Without this
+   * the only cure was a reload, which is why the assistant looked dead while the
+   * database had already replied.
+   */
+  async function recoverReply({ sentAt, pending }) {
+    try {
+      const session = await getSession();
+      if (!session) return false;
+
+      /* `ai_messages` has no user column — it belongs to a conversation, and the
+         conversation belongs to the user. So the conversation is resolved first:
+         the one on screen, or the user's newest one when the very first message
+         was the one that went quiet. */
+      let target = conversationId;
+      if (!target) {
+        const { data: latest } = await sb
+          .from("ai_conversations")
+          .select("id")
+          .eq("user_id", session.user.id)
+          .eq("kind", "assistant")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        target = latest?.id || null;
+      }
+      if (!target) return false;
+
+      const { data } = await sb
+        .from("ai_messages")
+        .select("conversation_id, role, content, created_at")
+        .eq("conversation_id", target)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const row = data?.[0];
+      if (!row || new Date(row.created_at).getTime() < sentAt) return false;
+
+      pending?.stop?.();
+      pending?.remove();
+      conversationId = row.conversation_id || target;
+      bubble("ai", row.content, "saved on the server while this page was waiting");
+      history.replaceState(
+        { view: "assistant" },
+        "",
+        `/app/?view=assistant&conversation=${encodeURIComponent(conversationId)}`
+      );
+      window.dispatchEvent(new CustomEvent("shinzora:chats-changed", { detail: { conversationId } }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function sendMessage(text) {
     const message = String(text || "").trim();
     if (!message || !aiReady) return;
@@ -316,17 +419,47 @@ export default async function render(root, ctx) {
     input.style.height = "auto";
     send.disabled = true;
     const pending = thinking();
+    const sentAt = Date.now();
+
+    /* The wait is bounded here, not by hope. A request that never settles used
+       to leave the composer disabled and the dots turning for as long as the tab
+       stayed open. Whichever finishes first wins: the answer, or the clock. */
+    let timer = null;
+    const clock = new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ __timeout: true }), ANSWER_WAIT_MS);
+      if (typeof timer?.unref === "function") timer.unref();
+    });
 
     try {
-      const result = await api.ai.chat({
-        message,
-        conversationId,
-        context: {
-          business: state.business || null,
-          plan: plan().id,
-          goals: state.business?.goals || []
+      const result = await Promise.race([
+        pending.cancelled,
+        api.ai.chat({
+          message,
+          conversationId,
+          context: {
+            business: state.business || null,
+            plan: plan().id,
+            goals: state.business?.goals || []
+          }
+        }),
+        clock
+      ]);
+
+      pending.stop();
+      if (result?.__timeout || result?.__cancelled) {
+        /* Not an error yet: the server may have saved the answer already. */
+        const recovered = await recoverReply({ sentAt, pending });
+        if (!recovered) {
+          pending.remove();
+          bubble(
+            "ai",
+            "That took longer than expected and nothing came back in time. Your message is saved — send it again, or reload and the answer will be in the conversation if it did arrive.",
+            "timed out"
+          );
+          input.value = message;
         }
-      });
+        return;
+      }
       pending.remove();
       const wasNew = !conversationId;
       conversationId = result.conversationId || conversationId;
@@ -343,6 +476,9 @@ export default async function render(root, ctx) {
         if (badge) badge.innerHTML = `${icon("sparkles", { size: 11 })}${esc(plan().name)} · ${result.usage.used}/${result.usage.limit}`;
       }
     } catch (error) {
+      pending.stop?.();
+      /* A failed request is not a lost answer: check before blaming the network. */
+      if (await recoverReply({ sentAt, pending })) return;
       pending.remove();
       const normalized = normalizeError(error);
       if (normalized.code === "functions_unavailable") {
@@ -352,6 +488,7 @@ export default async function render(root, ctx) {
       }
       toastError(normalized);
     } finally {
+      clearTimeout(timer);
       send.disabled = false;
       input.focus();
     }
