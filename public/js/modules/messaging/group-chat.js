@@ -489,6 +489,7 @@ export default async function mountGroups(root, options = {}) {
     if (!detail) return;
     const canManage = Boolean(detail.canManage);
     const members = detail.members || [];
+    const mine = members.find((row) => row.userId === me) || null;
     const modal = openModal({
       title: detail.name,
       desc: detail.description || "Group",
@@ -528,6 +529,10 @@ export default async function mountGroups(root, options = {}) {
         </div>
         <div class="grp-member-list">${members.map(memberRow).join("")}</div>
         <div class="grp-info-footer">
+          <button class="btn btn-ghost btn-sm" type="button" data-toggle-mute>
+            ${icon(mine?.muted ? "bell-ring" : "bell", { size: 13 })}
+            <span>${mine?.muted ? "Unmute this group" : "Mute this group"}</span>
+          </button>
           ${
             detail.isOwner
               ? `<span class="muted">Ownership moves only with “Make owner”.</span>`
@@ -583,6 +588,20 @@ export default async function mountGroups(root, options = {}) {
           if (!yes) return;
           try {
             await rpc("group_remove_member", { p_group: detail.id, p_user: userId });
+            modal.close();
+            await open(detail.id);
+          } catch (error) {
+            toastError(error);
+          }
+        });
+
+        delegate(root2, "click", "[data-toggle-mute]", async () => {
+          if (!mine) return;
+          try {
+            /* Muting stops that group's message notices. Mentions the member is
+               allowed to receive still arrive — the database decides, and
+               `group_send` keeps them. */
+            await rpc("group_set_muted", { p_group: detail.id, p_muted: !mine.muted });
             modal.close();
             await open(detail.id);
           } catch (error) {
