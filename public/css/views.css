@@ -1811,8 +1811,12 @@ html {
 .chat-avatar-sm { width: 26px; height: 26px; font-size: var(--fs-2xs); }
 
 .chat-item-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.chat-item-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
+.chat-item-top { display: flex; align-items: baseline; gap: var(--s-2); }
+/* The name is what the row is for, so it takes the room and only truncates when
+   the row genuinely cannot hold it; the clock shrinks first. */
 .chat-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-2);
@@ -1820,7 +1824,7 @@ html {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.chat-item-time { font-size: var(--fs-2xs); color: var(--text-4); white-space: nowrap; }
+.chat-item-time { flex: 0 0 auto; font-size: var(--fs-2xs); color: var(--text-4); white-space: nowrap; }
 .chat-item-snippet {
   font-size: var(--fs-2xs);
   color: var(--text-3);
@@ -3533,28 +3537,27 @@ html {
 .hub-info-row span:first-of-type { flex: 1 1 auto; }
 .hub-info-row.is-danger { color: #fca5a5; }
 .hub-info-row.is-danger:hover { background: rgba(248, 113, 113, 0.1); }
+/* "Details" opens the folded panel; it is not a setting, so it is sized like the
+   other header buttons and its label is allowed to be read. It used to carry the
+   30x17 toggle skin, which clipped the word to a stray "…ails" over the ⋯. */
 .hub-info-switch {
-  width: 30px;
-  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   flex: none;
-  border-radius: 999px;
-  background: var(--panel-3);
-  border: 1px solid var(--line);
-  position: relative;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
 }
-.hub-info-switch::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--text-3);
-  transition: transform 140ms ease, background 140ms ease;
+.hub-info-switch span { white-space: nowrap; }
+.hub-info-switch:hover { color: var(--text); }
+.hub-info-switch.is-on {
+  background: rgba(124, 58, 237, 0.28);
+  border-color: var(--line-violet);
+  color: var(--white);
 }
-.hub-info-switch.is-on { background: rgba(124, 58, 237, 0.35); border-color: var(--line-violet); }
-.hub-info-switch.is-on::after { transform: translateX(13px); background: var(--white); }
 
 .hub-member-strip { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .hub-member-chip {
@@ -3762,3 +3765,312 @@ html {
   font-size: var(--fs-2xs);
   width: max-content;
 }
+
+/* ==========================================================================
+   The composer bar
+   --------------------------------------------------------------------------
+   One row that survives every width: the tools sit at the left — emoji, then
+   attach, then the six quick reactions — the field takes whatever is left, and
+   Send stays at the right edge. On a phone the quick reactions drop away first
+   (they are a convenience), then Send becomes its icon, so the field never
+   shrinks below something you can type in.
+   ========================================================================== */
+.hub-compose { position: relative; display: block; }
+.hub-compose-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.hub-compose-bar .chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 160px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  line-height: 1.45;
+}
+.hub-compose-bar .chat-send {
+  flex: none;
+  align-self: stretch;
+  min-height: 40px;
+  border-radius: var(--r-md);
+}
+
+.hub-compose-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  align-self: center;
+  order: -1;
+}
+.hub-tool {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  flex: none;
+}
+.hub-tool:hover { background: var(--panel-3); color: var(--text); }
+.hub-tool[aria-expanded="true"] { background: var(--panel-3); color: var(--lavender); border-color: var(--line-violet-soft); }
+.hub-quick-emoji { display: flex; align-items: center; gap: 0; margin-left: 2px; }
+.hub-quick {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(0.15);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.hub-quick:hover { background: var(--panel-3); transform: translateY(-1px); filter: none; }
+
+.hub-compose .hub-compose-bar { flex-wrap: nowrap; }
+
+@media (max-width: 1080px) {
+  .hub-quick-emoji { display: none; }
+}
+@media (max-width: 620px) {
+  .hub-compose-bar { gap: 6px; }
+  .hub-compose-bar .chat-send span { display: none; }
+  .hub-compose-bar .chat-send { padding: 0 12px; }
+  .hub-tool { width: 30px; height: 30px; }
+}
+
+/* ---- the emoji and attach popovers -------------------------------------- */
+.cmp-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  /* Never taller than the room a short viewport leaves above the bar — the
+     composer sits at the bottom of the page, so an unclamped popover on a
+     landscape phone would open past the top edge and be unclickable. */
+  max-height: calc(100dvh - 140px);
+  left: var(--s-3);
+  z-index: 30;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.cmp-emoji {
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 40px));
+  max-height: min(56vh, 420px, calc(100dvh - 140px));
+  overflow: hidden;
+}
+.cmp-emoji-top { display: flex; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--line); }
+.cmp-emoji-search { flex: 1 1 auto; min-width: 0; height: 32px; font-size: var(--fs-xs); }
+.cmp-x {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  flex: none;
+}
+.cmp-x:hover { color: var(--text); }
+.cmp-emoji-tabs { display: flex; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.cmp-emoji-tab {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+  opacity: 0.62;
+}
+.cmp-emoji-tab:hover { background: var(--panel-2); opacity: 1; }
+.cmp-emoji-tab.is-active { background: var(--panel-3); border-color: var(--line-violet-soft); opacity: 1; }
+.cmp-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
+  gap: 1px;
+  padding: 8px;
+  overflow-y: auto;
+  min-height: 120px;
+}
+.cmp-emoji-cell {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cmp-emoji-cell:hover { background: var(--panel-3); }
+
+.cmp-attach {
+  display: grid;
+  gap: 1px;
+  width: min(320px, calc(100vw - 40px));
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cmp-attach-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cmp-attach-row:hover { background: var(--panel-2); }
+.cmp-attach-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--panel-3);
+  color: var(--lavender);
+}
+.cmp-attach-text { display: grid; gap: 1px; min-width: 0; }
+.cmp-attach-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text); }
+.cmp-attach-hint { font-size: var(--fs-2xs); color: var(--text-3); }
+
+/* ---- attachments in the bubble ----------------------------------------- */
+.grp-attach-media {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  max-width: 340px;
+}
+.grp-attach-video {
+  width: 100%;
+  max-height: 300px;
+  border-radius: var(--r-md);
+  background: #000;
+  display: block;
+}
+.grp-attach-media figcaption {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+.grp-attach-media figcaption a { color: var(--lavender); }
+.grp-attach-audio { max-width: 320px; }
+.grp-attach-player { width: 100%; height: 34px; }
+.grp-attach-doc {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 320px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+  text-decoration: none;
+  color: inherit;
+}
+.grp-attach-doc:hover { border-color: var(--line-violet); background: var(--panel-3); }
+.grp-attach-doc-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--panel-3);
+  color: var(--lavender);
+}
+.grp-attach-doc-text { display: grid; gap: 1px; min-width: 0; }
+.grp-attach-doc-name { font-size: var(--fs-xs); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grp-attach-doc-hint { font-size: var(--fs-2xs); color: var(--text-3); }
+
+/* ---- polls -------------------------------------------------------------- */
+.hub-poll {
+  /* A poll is a card, not a line of text: the bubble it sits in is sized to its
+     content, so a percentage floor resolves to whatever the text was and the
+     question ended up in a 165 px column. A real floor makes the bubble widen.
+     On a narrow screen the floor gives way to the width available. */
+  min-width: 300px;
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+}
+.hub-poll-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.hub-poll-loading, .hub-poll-error { font-size: var(--fs-2xs); color: var(--text-3); }
+.hub-poll-options { display: grid; gap: 5px; }
+.hub-poll-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.hub-poll-option:hover { border-color: var(--line-violet); }
+.hub-poll-option:disabled { cursor: default; opacity: 0.8; }
+.hub-poll-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--line-violet-soft);
+  transition: width 220ms ease;
+  pointer-events: none;
+}
+.hub-poll-label { position: relative; flex: 1 1 auto; }
+.hub-poll-count { position: relative; font-variant-numeric: tabular-nums; font-weight: 650; color: var(--text-3); }
+.hub-poll-option.is-chosen { border-color: var(--line-violet); color: var(--text); }
+.hub-poll-option.is-chosen .hub-poll-count { color: var(--lavender); }
+.hub-poll-foot { font-size: var(--fs-2xs); color: var(--text-3); }
+
+@media (max-width: 620px) {
+  .hub-poll { min-width: 0; width: 100%; }
+  /* Break out of the 88% bubble so the options line up with the question. */
+  .bubble .hub-poll, .grp-bubble .hub-poll { width: 100%; }
+}
+
+.poll-form { display: grid; gap: var(--s-3); }
+.poll-options { display: grid; gap: 6px; margin-bottom: 6px; }
+.poll-option-row { display: flex; gap: 6px; align-items: center; }
+.poll-option-row .input { flex: 1 1 auto; min-width: 0; }
+.poll-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-2); }

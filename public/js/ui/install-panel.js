@@ -26,7 +26,7 @@
    this modal.
    ========================================================================== */
 
-import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261105j";
+import { canPromptInstall, promptInstall, isInstalled } from "./pwa.js?v=20261105m";
 import { icon } from "../lib/icons.js";
 import { platformMark } from "../lib/platform-icons.js?v=20261110b";
 

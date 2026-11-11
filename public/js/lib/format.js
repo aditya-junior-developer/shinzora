@@ -101,6 +101,26 @@ export function timeAgo(value) {
   return date(value);
 }
 
+/**
+ * The rail's clock: "now", "12m", "3h", "2d", "5w", "4 Mar".
+ *
+ * `timeAgo` spells it out — "12 minutes ago" — which is right in a bubble and
+ * wrong in a 260px rail, where it squeezed the group name down to "Desig…".
+ * Same instants, less ink.
+ */
+export function timeAgoShort(value) {
+  if (!value) return "";
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diff < 60) return "now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  if (diff < 31557600) return `${Math.floor(diff / 604800)}w`;
+  return date(value, { month: "short", day: "numeric" });
+}
+
 /** "3m 12s" style duration for job timers. */
 export function duration(ms) {
   const total = Math.max(0, Math.round(ms / 1000));

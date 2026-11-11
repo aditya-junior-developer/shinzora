@@ -141,6 +141,7 @@ export const APPLICATION_TABLES = [
      these in the backup a restore would lose everybody's group membership and
      their notification settings. */
   "community_groups", "community_group_members", "community_mentions",
+  "group_polls", "group_poll_votes",
   "notification_preferences", "push_subscriptions"
 ];
 

@@ -30,7 +30,11 @@ assert.match(teamSql, /values \('team-chat-files',[\s\S]*?false, 20971520/, "mes
 /* Team chat is the inbox now, so the Gmail invitation hand-off lives with the
    invite flow it belongs to — the team screen — not inside the message thread. */
 assert.match(teamView, /https:\/\/mail\.google\.com\/mail\//, "email invitations open Gmail for the user to send");
-assert.match(teamUi, /ALLOWED_FILES = new Set\(\["image\/jpeg"[\s\S]*?"application\/pdf"\]/, "team chat supports image and PDF attachments");
+assert.match(
+  teamUi,
+  /ALLOWED_FILES = new Set\(\[[\s\S]*?"image\/jpeg"[\s\S]*?"video\/mp4"[\s\S]*?"audio\/mpeg"[\s\S]*?"application\/pdf"/,
+  "team chat supports pictures, video, audio and PDFs"
+);
 assert.match(teamUi, /rpc\("team_chat_send"/, "messages are sent through the secure team-chat RPC");
 assert.match(teamUi, /QUICK_EMOJI[\s\S]*?linkify\(/, "team chat supports emoji and safe clickable links");
 /* 0023 replaced the old member_type wording with the two account types the

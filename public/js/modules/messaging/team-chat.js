@@ -17,7 +17,8 @@
 
 import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
-import { timeAgo, dateTime, initials } from "../../lib/format.js";
+import { composerPopsMarkup, composerToolsBar, bindComposerTools, ATTACH_KINDS } from "./composer-tools.js";
+import { timeAgo, timeAgoShort, dateTime, initials } from "../../lib/format.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { state } from "../../lib/store.js";
 import { toast, toastError } from "../../ui/toast.js";
@@ -26,8 +27,20 @@ import { createCall, callTopics, turnConfigured } from "./webrtc.js";
 import { openCallSurface, watchForCalls, showRingBanner } from "./call-ui.js";
 
 const BUCKET = "team-chat-files";
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_FILES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
+/* Mirrors `attachment_mime_ok` (0042); the database is the authority. */
+const ALLOWED_FILES = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "video/mp4", "video/webm", "video/quicktime", "video/ogg",
+  "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg",
+  "audio/webm", "audio/mp4", "audio/aac", "audio/flac",
+  "application/pdf", "text/plain", "text/csv", "text/markdown",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+]);
 const QUICK_EMOJI = ["🙂", "👍", "🎉", "❤️", "🙏", "✨"];
 
 function linkify(value) {
@@ -89,15 +102,17 @@ export default async function mountInbox(root, options = {}) {
         <div class="chat-empty-line">No conversation open.</div>
       </div>
 
-      <form class="chat-compose" id="dm-compose" hidden>
-        <div class="team-compose-tools" aria-label="Quick emoji">
-          ${QUICK_EMOJI.map((emoji) => `<button class="btn btn-ghost btn-sm" type="button" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`).join("")}
-          <label class="btn btn-ghost btn-sm" for="dm-files">${icon("paperclip", { size: 14 })}Attach</label>
-          <input id="dm-files" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden />
+      <form class="chat-compose hub-compose" id="dm-compose" hidden>
+        ${composerPopsMarkup("dm-cmp", { poll: false })}
+        <input id="dm-files" type="file" multiple hidden />
+        <div class="hub-compose-bar">
+          ${composerToolsBar({ quickEmoji: QUICK_EMOJI })}
+          <label class="sr-only" for="dm-body">Message</label>
+          <textarea class="textarea chat-input" id="dm-body" rows="1" maxlength="4000" placeholder="Write a message…"></textarea>
+          <button class="btn btn-primary chat-send" type="submit" id="dm-send" aria-label="Send message">${icon("send", {
+            size: 15
+          })}<span>Send</span></button>
         </div>
-        <label class="sr-only" for="dm-body">Message</label>
-        <textarea class="textarea chat-input" id="dm-body" rows="2" maxlength="4000" placeholder="Write a message…"></textarea>
-        <button class="btn btn-primary chat-send" type="submit" id="dm-send">${icon("send", { size: 15 })}<span>Send</span></button>
       </form>
     </section>`;
   root.appendChild(wrap);
@@ -146,7 +161,7 @@ export default async function mountInbox(root, options = {}) {
           <span class="chat-item-body">
             <span class="chat-item-top">
               <span class="chat-item-name">${esc(title)}</span>
-              <span class="chat-item-time">${row.lastMessageAt ? esc(timeAgo(row.lastMessageAt)) : ""}</span>
+              <span class="chat-item-time">${row.lastMessageAt ? esc(timeAgoShort(row.lastMessageAt)) : ""}</span>
             </span>
             <span class="chat-item-snippet">${row.lastMessage ? esc(String(row.lastMessage).slice(0, 80)) : esc(sub)}</span>
           </span>
@@ -279,10 +294,29 @@ export default async function mountInbox(root, options = {}) {
             } catch {
               /* A missing object shows as a filename, never a public URL. */
             }
-            return `<a class="team-attachment" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${icon(
-              file.mime?.startsWith("image/") ? "image" : "file-text",
-              { size: 13 }
-            )}${esc(file.name || "Attachment")}</a>`;
+            const mime = String(file.mime || "");
+            const name = esc(file.name || "Attachment");
+            if (mime.startsWith("image/")) {
+              return `<a class="grp-attach-image" href="${esc(href)}" target="_blank" rel="noopener noreferrer">
+                  <img src="${esc(href)}" alt="${name}" loading="lazy" decoding="async" /></a>`;
+            }
+            if (mime.startsWith("video/")) {
+              return `<figure class="grp-attach-media"><video class="grp-attach-video" src="${esc(
+                href
+              )}" controls preload="metadata" playsinline aria-label="${name}"></video></figure>`;
+            }
+            if (mime.startsWith("audio/")) {
+              return `<figure class="grp-attach-media grp-attach-audio"><figcaption>${icon("audio-lines", {
+                size: 13
+              })}${name}</figcaption><audio class="grp-attach-player" src="${esc(
+                href
+              )}" controls preload="metadata" aria-label="${name}"></audio></figure>`;
+            }
+            return `<a class="grp-attach-doc" href="${esc(href)}" target="_blank" rel="noopener noreferrer">
+                <span class="grp-attach-doc-icon">${icon(mime === "application/pdf" ? "file-text" : "file", { size: 15 })}</span>
+                <span class="grp-attach-doc-text"><span class="grp-attach-doc-name">${name}</span>
+                <span class="grp-attach-doc-hint">${mime === "application/pdf" ? "PDF" : "Document"} · open</span></span>
+              </a>`;
           })
         );
         return `<div class="bubble-row${mine ? " is-mine" : ""}"><div class="bubble${mine ? " bubble-mine" : ""}">
@@ -376,12 +410,27 @@ export default async function mountInbox(root, options = {}) {
     }
   });
 
-  delegate(wrap, "click", "[data-emoji]", (_event, button) => {
+  function insertEmoji(emoji) {
     const field = qs("#dm-body", wrap);
     const start = field.selectionStart ?? field.value.length;
     const end = field.selectionEnd ?? start;
-    field.setRangeText(button.dataset.emoji, start, end, "end");
+    field.setRangeText(emoji, start, end, "end");
     field.focus();
+  }
+
+  /** One attach button, four kinds — a direct conversation has no polls. */
+  function pickFiles(kind) {
+    const spec = ATTACH_KINDS.find((row) => row.id === kind);
+    const input = qs("#dm-files", wrap);
+    if (!spec || !input) return;
+    input.accept = spec.accept;
+    input.click();
+  }
+
+  bindComposerTools(formEl, {
+    prefix: "dm-cmp",
+    onEmoji: insertEmoji,
+    onAttach: pickFiles
   });
 
   on(qs("#dm-body", wrap), "keydown", (event) => {
@@ -405,8 +454,10 @@ export default async function mountInbox(root, options = {}) {
     try {
       const uploaded = [];
       for (const file of files) {
-        if (!ALLOWED_FILES.has(file.type)) throw new Error("Attach a JPEG, PNG or WebP image, or a PDF.");
-        if (!file.size || file.size > MAX_FILE_BYTES) throw new Error("Each attachment must be under 20 MB.");
+        if (!ALLOWED_FILES.has(file.type)) {
+          throw new Error("Attach a picture, video, audio file, PDF or document.");
+        }
+        if (!file.size || file.size > MAX_FILE_BYTES) throw new Error("Each attachment must be under 50 MB.");
         const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "attachment";
         const path = `${active}/${me}/${crypto.randomUUID()}-${cleanName}`;
         const { error } = await sb.storage.from(BUCKET).upload(path, file, { upsert: false, contentType: file.type });

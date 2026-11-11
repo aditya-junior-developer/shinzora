@@ -86,6 +86,9 @@ export function el(tag, attrs = {}, children = []) {
 
 /** Event delegation: bind once on a container, match descendants by selector. */
 export function delegate(root, eventName, selector, handler) {
+  /* A surface that is not on this page is not an error: Community has no groups
+     column, so its handlers simply have nowhere to bind. */
+  if (!root) return () => {};
   const listener = (event) => {
     const target = event.target instanceof Element ? event.target.closest(selector) : null;
     if (target && root.contains(target)) handler(event, target);

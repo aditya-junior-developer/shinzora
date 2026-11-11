@@ -5,7 +5,7 @@
    drawing a convincing chart out of nothing.
    ========================================================================== */
 
-import { qs, esc } from "../../../lib/dom.js";
+import { qs, esc, on } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { money, compact, timeAgo, statusLabel } from "../../../lib/format.js";
 import { state, aiCredits, plan } from "../../../lib/store.js";

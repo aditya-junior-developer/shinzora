@@ -6,7 +6,7 @@
    ========================================================================== */
 
 import { hydrateIcons } from "../lib/icons.js";
-import { qs, qsa, debounce, safeSet } from "../lib/dom.js";
+import { qs, qsa, esc, debounce, safeSet } from "../lib/dom.js";
 import { sb, normalizeError, uploadPublic, AppError } from "../lib/supabase.js";
 import { loadIdentity, state } from "../lib/store.js";
 import { requireSession, logoutEverywhere } from "../lib/guard.js";
@@ -14,7 +14,6 @@ import { validateForm, rules } from "../lib/validate.js";
 import { setBusy, setAlert, showError, fieldError } from "../ui/form.js";
 import { toast } from "../ui/toast.js";
 import { PLANS, planById } from "../config/env.js";
-import { esc } from "../lib/dom.js";
 
 hydrateIcons();
 

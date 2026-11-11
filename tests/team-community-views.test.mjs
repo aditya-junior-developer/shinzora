@@ -471,7 +471,9 @@ test("Community renders the same hub every signed-in account gets, and sends tex
 
   /* Text only, enforced by the schema — so the control is not offered. */
   assert.equal(root.querySelector("#grp-files").disabled, true, "attachments are off in a public room");
-  assert.equal(root.querySelector('label[for="grp-files"]').hidden, true, "the attach control is not shown");
+  assert.equal(root.querySelector('[data-cmp="attach"]').hidden, true, "the attach control is not shown");
+  assert.equal(root.querySelector("#grp-list"), null, "and there is no Groups column here");
+  assert.equal(root.querySelectorAll("[data-group]").length, 0, "groups live under Messages only");
   assert.match(root.textContent, /Text only/, "the limitation is stated up front");
 
   const field = root.querySelector("#grp-body");

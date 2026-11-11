@@ -329,3 +329,89 @@ Two limits, stated rather than glossed:
 - **Closed-tab alerts need Web Push configured** — permission granted, a
   subscription row, and the `push` function's VAPID keys. The card tells you
   which of those is missing instead of promising delivery.
+
+## 21. The composer, richer attachments, polls, and six themes
+
+### 21.1 The message bar
+
+One row at every width: **😊** and **📎** at the left, the six quick reactions
+next to them, the field in the middle taking what is left, **Send** at the
+right.
+
+- [ ] On a laptop the quick reactions are visible; under ~1080 px they step
+      away, because the field matters more than six shortcut faces.
+- [ ] On a phone **Send** becomes its icon and the field keeps at least a
+      usable width. Nothing wraps onto a second row.
+
+### 21.2 The emoji button
+
+- [ ] It opens the **whole set** — 2,295 emoji in nine groups (Smileys, People,
+      Nature, Food, Travel, Activity, Objects, Symbols, Flags).
+- [ ] The search box finds emoji by name: type `rocket`, `party`, `thumbs`.
+- [ ] Picking one inserts it at the caret in the message field, not at the end.
+
+Skin-tone variants are the one omission: they repeat a base emoji the picker
+already offers, and including them would have tripled the file. Everything else
+in Unicode 15.1 is here.
+
+### 21.3 The attach button
+
+It asks *what* is being attached, because the four flows end differently:
+
+| Kind | What happens |
+| --- | --- |
+| **Photo or video** | picture shown inline, video gets a player in the bubble |
+| **Document** | PDF, Word, Excel, CSV, text — opens in the browser's own viewer, never a forced download |
+| **Poll** | a real poll in the thread: question, 2–10 options, one vote per person unless "pick more than one" |
+| **Audio** | a voice note or clip with a player in the bubble |
+
+- [ ] A file that is not one of the allowed types is refused by the database,
+      not only by the file picker — try `text/html` from the console and read the
+      refusal.
+- [ ] Each file may be up to 50 MB, five per message.
+- [ ] A poll's tally updates for everyone who can see it; an outsider cannot
+      read or vote on it.
+- [ ] Voting twice for the same option is a no-op; on a single-choice poll a new
+      vote replaces the old one.
+
+### 21.4 Six themes
+
+Settings → Appearance now offers **Midnight**, **Nebula**, **Grove** (dark) and
+**Blossom**, **Daylight**, **Porcelain** (light). Same components, different
+tokens; every text step is above 4.5:1 on the surface behind it, and the choice
+follows the account to other devices.
+
+### 21.5 Community is channels only
+
+The Community page is the same three-column hub, but its rail lists the public
+rooms and nothing else: groups live under Messages. A signed-out visitor still
+gets the read-only room page.
+
+### 21.6 Two fixes worth knowing about
+
+- **Analytics** failed with `on is not defined` — a helper was called without
+  being imported, so the whole view threw after painting its skeleton. Fixed,
+  and `scripts/check.mjs` now refuses to pass a module that calls a `lib/dom`
+  helper it never imported, which is how this shipped in the first place.
+- **The AI command bar** occasionally answered `ai_bad_json`. The site builder
+  already retried once with a stricter instruction; the assistant, the ideas,
+  the support replies and the analysis now do the same, so one malformed answer
+  no longer costs the sentence you typed.
+
+### 21.7 What a browser run found, and what changed because of it
+
+Everything below was measured in Chromium against the real views, not eyeballed.
+
+| Found | Fixed |
+| --- | --- |
+| The rail clock read "10 minutes ago", which squeezed the group name to "Desig…". | The rail now uses a compact clock — `now`, `12m`, `3h`, `2d`, `5w` — and the name keeps the room. Bubbles still spell it out. |
+| The **Details** button carried a 30×17 toggle skin, so its own label spilled out of the pill and collided with the ⋯ beside it. | It is a button again: sized like the others, label readable, `is-on` still marks the open state. |
+| A poll's card was squeezed into a 165 px column because `min-width: min(320px, 100%)` resolved against a shrink-to-fit bubble. | The card has a real 300 px floor and gives way to `width: 100%` under 620 px. |
+| Opening a group scrolled to the bottom *before* the composer was shown, so the last message sat 60 px below the fold. A poll arriving live pushed itself out of view as its card grew. | The thread lands on the bottom after the composer appears, and `paintPolls` restores the bottom only if the reader was already there. |
+| A poll printed "Loading poll…" and stayed there. | `paintThread` is awaited before `paintPolls` — the polls are found by walking the bubbles it writes. |
+| A public room's field still said "type @ to mention somebody", and typing `@` asked a group-only RPC with no group. | A room's field says "Write a message…", and the @ menu is not offered where it cannot resolve. Attach was already hidden; now the promise matches. |
+| The emoji and attach popovers could open past the top of a short viewport. | `.cmp-pop` is clamped to `100dvh - 140px`, and the attach list scrolls. |
+
+Measured at 1180, 900 and 620 px: one row in the composer, no horizontal overflow, the
+emoji popover fully in view with all nine group tabs, the attach menu offering
+photo/video, document, poll and audio, and every popover closable with Escape.

@@ -480,6 +480,29 @@ async function handleGenerate(
   });
 }
 
+/**
+ * Ask for JSON, and repair once if the answer did not parse.
+ *
+ * Every caller that reads a structured answer needs this, not just site
+ * generation: the assistant command parser failed about one call in ten with
+ * `ai_bad_json`, and the platform status page reported it honestly while the
+ * request itself was lost. A second attempt with an explicit "JSON only"
+ * instruction costs one call and saves the sentence the person typed.
+ */
+async function geminiJsonWithRepair<T>(prompt: string, options: Record<string, unknown> = {}): Promise<T> {
+  try {
+    return await geminiJson<T>(prompt, options);
+  } catch (error) {
+    if (error instanceof GeminiError && error.code === "ai_bad_json") {
+      return await geminiJson<T>(
+        `${prompt}\n\nIMPORTANT: your previous reply could not be parsed. Return ONLY the JSON object — no prose, no markdown fences — and make sure every quote and newline inside string values is escaped.`,
+        { ...options, temperature: 0.2 }
+      );
+    }
+    throw error;
+  }
+}
+
 async function requestGeneration(
   prompt: string,
   options: { model?: string; capability?: Capability } = {}
@@ -710,7 +733,7 @@ async function handleDomainIdeas(caller: Caller, body: Record<string, unknown>) 
     });
   }
 
-  const parsed = await geminiJson<{ ideas?: Array<{ domain?: string; reason?: string }> }>(
+  const parsed = await geminiJsonWithRepair<{ ideas?: Array<{ domain?: string; reason?: string }> }>(
     `${DOMAIN_IDEAS_PROMPT}\n\nBusiness:\n${JSON.stringify(business)}`,
     { temperature: 0.9, maxOutputTokens: 1200 }
   );
@@ -736,7 +759,7 @@ async function handleCopy(caller: Caller, body: Record<string, unknown>) {
     const objective = clean(body.objective, 1200);
     if (!objective) return fail(400, "invalid_input", "Describe the campaign objective.");
 
-    const parsed = await geminiJson<Record<string, unknown>>(
+    const parsed = await geminiJsonWithRepair<Record<string, unknown>>(
       `${MARKETING_PROMPT}\n\nBUSINESS\n${JSON.stringify(business)}\n\nCATALOGUE\n${JSON.stringify(
         body.catalogue ?? []
       )}\n\nRECENT ORDERS\n${JSON.stringify(body.recentOrders ?? [])}\n\nOBJECTIVE\n${objective}\nPRIMARY CHANNEL\n${
@@ -771,7 +794,7 @@ async function handleSupportReply(caller: Caller, body: Record<string, unknown>)
   const thread = Array.isArray(body.thread) ? body.thread.slice(-10) : [];
   const business = await businessFor(caller.user.id, body.business);
 
-  const parsed = await geminiJson<{ reply?: string; needs_owner?: boolean }>(
+  const parsed = await geminiJsonWithRepair<{ reply?: string; needs_owner?: boolean }>(
     `${SUPPORT_PROMPT}\n\nBUSINESS\n${JSON.stringify(business)}\n\nTICKET\nSubject: ${clean(
       ticket.subject,
       200
@@ -830,7 +853,7 @@ async function handleSupportAutoReply(caller: Caller, body: Record<string, unkno
   }
 
   const business = await businessFor(caller.user.id, body.business);
-  const parsed = await geminiJson<{ reply?: string; needs_owner?: boolean }>(
+  const parsed = await geminiJsonWithRepair<{ reply?: string; needs_owner?: boolean }>(
     `${SUPPORT_PROMPT}\n\nYou are answering automatically, with no human reading it first. Be brief, concrete and honest \
 — never promise a refund, a date or a discount you were not given. If the answer needs a decision only the owner \
 can make, reply with the most useful thing you can say now and set needs_owner to true.\n\nBUSINESS\n${JSON.stringify(
@@ -886,7 +909,7 @@ async function handleDataAnalysis(caller: Caller, body: Record<string, unknown>)
     return fail(400, "invalid_input", "Send the numbers to analyse.");
   }
 
-  const analysis = await geminiJson<{
+  const analysis = await geminiJsonWithRepair<{
     headline?: string;
     findings?: Array<{ title?: string; detail?: string; action?: string; confidence?: string }>;
     caveats?: string[];
@@ -971,7 +994,7 @@ async function handleCommand(caller: Caller, body: Record<string, unknown>) {
   const context = (body.context ?? {}) as Record<string, unknown>;
   if (request.length < 3) return fail(400, "invalid_input", "Say what you want done.");
 
-  const parsed = await geminiJson<{
+  const parsed = await geminiJsonWithRepair<{
     understood?: boolean;
     action?: string;
     payload?: Record<string, unknown>;

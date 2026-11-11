@@ -21,21 +21,54 @@
 
 import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
-import { timeAgo, dateTime, initials } from "../../lib/format.js";
+import { timeAgo, timeAgoShort, dateTime, initials, bytes } from "../../lib/format.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { avatarMarkup, paintAvatar } from "../../lib/avatar.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { openModal, confirmDialog, formDialog } from "../../ui/modal.js";
 import { openProfile } from "../dashboard/views/find-team.js";
 import { createCall, callTopics, turnConfigured } from "./webrtc.js";
+import { composerPopsMarkup, composerToolsBar, bindComposerTools, ATTACH_KINDS } from "./composer-tools.js";
 import { openCallSurface, watchForCalls, showRingBanner } from "./call-ui.js";
 
 const ROLE_LABEL = { owner: "Owner", admin: "Group admin", member: "Member" };
 const AVATAR_BUCKET = "avatars";
 const MAX_PICTURE_BYTES = 4 * 1024 * 1024;
 const FILES_BUCKET = "group-chat-files";
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_FILES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * What may be attached, mirroring `public.attachment_mime_ok` in 0042.
+ *
+ * The server is the authority — this set only exists so a bad pick is refused
+ * before a 40 MB upload starts. If the two ever disagree the database wins and
+ * the member reads its words.
+ */
+const ALLOWED_FILES = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "video/mp4", "video/webm", "video/quicktime", "video/ogg",
+  "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg",
+  "audio/webm", "audio/mp4", "audio/aac", "audio/flac",
+  "application/pdf", "text/plain", "text/csv", "text/markdown",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+]);
+
+/** Which of the four kinds a file is, for the pending list and the bubble. */
+function fileKind(mime = "") {
+  const type = String(mime);
+  if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+  if (type === "application/x-shinzora-poll") return "poll";
+  if (type === "application/pdf") return "pdf";
+  return "document";
+}
+
+const KIND_ICON = { image: "image", video: "video", audio: "audio-lines", pdf: "file-text", document: "file", poll: "list-checks" };
 const QUICK_EMOJI = ["🙂", "👍", "🎉", "❤️", "🙏", "✨"];
 
 /** "Today" / "Yesterday" / a long date, for the day pills in a room. */
@@ -113,8 +146,12 @@ function paintBody(body, mentions = []) {
 /* ---------------------------------------------------------------- the surface */
 
 export default async function mountGroups(root, options = {}) {
+  /* Community is the same hub with only its public rooms in the rail: groups
+     live under Messages, and a second copy of them here was two places to look
+     for the same thing. */
+  const withGroups = options.groups !== false;
   const wrap = document.createElement("div");
-  wrap.className = "chat group-chat hub";
+  wrap.className = `chat group-chat hub${withGroups ? "" : " hub-channels-only"}`;
   wrap.innerHTML = `
     <aside class="chat-pane chat-pane-list hub-rail">
       <div class="hub-rail-head">
@@ -124,7 +161,9 @@ export default async function mountGroups(root, options = {}) {
         <div class="chat-empty-line">Loading channels…</div>
       </div>
 
-      <div class="hub-rail-head hub-rail-groups">
+      ${
+        withGroups
+          ? `<div class="hub-rail-head hub-rail-groups">
         <div class="chat-pane-title">${icon("users", { size: 15 })}<span>Groups</span></div>
         <div class="pane-head-actions">
           <button class="btn btn-primary btn-sm" type="button" id="grp-new">${icon("plus", { size: 13 })}New</button>
@@ -134,7 +173,9 @@ export default async function mountGroups(root, options = {}) {
           )}</button>
         </div>
       </div>
-      <div class="chat-list hub-groups" id="grp-list"><div class="chat-empty-line">Loading groups…</div></div>
+      <div class="chat-list hub-groups" id="grp-list"><div class="chat-empty-line">Loading groups…</div></div>`
+          : ""
+      }
     </aside>
 
     <section class="chat-pane chat-pane-thread">
@@ -189,25 +230,22 @@ export default async function mountGroups(root, options = {}) {
         <div class="chat-empty-line">No group open.</div>
       </div>
 
-      <form class="chat-compose" id="grp-compose" hidden>
+      <form class="chat-compose hub-compose" id="grp-compose" hidden>
         <div class="mention-pop" id="grp-mentions" role="listbox" aria-label="Mention somebody in this group" hidden></div>
-        <div class="team-compose-tools" aria-label="Message tools">
-          ${QUICK_EMOJI.map(
-            (emoji) =>
-              `<button class="btn btn-ghost btn-sm" type="button" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`
-          ).join("")}
-          <label class="btn btn-ghost btn-sm" for="grp-files" title="Attach a picture or PDF">
-            ${icon("paperclip", { size: 14 })}<span>Attach</span>
-          </label>
-          <input id="grp-files" type="file" hidden multiple
-                 accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" />
-          <span class="grp-file-count" id="grp-file-count" hidden></span>
-        </div>
+        ${composerPopsMarkup("grp-cmp")}
+        <input id="grp-files" type="file" hidden multiple />
         <div class="grp-pending" id="grp-pending" hidden></div>
-        <label class="sr-only" for="grp-body">Message</label>
-        <textarea class="textarea chat-input" id="grp-body" rows="2" maxlength="4000"
-          placeholder="Write a message… type @ to mention somebody"></textarea>
-        <button class="btn btn-primary chat-send" type="submit" id="grp-send">${icon("send", { size: 15 })}<span>Send</span></button>
+        <span class="grp-file-count" id="grp-file-count" hidden></span>
+        <div class="hub-compose-bar">
+          ${composerToolsBar({ quickEmoji: QUICK_EMOJI })}
+          <label class="sr-only" for="grp-body">Message</label>
+          <textarea class="textarea chat-input" id="grp-body" rows="1" maxlength="4000"
+            placeholder="Write a message… type @ to mention somebody"></textarea>
+          <button class="btn btn-primary chat-send" type="submit" id="grp-send" aria-label="Send message">${icon(
+            "send",
+            { size: 15 }
+          )}<span>Send</span></button>
+        </div>
       </form>
     </section>
 
@@ -258,6 +296,7 @@ export default async function mountGroups(root, options = {}) {
 
   /* ------------------------------------------------------------------- list */
   function paintList() {
+    if (!listEl) return;
     if (!groups.length) {
       listEl.innerHTML = `<div class="chat-empty-line">You are not in a group yet. Press <strong>New</strong> to create one, then add people you work with.</div>`;
       return;
@@ -275,7 +314,7 @@ export default async function mountGroups(root, options = {}) {
           <span class="chat-item-body">
             <span class="chat-item-top">
               <span class="chat-item-name">${esc(group.name)}</span>
-              <span class="chat-item-time">${group.lastMessageAt ? esc(timeAgo(group.lastMessageAt)) : ""}</span>
+              <span class="chat-item-time">${group.lastMessageAt ? esc(timeAgoShort(group.lastMessageAt)) : ""}</span>
             </span>
             <span class="chat-item-snippet">${
               group.lastMessage
@@ -290,6 +329,7 @@ export default async function mountGroups(root, options = {}) {
   }
 
   async function loadList() {
+    if (!withGroups) return groups;
     const rows = await rpc("group_my_groups");
     groups = Array.isArray(rows) ? rows : [];
     paintList();
@@ -360,9 +400,12 @@ export default async function mountGroups(root, options = {}) {
     if (title) title.textContent = `#${channel.name}`;
     if (sub) sub.textContent = channel.description || "A public room — everyone on Shinzora can read it.";
     paintChannelInfo(channel);
+    bodyEl.placeholder = PLACEHOLDER_CHANNEL;
     qs("#grp-search", wrap).hidden = true; // group search only — a room has no membership
-    const attachLabel = wrap.querySelector('label[for="grp-files"]');
-    if (attachLabel) attachLabel.hidden = true;
+    /* Public rooms are text-only, enforced by the schema. Offering the attach
+       menu would only produce a refusal, so the button is not drawn. */
+    const attachTool = qs('[data-cmp="attach"]', formEl);
+    if (attachTool) attachTool.hidden = true;
     messagesEl.innerHTML = `<div class="chat-empty-line">Loading #${esc(channel.slug)}…</div>`;
     formEl.hidden = false;
     filesInput.disabled = true; // public rooms are text-only
@@ -501,9 +544,17 @@ export default async function mountGroups(root, options = {}) {
     try {
       detail = await rpc("group_get", { p_group: id });
       paintHead(detail);
+      bodyEl.placeholder = PLACEHOLDER_GROUP;
       const rows = await rpc("group_messages_list", { p_group: id, p_limit: 80 });
-      paintThread(Array.isArray(rows) ? rows : [], focusMessageId);
+      /* Awaited: the polls are found by walking the bubbles that paintThread
+         writes, so painting them first would find nothing and leave every poll
+         stuck on "Loading poll…". */
+      await paintThread(Array.isArray(rows) ? rows : [], focusMessageId);
+      await paintPolls();
       formEl.hidden = false;
+      /* Showing the composer shrinks the thread by its height, so the bottom
+         the scroll was pinned to is no longer the bottom. Land on it again. */
+      if (!focusMessageId) messagesEl.scrollTop = messagesEl.scrollHeight;
       bodyEl.focus({ preventScroll: true });
       await rpc("group_mark_read", { p_group: id });
       /* The details column and the pin bar belong to the same paint as the
@@ -512,8 +563,8 @@ export default async function mountGroups(root, options = {}) {
       paintGroupInfo();
       filesInput.disabled = false;
       qs("#grp-search", wrap).hidden = false;
-      const attachLabel = wrap.querySelector('label[for="grp-files"]');
-      if (attachLabel) attachLabel.hidden = false;
+      const attachTool = qs('[data-cmp="attach"]', formEl);
+      if (attachTool) attachTool.hidden = false;
       await loadPin();
       watchThisGroup();
       await loadList();
@@ -536,7 +587,7 @@ export default async function mountGroups(root, options = {}) {
     pendingEl.innerHTML = pending
       .map(
         (file, index) => `<span class="grp-pending-item">
-            ${icon(file.type === "application/pdf" ? "file-text" : "image", { size: 12 })}
+            ${icon(KIND_ICON[fileKind(file.type)] || "file", { size: 12 })}
             <span class="grp-pending-name">${esc(file.name)}</span>
             <span class="grp-pending-size">${Math.round(file.size / 1024)} KB</span>
             <button type="button" class="grp-pending-x" data-drop-pending="${index}" aria-label="Remove ${esc(
@@ -552,11 +603,11 @@ export default async function mountGroups(root, options = {}) {
     if (!incoming.length) return;
     for (const file of incoming) {
       if (!ALLOWED_FILES.has(file.type)) {
-        toastError(new Error(`${file.name} is not a JPEG, PNG, WebP, GIF or PDF.`));
+        toastError(new Error(`${file.name} is not a picture, video, audio file, PDF or document.`));
         continue;
       }
       if (!file.size || file.size > MAX_FILE_BYTES) {
-        toastError(new Error(`${file.name} is over 20 MB.`));
+        toastError(new Error(`${file.name} is over 50 MB.`));
         continue;
       }
       if (pending.length >= 5) {
@@ -625,21 +676,234 @@ export default async function mountGroups(root, options = {}) {
    * and a link that could not be signed says so instead of looking broken.
    */
   async function attachmentMarkup(file) {
-    const isImage = String(file.mime || "").startsWith("image/");
+    const kind = fileKind(file.mime);
+    const label = file.name || "Attachment";
+
+    /* A poll is not a file: nothing to sign, and the tally is fetched live so
+       two people looking at the same poll see the same numbers. */
+    if (kind === "poll") {
+      const pollId = file.pollId || String(file.path || "").replace("poll:", "");
+      if (!pollId) {
+        return `<span class="grp-attach is-broken">${icon("triangle-alert", { size: 12 })}Poll unavailable</span>`;
+      }
+      return `<div class="hub-poll" data-poll="${esc(pollId)}">
+          <div class="hub-poll-loading">Loading poll…</div>
+        </div>`;
+    }
+
     const url = await attachmentUrl(file.path);
     if (!url) {
       return `<span class="grp-attach is-broken">${icon("triangle-alert", { size: 12 })}${esc(
-        file.name || "Attachment"
+        label
       )} · could not be opened</span>`;
     }
-    if (isImage) {
+
+    const meta = file.size ? ` · ${bytes(file.size)}` : "";
+
+    if (kind === "image") {
       return `<a class="grp-attach-image" href="${esc(url)}" target="_blank" rel="noopener noreferrer">
-          <img src="${esc(url)}" alt="${esc(file.name || "Attached picture")}" loading="lazy" decoding="async" />
+          <img src="${esc(url)}" alt="${esc(label)}" loading="lazy" decoding="async" />
         </a>`;
     }
-    return `<a class="team-attachment" href="${esc(url)}" target="_blank" rel="noopener noreferrer">
-        ${icon("file-text", { size: 13 })}${esc(file.name || "Attachment")}
+    if (kind === "video") {
+      return `<figure class="grp-attach-media">
+          <video class="grp-attach-video" src="${esc(url)}" controls preload="metadata" playsinline
+                 aria-label="${esc(label)}"></video>
+          <figcaption><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>${meta}</figcaption>
+        </figure>`;
+    }
+    if (kind === "audio") {
+      return `<figure class="grp-attach-media grp-attach-audio">
+          <figcaption>${icon("audio-lines", { size: 13 })}${esc(label)}${meta}</figcaption>
+          <audio class="grp-attach-player" src="${esc(url)}" controls preload="metadata"
+                 aria-label="${esc(label)}"></audio>
+        </figure>`;
+    }
+    /* Documents open in the browser's own viewer — never a forced download. A
+       PDF previews inline; anything else opens in a new tab. */
+    const isPdf = kind === "pdf";
+    return `<a class="grp-attach-doc" href="${esc(url)}${isPdf ? "#view=FitH" : ""}" target="_blank" rel="noopener noreferrer">
+        <span class="grp-attach-doc-icon">${icon(isPdf ? "file-text" : "file", { size: 15 })}</span>
+        <span class="grp-attach-doc-text">
+          <span class="grp-attach-doc-name">${esc(label)}</span>
+          <span class="grp-attach-doc-hint">${isPdf ? "PDF" : "Document"}${meta} · open${isPdf ? " to preview" : ""}</span>
+        </span>
       </a>`;
+  }
+
+  /* ------------------------------------------------------------------ polls */
+
+  /**
+   * Paint every poll in the thread.
+   *
+   * One round trip per poll, in parallel, after the messages are on screen: a
+   * poll's tally changes without the message changing, so it cannot be baked
+   * into the message payload.
+   */
+  async function paintPolls() {
+    const nodes = [...messagesEl.querySelectorAll("[data-poll]")];
+    if (!nodes.length) return;
+    /* Each poll lands as a one-line placeholder and is replaced here by a card
+       several times taller. If the reader was at the bottom of the thread when
+       that happened, the card pushed itself out of sight — a poll arriving in a
+       live room looked cut in half. Put them back where they were. */
+    const atBottom =
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 48;
+    await Promise.all(
+      nodes.map(async (node) => {
+        const pollId = node.getAttribute("data-poll");
+        try {
+          const poll = await rpc("group_poll_get", { p_poll: pollId });
+          node.innerHTML = pollMarkup(poll);
+          node.classList.remove("is-loading");
+        } catch (error) {
+          node.innerHTML = `<div class="hub-poll-error">${esc(
+            error?.message || "This poll could not be loaded."
+          )}</div>`;
+        }
+      })
+    );
+    if (atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function pollMarkup(poll) {
+    if (!poll) return "";
+    const total = poll.options.reduce((sum, option) => sum + Number(option.count || 0), 0);
+    const mine = new Set(poll.mine || []);
+    return `
+      <div class="hub-poll-head">
+        ${icon("list-checks", { size: 13 })}<span>Poll${poll.multiple ? " · pick any" : ""}</span>
+        ${poll.closed ? `<span class="badge badge-neutral">Closed</span>` : ""}
+      </div>
+      <div class="hub-poll-options" role="group" aria-label="${esc(poll.question)}">
+        ${poll.options
+          .map((option) => {
+            const chosen = mine.has(option.index);
+            const share = total ? Math.round((Number(option.count) / total) * 100) : 0;
+            return `<button class="hub-poll-option${chosen ? " is-chosen" : ""}" type="button"
+                data-poll-vote="${option.index}" data-poll-id="${esc(poll.id)}"
+                aria-pressed="${chosen}" ${poll.closed ? "disabled" : ""}>
+                <span class="hub-poll-fill" style="width:${share}%"></span>
+                <span class="hub-poll-label">${esc(option.label)}</span>
+                <span class="hub-poll-count">${option.count}</span>
+              </button>`;
+          })
+          .join("")}
+      </div>
+      <div class="hub-poll-foot">${poll.totalVoters} voted${poll.closed ? " · closed" : " · tap to vote"}</div>`;
+  }
+
+  async function vote(pollId, optionIndex, node) {
+    const option = node.closest(".hub-poll-option");
+    const on_ = !option?.classList.contains("is-chosen");
+    try {
+      const poll = await rpc("group_poll_vote", {
+        p_poll: pollId,
+        p_option: Number(optionIndex),
+        p_on: on_
+      });
+      const host = messagesEl.querySelector(`[data-poll="${pollId}"]`);
+      if (host && poll) host.innerHTML = pollMarkup(poll);
+    } catch (error) {
+      toastError(error);
+    }
+  }
+
+  /**
+   * Ask for a poll.
+   *
+   * Two fields and a growing list of options: the question, then at least two
+   * answers. Options are added and removed in place, because a dialog that
+   * sends you back to a form to add a third choice is a dialog people abandon.
+   */
+  function openPollDialog() {
+    if (!detail) return;
+    const state_ = { options: ["", ""] };
+    const modal = openModal({
+      title: "New poll",
+      desc: `Everyone in ${detail.name} can vote. You can add up to ten options.`,
+      body: `<div class="poll-form">
+          <label class="field"><span class="field-label">Question</span>
+            <input class="input" id="poll-question" maxlength="300" placeholder="What should we ask?" />
+          </label>
+          <div class="field"><span class="field-label">Options</span>
+            <div class="poll-options" id="poll-options"></div>
+            <button class="btn btn-ghost btn-sm" type="button" id="poll-add-option">
+              ${icon("plus", { size: 13 })}Add option
+            </button>
+          </div>
+          <label class="poll-check"><input type="checkbox" id="poll-multiple" />
+            <span>Let people pick more than one</span></label>
+        </div>`,
+      footer: `<button class="btn btn-ghost" data-modal-close>Cancel</button>
+               <button class="btn btn-primary" id="poll-create">Create poll</button>`
+    });
+
+    const paintOptions = () => {
+      const host = qs("#poll-options", modal.root);
+      host.innerHTML = state_.options
+        .map(
+          (value, index) => `<div class="poll-option-row">
+              <input class="input" data-poll-option="${index}" maxlength="120"
+                     placeholder="Option ${index + 1}" value="${esc(value)}" />
+              ${
+                state_.options.length > 2
+                  ? `<button class="btn btn-ghost btn-sm" type="button" data-poll-remove="${index}"
+                       aria-label="Remove option ${index + 1}">${icon("x", { size: 12 })}</button>`
+                  : ""
+              }
+            </div>`
+        )
+        .join("");
+      const add = qs("#poll-add-option", modal.root);
+      if (add) add.hidden = state_.options.length >= 10;
+    };
+
+    paintOptions();
+    qs("#poll-question", modal.root)?.focus({ preventScroll: true });
+
+    on(qs("#poll-options", modal.root), "input", (event) => {
+      const field = event.target.closest("[data-poll-option]");
+      if (!field) return;
+      state_.options[Number(field.getAttribute("data-poll-option"))] = field.value;
+    });
+
+    on(qs("#poll-options", modal.root), "click", (event) => {
+      const remove = event.target.closest("[data-poll-remove]");
+      if (!remove) return;
+      state_.options.splice(Number(remove.getAttribute("data-poll-remove")), 1);
+      paintOptions();
+    });
+
+    on(qs("#poll-add-option", modal.root), "click", () => {
+      if (state_.options.length >= 10) return;
+      state_.options.push("");
+      paintOptions();
+      const fields = modal.root.querySelectorAll("[data-poll-option]");
+      fields[fields.length - 1]?.focus({ preventScroll: true });
+    });
+
+    on(qs("#poll-create", modal.root), "click", async (event) => {
+      const button = event.currentTarget;
+      const question = qs("#poll-question", modal.root)?.value?.trim() || "";
+      const options = state_.options.map((value) => value.trim()).filter(Boolean);
+      if (question.length < 1) return toastError(new Error("A poll needs a question."));
+      if (options.length < 2) return toastError(new Error("A poll needs at least two options."));
+      button.disabled = true;
+      try {
+        await rpc("group_poll_create", {
+          p_group: detail.id,
+          p_question: question,
+          p_options: options,
+          p_multiple: Boolean(qs("#poll-multiple", modal.root)?.checked)
+        });
+        modal.close();
+        await open(active);
+      } catch (error) {
+        toastError(error);
+        button.disabled = false;
+      }
+    });
   }
 
   let lastThread = [];
@@ -804,8 +1068,18 @@ function insertAtCaret(field, text, start, end) {
       .join("");
   }
 
+  const PLACEHOLDER_GROUP = "Write a message… type @ to mention somebody";
+  const PLACEHOLDER_CHANNEL = "Write a message…";
+
   let popTimer = null;
   function schedulePop() {
+    /* A public room has no membership list to resolve handles against —
+       `group_mention_candidates` is keyed on a group. Offering the @ menu here
+       would only produce a refusal, so it is not offered. */
+    if (view === "channel") {
+      hidePop();
+      return;
+    }
     const spot = mentionSpot();
     clearTimeout(popTimer);
     if (!spot) {
@@ -911,10 +1185,27 @@ function insertAtCaret(field, text, start, end) {
     }
   });
 
-  delegate(formEl, "click", "[data-emoji]", (_event, button) => {
+  /* ------------------------------------------------- the emoji and attach menu */
+
+  function insertEmoji(emoji) {
     const start = bodyEl.selectionStart ?? bodyEl.value.length;
-    insertAtCaret(bodyEl, button.dataset.emoji, start, bodyEl.selectionEnd ?? start);
+    insertAtCaret(bodyEl, emoji, start, bodyEl.selectionEnd ?? start);
     bodyEl.focus();
+  }
+
+  /** Open the system picker, filtered to the kind of thing chosen in the menu. */
+  function pickFiles(kind) {
+    const spec = ATTACH_KINDS.find((row) => row.id === kind);
+    if (!spec || !filesInput) return;
+    filesInput.accept = spec.accept;
+    filesInput.click();
+  }
+
+  bindComposerTools(formEl, {
+    prefix: "grp-cmp",
+    onEmoji: insertEmoji,
+    onAttach: pickFiles,
+    onPoll: () => openPollDialog()
   });
 
   /* ---------------------------------------------------------------- calls */
@@ -1084,6 +1375,13 @@ function insertAtCaret(field, text, start, end) {
     if (active && focusId) open(active, focusId);
   });
   on(pinClearEl, "click", () => setPin(null));
+  delegate(messagesEl, "click", ".hub-poll-option", (event, option) => {
+    if (option.disabled) return;
+    const pollId = option.getAttribute("data-poll-id");
+    const index = option.getAttribute("data-poll-vote");
+    if (pollId && index !== null) vote(pollId, index, event.target);
+  });
+
   delegate(messagesEl, "click", "[data-pin-msg]", (_event, button) => {
     const messageId = button.getAttribute("data-pin-msg");
     if (messageId) setPin(messageId);

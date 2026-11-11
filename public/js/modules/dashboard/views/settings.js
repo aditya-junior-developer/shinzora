@@ -632,7 +632,7 @@ export default async function render(root) {
         ${themePicker(active)}
         <div class="alert alert-info" style="margin-top:var(--s-4);font-size:var(--fs-2xs)">
           ${icon("info", { size: 14 })}
-          <span>Blossom and Daylight are both light, but they are not the same white: Blossom is a clean page with pink in the rules, Daylight is warm paper with no pure white anywhere, which is the one that stops a light theme hurting after an hour. All three pass the same contrast checks, and your choice follows the account to other devices.</span>
+          <span>Six themes, three dark and three light. Midnight is black-purple, Nebula is blue-black, Grove is green-black; Blossom is a clean white page with pink in the rules, Daylight is warm paper with no pure white anywhere, and Porcelain is cool grey-blue. They are the same components with different tokens, every text step is checked against the surface behind it, and your choice follows the account to other devices.</span>
         </div>
       </div>
     </div>`;

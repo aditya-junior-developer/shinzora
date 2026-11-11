@@ -465,3 +465,78 @@
   color: #065f46;
 }
 
+
+/* --------------------------------------------------------------------------
+   Porcelain — the fourth light theme, and the cool one
+   --------------------------------------------------------------------------
+   Daylight is warm paper, Blossom is white with pink. Porcelain is neither: a
+   cool grey-blue page with indigo ink, for screens calibrated warm or for rooms
+   lit by a window. It is deliberately the quietest of the six — the brand
+   appears in the type and the primary button, and nowhere else.
+   -------------------------------------------------------------------------- */
+:root[data-theme="porcelain"] {
+  color-scheme: light;
+
+  --void: #eef1f6;
+  --base: #f7f9fc;
+  --base-elev: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f4f7fb;
+  --panel-3: #eaeff7;
+  --ink-glass: rgba(255, 255, 255, 0.82);
+  --ink-glass-strong: rgba(255, 255, 255, 0.95);
+
+  --purple-900: #1e1b4b;
+  --purple-800: #2a2468;
+  --purple-700: #352f8a;
+  --purple-600: #4338ca;
+  --purple-500: #4f46e5;
+  --purple-400: #6366f1;
+  --violet: #4f46e5;
+  --violet-soft: #4338ca;
+  --lavender: #3730a3;
+  --lavender-dim: #5c6480;
+
+  --white: #12172a;
+  --text: #1b2138;
+  --text-2: #444d68;
+  --text-3: #556080;
+  --text-4: #626d8c;
+
+  --line: rgba(27, 33, 56, 0.1);
+  --line-strong: rgba(27, 33, 56, 0.18);
+  --line-violet: rgba(79, 70, 229, 0.3);
+  --line-violet-soft: rgba(79, 70, 229, 0.14);
+
+  --ok: #047857;
+  --ok-dim: rgba(4, 120, 87, 0.1);
+  --warn: #b45309;
+  --warn-dim: rgba(180, 83, 9, 0.1);
+  --danger: #be123c;
+  --danger-dim: rgba(190, 18, 60, 0.08);
+  --info: #1d4ed8;
+  --info-dim: rgba(29, 78, 216, 0.08);
+
+  --grad-brand: linear-gradient(135deg, #6366f1 0%, #4f46e5 45%, #3730a3 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(55, 48, 163, 0.08));
+  --grad-sheen: linear-gradient(180deg, rgba(27, 33, 56, 0.045), rgba(27, 33, 56, 0) 62%);
+  --grad-panel: linear-gradient(168deg, #ffffff 0%, #f8fafd 58%, #f2f6fc 100%);
+  --grad-text: linear-gradient(102deg, #1b2138 12%, #3730a3 52%, #4f46e5 88%);
+  --grad-line: linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.36), transparent);
+
+  --glow-violet: radial-gradient(60% 60% at 50% 0%, rgba(79, 70, 229, 0.09), transparent 72%);
+  --glow-soft: radial-gradient(50% 50% at 50% 50%, rgba(99, 102, 241, 0.08), transparent 70%);
+
+  --shadow-xs: 0 1px 2px rgba(24, 33, 62, 0.07);
+  --shadow-sm: 0 2px 8px rgba(24, 33, 62, 0.08);
+  --shadow-md: 0 12px 28px -14px rgba(24, 33, 62, 0.2);
+  --shadow-lg: 0 24px 56px -26px rgba(24, 33, 62, 0.24);
+  --shadow-violet: 0 20px 48px -26px rgba(79, 70, 229, 0.34);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --sidebar-grad: linear-gradient(180deg, #fbfcfe 0%, #f1f5fb 100%);
+  --topbar-glass: rgba(247, 249, 252, 0.86);
+  --scrim: rgba(24, 33, 62, 0.32);
+  --field: #ffffff;
+  --hover-tint: rgba(27, 33, 56, 0.06);
+}

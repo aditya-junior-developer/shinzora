@@ -435,7 +435,7 @@ test("a channel opens in the middle column and is text-only", async () => {
 
   assert.deepEqual(lastArgs(world.calls, "community_messages_list"), { p_channel: "general", p_limit: 80 });
   assert.equal(world.root.querySelector("#grp-files").disabled, true, "attachments are off in a public room");
-  assert.equal(world.root.querySelector('label[for="grp-files"]').hidden, true, "and the control is not shown");
+  assert.equal(world.root.querySelector('[data-cmp="attach"]').hidden, true, "and the control is not shown");
   assert.match(world.root.querySelector(".chat-thread-title").textContent, /#General/);
   assert.match(world.root.querySelector("#grp-info-col").textContent, /everyone can read it/);
   assert.equal(
@@ -563,4 +563,210 @@ test("a member is offered Leave, which the owner never is", async () => {
   const leave = world.root.querySelector("#grp-info-col [data-leave-group]");
   assert.ok(leave, "the member has a way out");
   assert.match(leave.textContent, /Leave group/);
+});
+
+/* --------------------------------------------- the composer, in a real thread */
+
+test("the emoji button opens the whole set and a pick lands in the field", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  const open = world.root.querySelector('[data-cmp="emoji"]');
+  assert.ok(open, "the emoji button is in the bar");
+  click(world.window, open);
+  const pop = world.root.querySelector("#grp-cmp-emoji");
+  assert.equal(pop.hidden, false, "the picker opens");
+
+  const search = pop.querySelector("#grp-cmp-emoji-search");
+  search.value = "rocket";
+  search.dispatchEvent(new world.window.Event("input", { bubbles: true }));
+  const cell = pop.querySelector('[data-emoji-pick="🚀"]');
+  assert.ok(cell, "searching “rocket” finds the rocket");
+
+  const field = world.root.querySelector("#grp-body");
+  field.value = "ship it ";
+  field.selectionStart = field.value.length;
+  click(world.window, cell);
+  assert.equal(field.value, "ship it 🚀", "the emoji is inserted at the caret");
+});
+
+test("the attach button asks which kind, and each kind filters the file picker", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  click(world.window, world.root.querySelector('[data-cmp="attach"]'));
+  const menu = world.root.querySelector("#grp-cmp-attach");
+  assert.equal(menu.hidden, false, "the menu opens");
+  const kinds = [...menu.querySelectorAll("[data-attach-kind]")].map((row) => row.getAttribute("data-attach-kind"));
+  assert.deepEqual(kinds, ["media", "document", "poll", "audio"], "the four kinds the server accepts");
+
+  const input = world.root.querySelector("#grp-files");
+  let opened = 0;
+  input.click = () => (opened += 1);
+  click(world.window, menu.querySelector('[data-attach-kind="media"]'));
+  assert.match(input.accept, /video\/mp4/, "media opens the picker for pictures and video");
+  assert.equal(opened, 1, "and the picker was opened");
+
+  click(world.window, world.root.querySelector('[data-cmp="attach"]'));
+  click(world.window, menu.querySelector('[data-attach-kind="audio"]'));
+  assert.match(input.accept, /^audio\//, "audio opens the picker for audio only");
+});
+
+test("a poll is created from the composer and lands in the thread", async () => {
+  const world = makeWorld({
+    detail: { ...DETAIL, members: MEMBERS },
+    thread: THREAD
+  });
+  await openGroupsTab(world);
+
+  click(world.window, world.root.querySelector('[data-cmp="attach"]'));
+  click(world.window, world.root.querySelector('#grp-cmp-attach [data-attach-kind="poll"]'));
+
+  const dialog = world.document.querySelector(".modal");
+  assert.ok(dialog, "the poll dialog opened");
+  dialog.querySelector("#poll-question").value = "Where should we meet?";
+  const field = dialog.querySelector("[data-poll-option]");
+  field.value = "Office";
+  field.dispatchEvent(new world.window.Event("input", { bubbles: true }));
+  dialog.querySelector('[data-poll-option="1"]').value = "Cafe";
+  dialog.querySelector('[data-poll-option="1"]').dispatchEvent(new world.window.Event("input", { bubbles: true }));
+
+  click(world.window, dialog.querySelector("#poll-create"));
+  await settle();
+
+  const args = lastArgs(world.calls, "group_poll_create");
+  assert.ok(args, "group_poll_create was called");
+  assert.equal(args.p_question, "Where should we meet?");
+  assert.deepEqual(args.p_options, ["Office", "Cafe"]);
+  assert.equal(args.p_multiple, false);
+});
+
+test("a poll in the thread renders its options, and a click votes", async () => {
+  const poll = {
+    id: "poll-1",
+    groupId: GROUP.id,
+    question: "Where should we meet?",
+    multiple: false,
+    closed: false,
+    options: [
+      { index: 0, label: "Office", count: 2 },
+      { index: 1, label: "Cafe", count: 1 }
+    ],
+    mine: [0],
+    totalVoters: 3
+  };
+  const world = makeWorld({
+    thread: [
+      ...THREAD,
+      {
+        id: "m-poll",
+        body: "Where should we meet?",
+        createdAt: new Date().toISOString(),
+        authorId: "user-b",
+        authorName: "Asha",
+        mentions: [],
+        attachments: [
+          { kind: "poll", mime: "application/x-shinzora-poll", pollId: "poll-1", path: "poll:poll-1", name: "Poll", size: 1 }
+        ]
+      }
+    ]
+  });
+  globalThis.__rpc = ((original) => (name, args) => {
+    world.calls.push({ name, args });
+    if (name === "group_poll_get") return poll;
+    if (name === "group_poll_vote") return { ...poll, mine: [1], options: [{ index: 0, label: "Office", count: 1 }, { index: 1, label: "Cafe", count: 2 }] };
+    return original(name, args);
+  })(globalThis.__rpc);
+
+  await openGroupsTab(world);
+  await settle(120);
+
+  const card = world.root.querySelector('[data-poll="poll-1"]');
+  assert.ok(card, "the poll is painted in the thread");
+  const options = [...card.querySelectorAll("[data-poll-vote]")];
+  assert.equal(options.length, 2, "both options are there");
+  assert.match(card.textContent, /Office/);
+  assert.match(card.textContent, /3 voted/, "the voter count is shown");
+  assert.ok(card.querySelector(".is-chosen"), "the option this member chose is marked");
+
+  click(world.window, options[1]);
+  await settle();
+  const args = lastArgs(world.calls, "group_poll_vote");
+  assert.deepEqual(args, { p_poll: "poll-1", p_option: 1, p_on: true });
+  assert.match(
+    world.root.querySelector('[data-poll="poll-1"]').textContent,
+    /Cafe/,
+    "the tally repainted after voting"
+  );
+});
+
+test("video, audio and documents get a real preview, not a filename", async () => {
+  const world = makeWorld({
+    thread: [
+      {
+        id: "m-media",
+        body: "",
+        createdAt: new Date().toISOString(),
+        authorId: "user-b",
+        authorName: "Asha",
+        mentions: [],
+        attachments: [
+          { path: `${GROUP.id}/user-b/clip.mp4`, name: "clip.mp4", mime: "video/mp4", size: 2_400_000 },
+          { path: `${GROUP.id}/user-b/note.mp3`, name: "note.mp3", mime: "audio/mpeg", size: 90_000 },
+          { path: `${GROUP.id}/user-b/brief.pdf`, name: "brief.pdf", mime: "application/pdf", size: 120_000 }
+        ]
+      }
+    ]
+  });
+  await openGroupsTab(world);
+  await settle(120);
+
+  assert.ok(world.root.querySelector("video.grp-attach-video"), "the video has a player");
+  assert.ok(world.root.querySelector("audio.grp-attach-player"), "the audio clip plays in the bubble");
+  const doc = world.root.querySelector(".grp-attach-doc");
+  assert.ok(doc, "the document is a card");
+  assert.match(doc.textContent, /brief\.pdf/);
+  assert.match(doc.getAttribute("href"), /#view=FitH$/, "a PDF opens the browser's preview at the top");
+});
+
+/* ------------------------------------------------- the defects this round fixed */
+
+test("the rail's clock is compact, so the group name is not squeezed", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+  const time = world.root.querySelector("[data-group] .chat-item-time");
+  assert.ok(time, "the row shows a time");
+  assert.match(time.textContent.trim(), /^(now|\d+[mhdw]|\w{3} \d+)$/, `compact clock, got "${time.textContent}"`);
+  assert.doesNotMatch(world.root.querySelector("[data-group]").textContent, /minutes? ago/, "no spelled-out clock in the rail");
+});
+
+test("a public room does not offer mentions it cannot resolve", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+  const channel = world.root.querySelector('[data-channel="general"]');
+  assert.ok(channel, "the channel row rendered");
+  click(world.window, channel);
+  await settle();
+
+  const field = world.root.querySelector("#grp-body");
+  assert.ok(field, "the composer is there");
+  assert.doesNotMatch(field.placeholder, /@/, "the field does not promise mentions");
+
+  /* Typing @ must not ask a group-scoped RPC with no group. */
+  field.value = "@as";
+  field.dispatchEvent(new world.window.Event("input", { bubbles: true }));
+  await settle(200);
+  assert.equal(count(world.calls, "group_mention_candidates"), 0, "no mention lookup in a room");
+  assert.equal(world.root.querySelector("#grp-mentions").hidden, true, "no @ menu in a room");
+  assert.deepEqual(world.toasts, [], "and nothing failed loudly");
+});
+
+test("a group opened after a room promises mentions again", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+  click(world.window, world.root.querySelector('[data-channel="general"]'));
+  await settle();
+  click(world.window, world.root.querySelector("[data-group]"));
+  await settle();
+  assert.match(world.root.querySelector("#grp-body").placeholder, /@/, "the promise comes back with a group");
 });

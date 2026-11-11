@@ -31,19 +31,54 @@ export const THEMES = [
     name: "Daylight",
     note: "Warm paper, ink text, soft rose wash. No pure white and no glare, for tired eyes.",
     swatch: ["#fbf7f4", "#f1e9e4", "#7c3aed", "#be185d"]
+  },
+  {
+    id: "nebula",
+    name: "Nebula",
+    note: "Blue-black with a cold violet. A dark theme that is not the same dark theme.",
+    swatch: ["#070b14", "#111a2c", "#4f63e8", "#bccdff"]
+  },
+  {
+    id: "grove",
+    name: "Grove",
+    note: "Green-black with sage ink, for anyone who finds violet harsh at the end of a long day.",
+    swatch: ["#070d09", "#101d16", "#159a63", "#a7f3d0"]
+  },
+  {
+    id: "porcelain",
+    name: "Porcelain",
+    note: "Cool grey-blue paper with indigo ink. The quietest of the six.",
+    swatch: ["#f7f9fc", "#eaeff7", "#4f46e5", "#3730a3"]
   }
 ];
 
-/* Two of the three are light. The stylesheet draws its shared corrections from
-   `data-tone`, so a fourth light theme would be a palette and a line here rather
-   than another fifty selectors. */
-const TONE = { midnight: "dark", blossom: "light", daylight: "light" };
+/* Three dark, three light. The stylesheet draws its shared corrections from
+   `data-tone`, so another light theme is a palette and a line here rather than
+   another fifty selectors — which is why there are six. */
+const TONE = {
+  midnight: "dark",
+  blossom: "light",
+  daylight: "light",
+  nebula: "dark",
+  grove: "dark",
+  porcelain: "light"
+};
 
 const KEY = "shinzora:theme";
 const VALID = new Set(THEMES.map((theme) => theme.id));
-const META_COLOR = { midnight: "#08070e", blossom: "#fdfbff", daylight: "#fbf7f4" };
+const META_COLOR = {
+  midnight: "#08070e",
+  blossom: "#fdfbff",
+  daylight: "#fbf7f4",
+  nebula: "#070b14",
+  grove: "#070d09",
+  porcelain: "#f7f9fc"
+};
 
 export const isTheme = (value) => VALID.has(String(value || ""));
+
+/** The tone of a given theme id: "light" or "dark". */
+export const toneOf = (id) => TONE[id] || "dark";
 
 /** The tone the stylesheet corrects against: "light" or "dark". */
 export const currentTone = () => TONE[currentTheme()] || "dark";

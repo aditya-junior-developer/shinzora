@@ -132,13 +132,26 @@ await check("an executable is refused by type", async () => {
   await asUser(A);
   await assert.rejects(
     () => send(GROUP, "", [file({ name: "setup.exe", mime: "application/x-msdownload" })]),
-    /JPEG, PNG, WebP, GIF or PDF/
+    /file type cannot be attached/i
   );
 });
 
-await check("a file over 20 MB is refused", async () => {
+await check("a video, an audio clip and a spreadsheet are accepted", async () => {
   await asUser(A);
-  await assert.rejects(() => send(GROUP, "", [file({ size: 21 * 1024 * 1024 })]), /under 20 MB/);
+  for (const [mime, name] of [
+    ["video/mp4", "clip.mp4"],
+    ["audio/mpeg", "voice.mp3"],
+    ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "sheet.xlsx"]
+  ]) {
+    const made = await send(GROUP, "", [file({ name, mime })]);
+    assert.ok(made?.id, `${mime} was accepted`);
+  }
+  return "three new types";
+});
+
+await check("a file over 50 MB is refused", async () => {
+  await asUser(A);
+  await assert.rejects(() => send(GROUP, "", [file({ size: 51 * 1024 * 1024 })]), /under 50 MB/);
 });
 
 await check("six files in one message is refused", async () => {

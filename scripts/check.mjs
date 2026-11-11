@@ -129,6 +129,38 @@ for (const file of jsFiles) {
   }
 }
 
+/* ------------------------- 3b. helpers used but never imported */
+/* Analytics shipped calling `on(...)` with only `qs, esc` imported: the page
+   loaded, painted its skeleton, then threw "on is not defined" — the whole view
+   dead, and no static check noticed because the module still parsed. The shared
+   DOM helpers are the ones this actually happens to, so they are checked by
+   name: any module that calls one must import it from lib/dom.js. */
+{
+  const HELPERS = ["qs", "qsa", "esc", "on", "delegate", "debounce", "trapFocus"];
+  for (const file of jsFiles) {
+    const source = fs.readFileSync(file, "utf8");
+    const importRe = /import\s*\{([^}]*)\}\s*from\s*["'][^"']*lib\/dom\.js["']/g;
+    const chunks = [...source.matchAll(importRe)];
+    if (!chunks.length) continue;
+    const imported = new Set();
+    for (const chunk of chunks) {
+      for (const part of chunk[1].split(",")) {
+        const name = part.trim().split(/\s+as\s+/)[0].trim();
+        if (name) imported.add(name);
+      }
+    }
+    const body = source;
+    for (const helper of HELPERS) {
+      const calls = new RegExp(`(^|[^.\\w$])${helper}\\s*\\(`, "m");
+      if (!calls.test(body) || imported.has(helper)) continue;
+      /* A local function/const of the same name counts as a definition. */
+      const declared = new RegExp(`(function\\s+${helper}\\b|(const|let|var)\\s+${helper}\\s*=)`);
+      if (declared.test(body)) continue;
+      fail(`${path.relative(ROOT, file)} calls ${helper}() but does not import it from lib/dom.js — that is a runtime "not defined" error.`);
+    }
+  }
+}
+
 /* ------------------------------------------- 4. HTML asset references */
 const assetRe = /(?:href|src)\s*=\s*["'](\/[^"'#?]+)(?:\?[^"']*)?["']/g;
 for (const file of htmlFiles) {

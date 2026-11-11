@@ -57,11 +57,17 @@ export default async function render(root) {
       root.innerHTML =
         pageHead({
           title: "Community",
-          desc: "The public rooms, in the same hub as your groups. Everyone signed in sees this page — nothing about it changes with your role.",
+          desc: "The public rooms, in the same three-column hub as Messages. Everyone signed in sees this page — nothing about it changes with your role.",
           badge: `<span class="badge badge-neutral">${icon("message-circle", { size: 12 })}Text only</span>`
         }) + `<div id="community-hub"></div>`;
       const host = qs("#community-hub", root);
-      const mounted = await mountHub(host, { channel: wanted || null, preferChannel: true });
+      /* Channels only: groups are a Messages idea, and a second copy of them
+         here was two places to look for the same conversation. */
+      const mounted = await mountHub(host, {
+        channel: wanted || null,
+        preferChannel: true,
+        groups: false
+      });
       root.__cmCleanup = () => {
         host.innerHTML = "";
       };

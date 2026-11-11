@@ -619,3 +619,152 @@ dd a:hover,
 figcaption a:hover {
   text-decoration-color: currentColor;
 }
+
+/* ==========================================================================
+   Nebula — the second dark theme
+   --------------------------------------------------------------------------
+   Midnight is black-purple. Nebula is blue-black with a cold violet, so two
+   people who both work at night can tell their screens apart at a glance. Same
+   tokens, same components: only the palette moves, and every text step is held
+   above 4.5:1 on the darkest surface it is used on.
+   ========================================================================== */
+:root[data-theme="nebula"] {
+  color-scheme: dark;
+
+  --void: #04070f;
+  --base: #070b14;
+  --base-elev: #0a101c;
+  --panel: #0d1422;
+  --panel-2: #111a2c;
+  --panel-3: #16213a;
+  --ink-glass: rgba(13, 20, 34, 0.64);
+  --ink-glass-strong: rgba(9, 14, 26, 0.88);
+  --hover-tint: rgba(255, 255, 255, 0.05);
+
+  --purple-900: #101a3d;
+  --purple-800: #182a63;
+  --purple-700: #24398c;
+  --purple-600: #3348b8;
+  --purple-500: #4f63e8;
+  --purple-400: #6d84ff;
+  --violet: #7c9bff;
+  --violet-soft: #9db3ff;
+  --lavender: #bccdff;
+  --lavender-dim: #93a2cf;
+
+  --white: #f6f9ff;
+  --text: #e2e9f8;
+  --text-2: #a3b0cb;
+  --text-3: #8b98b6;
+  --text-4: #8391b0;
+
+  --line: rgba(173, 199, 255, 0.1);
+  --line-strong: rgba(173, 199, 255, 0.18);
+  --line-violet: rgba(124, 155, 255, 0.3);
+  --line-violet-soft: rgba(124, 155, 255, 0.15);
+
+  --ok: #34d399;
+  --ok-dim: rgba(52, 211, 153, 0.12);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.12);
+  --danger: #fb7185;
+  --danger-dim: rgba(251, 113, 133, 0.12);
+  --info: #60a5fa;
+  --info-dim: rgba(96, 165, 250, 0.12);
+
+  --grad-brand: linear-gradient(135deg, #6d84ff 0%, #4f63e8 38%, #2f3fb0 78%, #1c2a7a 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(109, 132, 255, 0.24), rgba(38, 60, 160, 0.16));
+  --grad-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 62%);
+  --grad-panel: linear-gradient(168deg, rgba(21, 33, 58, 0.92) 0%, rgba(11, 18, 33, 0.94) 58%, rgba(7, 11, 20, 0.97) 100%);
+  --grad-text: linear-gradient(102deg, #ffffff 12%, #d7e3ff 46%, #9db3ff 88%);
+  --grad-line: linear-gradient(90deg, transparent, rgba(124, 155, 255, 0.55), transparent);
+
+  --glow-violet: radial-gradient(60% 60% at 50% 0%, rgba(79, 99, 232, 0.4), transparent 72%);
+  --glow-soft: radial-gradient(50% 50% at 50% 50%, rgba(124, 155, 255, 0.16), transparent 70%);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 12px 32px -12px rgba(0, 0, 0, 0.72);
+  --shadow-lg: 0 28px 68px -24px rgba(0, 0, 0, 0.84);
+  --shadow-violet: 0 24px 64px -28px rgba(79, 99, 232, 0.55);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+
+  --sidebar-grad: linear-gradient(180deg, #0a101c 0%, #070b14 100%);
+  --topbar-glass: rgba(7, 11, 20, 0.82);
+  --scrim: rgba(4, 7, 15, 0.62);
+  --field: rgba(13, 20, 34, 0.9);
+}
+
+/* ==========================================================================
+   Grove — the third dark theme
+   --------------------------------------------------------------------------
+   Green-black with a sage accent, for people who find violet harsh after a long
+   day. The brand is still legible — links and primary buttons stay a deep
+   emerald rather than turning into a different product.
+   ========================================================================== */
+:root[data-theme="grove"] {
+  color-scheme: dark;
+
+  --void: #040906;
+  --base: #070d09;
+  --base-elev: #0a120d;
+  --panel: #0d1712;
+  --panel-2: #101d16;
+  --panel-3: #15251c;
+  --ink-glass: rgba(13, 23, 18, 0.64);
+  --ink-glass-strong: rgba(8, 15, 11, 0.88);
+  --hover-tint: rgba(255, 255, 255, 0.05);
+
+  --purple-900: #062b1d;
+  --purple-800: #08402b;
+  --purple-700: #0b5739;
+  --purple-600: #0f7149;
+  --purple-500: #159a63;
+  --purple-400: #2fc088;
+  --violet: #3ddc97;
+  --violet-soft: #6ee7b7;
+  --lavender: #a7f3d0;
+  --lavender-dim: #8fb9a6;
+
+  --white: #f3fbf6;
+  --text: #dcefe4;
+  --text-2: #9fbcaa;
+  --text-3: #8aa898;
+  --text-4: #83a091;
+
+  --line: rgba(167, 243, 208, 0.1);
+  --line-strong: rgba(167, 243, 208, 0.18);
+  --line-violet: rgba(61, 220, 151, 0.28);
+  --line-violet-soft: rgba(61, 220, 151, 0.14);
+
+  --ok: #4ade80;
+  --ok-dim: rgba(74, 222, 128, 0.12);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.12);
+  --danger: #fb7185;
+  --danger-dim: rgba(251, 113, 133, 0.12);
+  --info: #67e8f9;
+  --info-dim: rgba(103, 232, 249, 0.12);
+
+  --grad-brand: linear-gradient(135deg, #2fc088 0%, #159a63 38%, #0f7149 78%, #08402b 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(47, 192, 136, 0.22), rgba(12, 90, 60, 0.16));
+  --grad-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 62%);
+  --grad-panel: linear-gradient(168deg, rgba(21, 37, 28, 0.92) 0%, rgba(12, 24, 18, 0.94) 58%, rgba(7, 13, 9, 0.97) 100%);
+  --grad-text: linear-gradient(102deg, #ffffff 12%, #d7f7e7 46%, #6ee7b7 88%);
+  --grad-line: linear-gradient(90deg, transparent, rgba(61, 220, 151, 0.5), transparent);
+
+  --glow-violet: radial-gradient(60% 60% at 50% 0%, rgba(21, 154, 99, 0.34), transparent 72%);
+  --glow-soft: radial-gradient(50% 50% at 50% 50%, rgba(61, 220, 151, 0.14), transparent 70%);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 12px 32px -12px rgba(0, 0, 0, 0.72);
+  --shadow-lg: 0 28px 68px -24px rgba(0, 0, 0, 0.84);
+  --shadow-violet: 0 24px 64px -28px rgba(21, 154, 99, 0.5);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+
+  --sidebar-grad: linear-gradient(180deg, #0a120d 0%, #070d09 100%);
+  --topbar-glass: rgba(7, 13, 9, 0.82);
+  --scrim: rgba(4, 9, 6, 0.62);
+  --field: rgba(13, 23, 18, 0.9);
+}
