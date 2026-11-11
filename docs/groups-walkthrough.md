@@ -263,3 +263,67 @@ belong to this group."*
   affected tile rather than spinning forever. To fix it, set
   `SHINZORA_TURN_URL`, `SHINZORA_TURN_USER` and `SHINZORA_TURN_CREDENTIAL` in the
   build environment — the engine picks them up with no code change.
+
+## 20. The messaging hub — one surface for everybody
+
+Messages → **Groups** is now three columns, the same layout for an owner, a
+plain member and a freelancer account. Nothing about the shape changes with
+role; only the rows the database would refuse are left out.
+
+**Left rail** — public **Channels** (# General, # Projects, # Wins,
+# Announcements) on top, then your **Groups** with their picture, last message,
+time and unread badge. Channels are public Community rooms: text only, and the
+attach control is not offered while one is open.
+
+**Middle** — the pinned-message bar under the group name, then the thread, then
+the composer (emoji, attach, image/file, send). The header carries search,
+voice meeting, video meeting and a **⋯** menu; **Details** appears only on the
+narrow widths where the right column folds away.
+
+**Right — Group info.** Picture with a camera badge (owner/admin only), name,
+member count with an honest *active now* figure (members whose heartbeat is
+inside five minutes), the About line, then the action rows: Add members, Group
+permissions, Mute (a real switch), Edit description, Leave group — then the
+member strip with **See all members** and the **Group media** grid with
+**See all**.
+
+### 20.1 Pinning a message
+
+**A** (owner or admin) hovers a message → the pin button → the bar appears for
+everyone.
+
+- [ ] A plain member gets no pin button, and calling `group_pin` directly is
+      refused by the database — the check is there, not in the button.
+- [ ] Pinning a second message replaces the first: one pin per group.
+- [ ] Clicking the pin jumps to the message; the ✕ on the bar unpins it.
+- [ ] Deleting the pinned message clears the pin (the column is
+      `on delete set null`), so no bar ever points at nothing.
+
+### 20.2 Searching a group
+
+The magnifier in the header opens a search field; from two characters it asks
+`group_messages_search` for this group only, and a hit opens the thread on that
+message. An outsider cannot search a group they are not in.
+
+### 20.3 "I am not getting notifications" — the ten-second check
+
+Settings → Notifications → **Test this account**.
+
+- [ ] It stores **one real notification** for your account, linked to your first
+      group if you have one, and says so: the row is stored, counted in the
+      badge and pushed like any other. Nothing is faked.
+- [ ] It reports what the browser says: permission granted or not, and how many
+      devices are subscribed for closed-tab alerts.
+- [ ] If no in-app notice appears within four seconds it says so plainly — that
+      means the Realtime stream is not reaching this tab, not that the data is
+      missing.
+- [ ] **Clear test notifications** deletes those rows again.
+
+Two limits, stated rather than glossed:
+
+- **Desktop alerts only fire while the tab is open** (behind another window is
+  fine). That is now real: the *Desktop alerts while the tab is open* preference
+  is wired to `Notification`, so turning it off actually stops them.
+- **Closed-tab alerts need Web Push configured** — permission granted, a
+  subscription row, and the `push` function's VAPID keys. The card tells you
+  which of those is missing instead of promising delivery.

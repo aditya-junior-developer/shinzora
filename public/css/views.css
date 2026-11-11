@@ -3383,3 +3383,369 @@ html {
   .call-stage { grid-template-columns: 1fr 1fr; }
   .ring-banner { top: var(--s-2); right: var(--s-2); left: var(--s-2); width: auto; }
 }
+
+/* Notification self-test */
+.notify-test {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: var(--s-4);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+}
+.notify-test-actions { display: inline-flex; gap: 6px; }
+.notify-test-result {
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+  background: var(--panel-2);
+}
+.notify-test-result ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.notify-test-result.is-ok { border-color: rgba(52, 211, 153, 0.35); }
+.notify-test-result.is-warn { border-color: rgba(251, 191, 36, 0.4); color: #fcd34d; }
+.notify-test-result.is-bad { border-color: rgba(248, 113, 113, 0.4); color: #fca5a5; }
+
+/* ==========================================================================
+   The hub — channels, groups and details in one screen
+   --------------------------------------------------------------------------
+   Three columns: rooms on the left, the conversation in the middle, the details
+   panel on the right (the shape from the design reference). The details panel is
+   part of the page rather than a modal, so the member list and the group picture
+   are visible while you read — and it folds away under 1180px, where there is no
+   room for it.
+   ========================================================================== */
+.hub {
+  grid-template-columns: minmax(220px, 268px) minmax(0, 1fr) minmax(250px, 300px);
+}
+.hub-rail { overflow: hidden; }
+.hub-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 9px var(--s-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.hub-rail-groups { border-top: 1px solid var(--line); }
+.hub-groups { flex: 1 1 auto; min-height: 96px; }
+.hub-channels { flex: 0 1 auto; min-height: 76px; }
+
+.hub-channel { grid-template-columns: 22px 1fr; }
+.hub-channel-hash {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-sm);
+  background: var(--panel-3);
+  color: var(--text-3);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+}
+
+.hub-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+.hub-info-empty { padding: var(--s-4) var(--s-2); font-size: var(--fs-2xs); color: var(--text-3); }
+.hub-info-section {
+  padding: var(--s-3) var(--s-2);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.hub-info-section:last-child { border-bottom: 0; }
+.hub-info-top { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding-top: var(--s-4); }
+.hub-info-avatar .avatar { --av: 76px; font-size: 26px; }
+.hub-info-channel-mark {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--panel-3);
+  color: var(--text-3);
+  font-size: 30px;
+  font-weight: 700;
+}
+.hub-info-name { font-size: var(--fs-base); font-weight: 650; color: var(--text); }
+.hub-info-meta { font-size: var(--fs-2xs); color: var(--text-3); }
+.hub-info-pic {
+  position: absolute;
+  right: calc(var(--s-2) + 34px);
+  bottom: var(--s-2);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-3);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.hub-info-pic:hover { color: var(--white); border-color: var(--line-violet); }
+
+.hub-info-label {
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 7px;
+}
+.hub-info-count { color: var(--text-3); font-weight: 500; }
+.hub-info-desc { margin: 0; font-size: var(--fs-2xs); line-height: 1.6; color: var(--text-2); }
+.hub-info-note { display: flex; gap: 7px; font-size: var(--fs-2xs); color: var(--text-3); line-height: 1.55; }
+
+.hub-info-actions { display: grid; gap: 1px; }
+.hub-info-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.hub-info-row:hover { background: var(--panel-2); color: var(--text); }
+.hub-info-row .ico { color: var(--text-3); flex: none; }
+.hub-info-row span:first-of-type { flex: 1 1 auto; }
+.hub-info-row.is-danger { color: #fca5a5; }
+.hub-info-row.is-danger:hover { background: rgba(248, 113, 113, 0.1); }
+.hub-info-switch {
+  width: 30px;
+  height: 17px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  position: relative;
+}
+.hub-info-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 140ms ease, background 140ms ease;
+}
+.hub-info-switch.is-on { background: rgba(124, 58, 237, 0.35); border-color: var(--line-violet); }
+.hub-info-switch.is-on::after { transform: translateX(13px); background: var(--white); }
+
+.hub-member-strip { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.hub-member-chip {
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}
+.hub-member-chip .avatar { --av: 30px; border: 2px solid var(--panel); }
+.hub-member-chip:hover .avatar { border-color: var(--line-violet); }
+.hub-member-more { font-size: var(--fs-2xs); color: var(--text-3); }
+.hub-info-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lavender);
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+}
+.hub-info-link:hover { color: var(--white); }
+
+.hub-media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.hub-media-cell {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--panel-2);
+  aspect-ratio: 1;
+  cursor: pointer;
+}
+.hub-media-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hub-media-cell.is-broken { background: var(--panel-3); }
+
+@media (max-width: 1180px) {
+  .hub { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); }
+  .hub-info { display: none; }
+}
+@media (max-width: 900px) {
+  .hub { grid-template-columns: 1fr; }
+  .hub-rail { max-height: 40vh; }
+}
+
+/* The thread header's control strip — one glyph per action, named for a screen
+   reader, the "Details" button only where the panel itself is folded away. */
+.hub-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-2);
+}
+.hub-icon-btn:hover { color: var(--text); }
+
+.hub-menu {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  z-index: 20;
+  display: grid;
+  gap: 1px;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.hub-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.hub-menu-row:hover { background: var(--panel-2); color: var(--text); }
+.chat-pane-thread { position: relative; }
+
+.hub-pin {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 var(--s-3);
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+}
+.hub-pin-icon { display: grid; place-items: center; color: var(--lavender); flex: none; }
+.hub-pin-wrap { min-width: 0; flex: 1 1 auto; }
+.hub-pin-label {
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.hub-pin-text {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.hub-pin-text:hover { color: var(--text); }
+.hub-pin-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.hub-pin-clear:hover { color: var(--text); border-color: var(--line-violet); }
+
+.hub-search {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 var(--s-3);
+}
+.hub-search .input { flex: 1 1 auto; }
+.hub-search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 15;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.hub-search-hit {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.hub-search-hit:hover { background: var(--panel-2); }
+.hub-search-hit-who { font-size: var(--fs-2xs); color: var(--text-3); }
+.hub-search-hit-body { font-size: var(--fs-xs); color: var(--text-2); }
+
+.bubble-pin {
+  position: absolute;
+  top: -8px;
+  right: 6px;
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-3);
+  cursor: pointer;
+}
+.bubble { position: relative; }
+.bubble-row:hover .bubble-pin { display: grid; }
+.bubble-pin:hover { color: var(--lavender); border-color: var(--line-violet); }

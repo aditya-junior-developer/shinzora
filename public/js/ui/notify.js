@@ -307,6 +307,41 @@ export async function disablePush() {
  * member's preferences say to stay quiet, so callers can tell the difference
  * between "delivered" and "suppressed".
  */
+/**
+ * Raise an operating-system notification while the tab is open.
+ *
+ * The "Desktop alerts" preference has been a switch since this file was written
+ * and nothing behind it — a dead control. This is the implementation: the same
+ * title, sender and link the in-app notice carries, shown by the OS so it is
+ * visible when the Shinzora tab is behind another window.
+ */
+function showDesktopAlert(row) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return false;
+  if (prefs && prefs.desktopNotifications === false) return false;
+  try {
+    const meta = row.meta || {};
+    const title = row.title || meta.groupName || "Shinzora";
+    const notification = new Notification(title, {
+      body: row.body || "",
+      tag: meta.messageId ? `shinzora-${meta.messageId}` : undefined,
+      icon: "/assets/icons/icon-192.png",
+      silent: prefs ? prefs.sounds === false : false,
+      data: { url: row.link || "/app/?view=messages&tab=groups" }
+    });
+    notification.onclick = () => {
+      window.focus();
+      if (row.link) location.assign(row.link);
+      notification.close();
+    };
+    /* A tab that is in front already shows the in-app notice; two identical
+       popups is noise. The OS alert is for when this window is behind. */
+    setTimeout(() => notification.close(), 12000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function presentNotification(row, { playSound = true } = {}) {
   const meta = row?.meta || {};
   const isGroup = row?.type === "group" || Boolean(meta.groupId);
@@ -319,6 +354,7 @@ export function presentNotification(row, { playSound = true } = {}) {
   }
 
   showNotice(row);
+  if (document.hidden) showDesktopAlert(row);
   if (playSound && (!prefs || prefs.sounds !== false)) {
     try {
       localStorage.setItem("shinzora:last-notice", String(Date.now()));
@@ -328,6 +364,25 @@ export function presentNotification(row, { playSound = true } = {}) {
     playChime();
   }
   return true;
+}
+
+/**
+ * Ask the server to create one real notification for this account, then watch
+ * for it arrive.
+ *
+ * This is how "I am not getting notifications" becomes answerable: the row is
+ * genuine (stored, counted in the badge, pushed like any other), so if it does
+ * not appear the break is in the client path and not in the data. Nothing is
+ * faked and nothing is seeded — the row is addressed to the caller and is
+ * deleted again by the same button.
+ */
+export async function sendTestNotification() {
+  const result = await rpc("notification_self_test");
+  return result;
+}
+
+export async function clearTestNotifications() {
+  return rpc("notification_self_test_clear");
 }
 
 /* ------------------------------------------------------------- preferences UI */
@@ -428,6 +483,20 @@ export function notificationSettingsMarkup(groupList = []) {
         </div>
       </div>
 
+      <div class="notify-test">
+        <div class="notify-test-copy">
+          <div style="font-size:var(--fs-sm);color:var(--text)">Test this account</div>
+          <div class="dim" style="font-size:var(--fs-2xs)">
+            Creates one real notification for you and watches it arrive. Delete it again afterwards.
+          </div>
+        </div>
+        <div class="notify-test-actions">
+          <button class="btn btn-secondary btn-sm" type="button" id="notify-test-send">Send a test</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="notify-test-clear" hidden>Remove it</button>
+        </div>
+      </div>
+      <div class="notify-test-result" id="notify-test-result" hidden></div>
+
       <div class="alert alert-info" style="margin-top:var(--s-4);font-size:var(--fs-2xs)">
         ${icon("info", { size: 14 })}
         <span>The browser permission is asked once, when you press “Turn on” — not when the page loads.</span>
@@ -472,6 +541,82 @@ export function bindNotificationSettings(root, { refresh } = {}) {
         toastError(error);
       } finally {
         pushButton.disabled = false;
+      }
+    });
+  }
+
+  const testBtn = qs("#notify-test-send", card);
+  const clearBtn = qs("#notify-test-clear", card);
+  const testOut = qs("#notify-test-result", card);
+
+  function reportTest(lines, tone = "") {
+    if (!testOut) return;
+    testOut.hidden = false;
+    testOut.className = `notify-test-result${tone ? ` is-${tone}` : ""}`;
+    testOut.innerHTML = `<ul>${lines.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>`;
+  }
+
+  if (testBtn) {
+    on(testBtn, "click", async () => {
+      testBtn.disabled = true;
+      testBtn.textContent = "Sending…";
+      try {
+        await loadPrefs(true);
+        const result = await sendTestNotification();
+        const lines = [
+          result?.inGroup
+            ? `A real notification was stored for you, linked to "${result.groupName}".`
+            : "A real notification was stored for you (you are not in a group, so it links to Settings).",
+          "The in-app notice and the sidebar badge should update within a second or two."
+        ];
+        if (Notification?.permission === "granted") {
+          lines.push("Browser permission is granted — with this tab behind another window you should also get a system alert.");
+        } else {
+          lines.push(
+            `Browser permission is "${Notification?.permission || "unsupported"}", so no system alert or closed-tab alert can appear until you press “Turn on”.`
+          );
+        }
+        lines.push(
+          result?.pushDevices
+            ? `${result.pushDevices} device${result.pushDevices === 1 ? "" : "s"} subscribed for closed-tab push.`
+            : "No device is subscribed for closed-tab push, so nothing will arrive with Shinzora closed — that is why “Turn on” exists."
+        );
+        reportTest(lines, "ok");
+        if (clearBtn) clearBtn.hidden = false;
+        /* Wait for it to actually arrive rather than assuming it did. */
+        setTimeout(() => {
+          const saw = document.querySelector(".notice");
+          if (!saw && testOut) {
+            reportTest(
+              [
+                ...lines,
+                "The row was stored but no notice appeared here: the Realtime stream is not reaching this tab. Reload once; if it persists, the subscription is the problem, not the data."
+              ],
+              "warn"
+            );
+          }
+        }, 4000);
+      } catch (error) {
+        reportTest([`The server refused to create the test notification: ${error.message}`], "bad");
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = "Send a test";
+      }
+    });
+  }
+
+  if (clearBtn) {
+    on(clearBtn, "click", async () => {
+      try {
+        const result = await clearTestNotifications();
+        if (testOut) {
+          testOut.hidden = false;
+          testOut.className = "notify-test-result";
+          testOut.innerHTML = `<ul><li>Removed ${result?.removed ?? 0} test notification(s).</li></ul>`;
+        }
+        clearBtn.hidden = true;
+      } catch (error) {
+        toastError(error);
       }
     });
   }

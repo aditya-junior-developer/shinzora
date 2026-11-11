@@ -173,9 +173,11 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
     if (state.status === "failed") {
       notice.hidden = false;
       notice.className = "call-notice is-bad";
+      /* A failure is only useful if the next step is one click away, so the
+         notice carries the reason *and* the retry. */
       notice.innerHTML = `${icon("triangle-alert", { size: 14 })}<span>${esc(
         state.error || "The call could not connect."
-      )}</span>`;
+      )}</span><button class="btn btn-secondary btn-sm" type="button" data-call-retry>Retry</button>`;
     } else if (state.status === "connecting") {
       notice.hidden = false;
       notice.className = "call-notice";
@@ -233,6 +235,25 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
   }
 
   on(leaveBtn, "click", () => call.leave("You left the call."));
+
+  delegate(notice, "click", "[data-call-retry]", async (event, button) => {
+    button.disabled = true;
+    button.textContent = "Retrying…";
+    try {
+      /* `join` re-requests the device, so a permission granted in the meantime
+         takes effect without reopening the panel. */
+      await call.join({ audioOnly: kind === "voice" });
+    } catch (error) {
+      if (!notice.textContent.includes("Retry")) {
+        notice.innerHTML = `${icon("triangle-alert", { size: 14 })}<span>${esc(
+          error?.message || "Still not connecting."
+        )}</span><button class="btn btn-secondary btn-sm" type="button" data-call-retry>Retry</button>`;
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = "Retry";
+    }
+  });
   on(qs("[data-call-minimise]", wrap), "click", () => {
     minimised = !minimised;
     wrap.classList.toggle("is-minimised", minimised);

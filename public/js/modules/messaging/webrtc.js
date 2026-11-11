@@ -101,36 +101,132 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
   /* ------------------------------------------------------------- media */
 
-  async function getMedia({ video }) {
-    if (localStream) return localStream;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(
-        "This browser cannot capture audio or video. Calls need an https address and a modern browser."
-      );
+  /**
+   * What the browser says about microphone and camera right now.
+   *
+   * "Permission was refused" covered four different situations in the first
+   * version of this file, and one of them — permission *granted* but the page
+   * still failing because it was loaded before the grant — sent the user to
+   * their browser settings to change something that was already correct. So the
+   * state is read rather than guessed: the Permissions API, whether the page is
+   * even allowed to ask (secure context, iframe, permissions policy), and then
+   * the error name.
+   */
+  async function mediaState() {
+    const state = {
+      secure: typeof window !== "undefined" ? window.isSecureContext !== false : true,
+      framed: typeof window !== "undefined" && window.top !== window.self,
+      policyAllowed: true,
+      microphone: "unknown",
+      camera: "unknown"
+    };
+
+    /* A Permissions-Policy header (or an iframe allow attribute) can forbid the
+       request outright, and the error for that is indistinguishable from a
+       refusal unless it is checked. */
+    try {
+      const policy = document.permissionsPolicy || document.featurePolicy;
+      if (policy?.allowsFeature) {
+        state.policyAllowed = policy.allowsFeature("microphone") || policy.allowsFeature("camera");
+      }
+    } catch {
+      /* older browsers have no policy object; not a failure */
     }
+
+    for (const name of ["microphone", "camera"]) {
+      try {
+        const status = await navigator.permissions?.query?.({ name });
+        if (status) state[name] = status.state; // granted | denied | prompt
+      } catch {
+        /* Safari throws for microphone/camera; leave it unknown */
+      }
+    }
+    return state;
+  }
+
+  async function getMedia({ video }) {
+    if (localStream && localStream.getTracks().some((track) => track.readyState !== "ended")) {
+      /* A stream whose tracks were stopped by a previous call would otherwise be
+         handed back as if it were live. */
+      return localStream;
+    }
+    localStream = null;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const state = await mediaState();
+      if (!state.secure) {
+        throw new Error(
+          "Calls need an https address. This page is not a secure context, so the browser will not hand over a microphone."
+        );
+      }
+      throw new Error("This browser cannot capture audio or video.");
+    }
+
+    const lastError = { microphone: null, camera: null };
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false
       });
+      return localStream;
     } catch (error) {
+      lastError[video ? "camera" : "microphone"] = error;
       const name = error?.name || "";
-      if (name === "NotAllowedError" || name === "SecurityError") {
-        throw new Error("Microphone or camera permission was refused. Allow it in the browser and try again.");
-      }
-      if (name === "NotFoundError" || name === "OverconstrainedError") {
+      const message = String(error?.message || "");
+      const state = await mediaState();
+      const device = video ? "camera" : "microphone";
+
+      if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError") {
         throw new Error(
           video
-            ? "No camera was found. Start the call with the microphone only."
+            ? "No camera was found on this device. Join with the microphone only."
             : "No microphone was found on this device."
         );
       }
-      if (name === "NotReadableError") {
-        throw new Error("The microphone or camera is being used by another app or tab.");
+      if (name === "NotReadableError" || name === "TrackStartError") {
+        throw new Error(
+          `The ${device} is being used by another app or tab. Close it (a video call in another window does this) and press Retry.`
+        );
       }
-      throw new Error(error?.message || "The microphone could not be opened.");
+      if (name === "AbortError") {
+        throw new Error(`The browser aborted the request for the ${device}. Press Retry.`);
+      }
+
+      /* Everything below is the "not allowed" family. Work out which one. */
+      if (!state.secure) {
+        throw new Error(
+          "Calls need an https address. This page is not a secure context, so the browser refuses to open the microphone."
+        );
+      }
+      if (!state.policyAllowed) {
+        throw new Error(
+          `This page's permissions policy does not allow the ${device}. If Shinzora is embedded in another page or app, open it in its own tab.`
+        );
+      }
+      if (state.framed) {
+        throw new Error(
+          `The ${device} is blocked because this page is inside a frame. Open Shinzora in its own browser tab, then start the call again.`
+        );
+      }
+      if (state[device] === "granted") {
+        /* The permission is already on, and the request still failed. That is
+           the classic "page was loaded before the grant" case: the already-open
+           document keeps the old decision until it reloads. Saying "you refused
+           it" here would send the user to change a setting that is already
+           right. */
+        throw new Error(
+          `Your browser already allows the ${device}, but this tab was opened before that and is still refusing it. Reload the page, then start the call again. (Press Retry after reloading.)`
+        );
+      }
+      if (state[device] === "prompt") {
+        throw new Error(
+          `The browser did not show the ${device} prompt. Press Retry — the prompt appears on a click, and some browsers suppress it after a previous dismissal.`
+        );
+      }
+      throw new Error(
+        `The ${device} is blocked for this site. Click the padlock or camera icon in the address bar → Site settings → allow the ${device} → reload this tab.`
+      );
     }
-    return localStream;
   }
 
   /* ----------------------------------------------------------- peers */
@@ -472,6 +568,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
   return {
     state,
+    mediaState,
     setListener(fn) {
       listener = fn || (() => {});
       emit();

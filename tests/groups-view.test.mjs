@@ -42,6 +42,11 @@ const GROUP = {
   lastSender: "Asha"
 };
 
+const CHANNELS = [
+  { id: "chan-1", slug: "general", name: "General", description: "Everything and anything", sort_order: 1 },
+  { id: "chan-2", slug: "wins", name: "Wins", description: "Post a win", sort_order: 2 }
+];
+
 const MEMBERS = [
   { userId: "user-a", name: "Aditya", username: "aditya", avatarUrl: null, role: "owner", muted: false },
   { userId: "user-b", name: "Asha", username: "asha", avatarUrl: null, role: "admin", muted: false },
@@ -90,7 +95,10 @@ async function bundle(entry) {
       const supabaseStub = `
         export const sb = {
           rpc: async (name, args) => ({ data: await globalThis.__rpc(name, args), error: null }),
-          from: () => ({ select: () => ({ order: async () => ({ data: [], error: null }) }) }),
+          from: (table) => ({ select: () => ({ order: async () => ({
+            data: table === "community_channels" ? globalThis.__channels || [] : [],
+            error: null
+          }) }) }),
           auth: { getSession: async () => ({ data: { session: { user: { id: "user-a" } } } }),
                   getUser: async () => ({ data: { user: { id: "user-a" } } }) },
           channel: () => { const api = { on: () => api, subscribe: () => api }; return api; },
@@ -129,7 +137,15 @@ async function bundle(entry) {
   return import(url);
 }
 
-function makeWorld({ groups = [GROUP], detail = DETAIL, thread = THREAD, candidates = MEMBERS } = {}) {
+function makeWorld({
+  groups = [GROUP],
+  detail = DETAIL,
+  thread = THREAD,
+  candidates = MEMBERS,
+  channels = CHANNELS,
+  pinned = null,
+  searchHits = []
+} = {}) {
   const { window, document } = parseHTML(
     "<!doctype html><html><body><div id='view-root'></div><div id='toast-region'></div></body></html>"
   );
@@ -145,6 +161,10 @@ function makeWorld({ groups = [GROUP], detail = DETAIL, thread = THREAD, candida
   globalThis.CustomEvent = window.CustomEvent;
   globalThis.HTMLInputElement = window.HTMLInputElement;
   globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  /* linkedom has no layout, so scrollIntoView does not exist. The thread uses it
+     to bring a focused message into view; stubbing it keeps that path honest
+     instead of skipping it. */
+  window.Element.prototype.scrollIntoView = function scrollIntoView() {};
   /* The views read `location.search` and rewrite it with `history.replaceState`,
      so both must exist as globals — the harness runs one page at a time. */
   globalThis.location = new URL("https://shinzora.test/app/?view=messages");
@@ -154,6 +174,7 @@ function makeWorld({ groups = [GROUP], detail = DETAIL, thread = THREAD, candida
      check for a service worker, which this harness deliberately lacks. */
   globalThis.navigator = { userAgent: "shinzora-test" };
   globalThis.__toast = (message, kind) => toasts.push({ message, kind });
+  globalThis.__channels = channels;
   globalThis.__uploads = [];
 
   const answers = {
@@ -163,6 +184,10 @@ function makeWorld({ groups = [GROUP], detail = DETAIL, thread = THREAD, candida
     group_mark_read: { ok: true },
     group_mention_candidates: candidates,
     group_send: { id: "m4", createdAt: new Date().toISOString() },
+    group_pinned: pinned,
+    group_pin: pinned,
+    group_unpin: { pinned: null },
+    group_messages_search: searchHits,
     dm_inbox: []
   };
   globalThis.__rpc = (name, args) => {
@@ -362,7 +387,10 @@ test("the group header offers a meeting button once a group is open", async () =
   const meet = world.root.querySelector("#grp-call");
   assert.ok(meet, "the Meet button exists");
   assert.equal(meet.hidden, false, "and is visible with a group open");
-  assert.match(meet.textContent, /Meet/);
+  assert.equal(meet.getAttribute("aria-label"), "Start a video meeting", "and is named for a screen reader");
+  const voice = world.root.querySelector("#grp-call-voice");
+  assert.equal(voice.hidden, false, "the voice-meeting button is there too");
+  assert.equal(voice.getAttribute("aria-label"), "Start a voice meeting");
 });
 
 test("an account with no groups gets a real empty state with a create button", async () => {
@@ -374,4 +402,165 @@ test("an account with no groups gets a real empty state with a create button", a
   assert.match(empty.textContent, /No groups yet/, "it says what is missing");
   assert.ok(world.root.querySelector("[data-new-group]"), "and offers to create one");
   assert.equal(count(world.calls, "group_get"), 0, "nothing is opened when there is nothing to open");
+});
+
+/* ------------------------------------------------------- the hub, as a surface */
+
+test("the rail lists the public channels above the groups", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  const rail = world.root.querySelector("#grp-channels");
+  assert.ok(rail, "the channels section exists");
+  const rows = [...rail.querySelectorAll("[data-channel]")];
+  assert.deepEqual(rows.map((row) => row.getAttribute("data-channel")), ["general", "wins"]);
+  assert.match(rail.textContent, /General/);
+  assert.equal(world.root.querySelectorAll("#grp-list [data-group]").length, 1, "the groups are still there");
+  /* The order is part of the design: public rooms on top, the member's own
+     groups under them. */
+  const channels = world.root.querySelector("#grp-channels");
+  const groups = world.root.querySelector("#grp-list");
+  assert.ok(
+    channels.compareDocumentPosition(groups) & 4,
+    "the channels section comes before the groups section"
+  );
+});
+
+test("a channel opens in the middle column and is text-only", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+  const channel = world.root.querySelector('[data-channel="general"]');
+  click(world.window, channel);
+  await settle();
+
+  assert.deepEqual(lastArgs(world.calls, "community_messages_list"), { p_channel: "general", p_limit: 80 });
+  assert.equal(world.root.querySelector("#grp-files").disabled, true, "attachments are off in a public room");
+  assert.equal(world.root.querySelector('label[for="grp-files"]').hidden, true, "and the control is not shown");
+  assert.match(world.root.querySelector(".chat-thread-title").textContent, /#General/);
+  assert.match(world.root.querySelector("#grp-info-col").textContent, /everyone can read it/);
+  assert.equal(
+    world.root.querySelector("#grp-list .is-active"),
+    null,
+    "no group is lit while a channel is open"
+  );
+});
+
+test("the details panel is part of the page, not a dialog", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  const panel = world.root.querySelector("#grp-info-col");
+  assert.ok(panel, "the column exists");
+  assert.match(panel.textContent, /Design team/, "the group name");
+  assert.match(panel.textContent, /Weekly reviews/, "the About line");
+  assert.match(panel.textContent, /3 members/, "the member count");
+  assert.ok(panel.querySelector("[data-add-people]"), "Add members is a row");
+  assert.ok(panel.querySelector("[data-edit-group]"), "Group permissions is a row");
+  assert.ok(panel.querySelector("[data-toggle-mute]"), "Mute is a row with its own switch");
+  assert.equal(panel.querySelector("[data-leave-group]"), null, "the owner is not offered Leave");
+  assert.ok(panel.querySelectorAll(".hub-member-chip").length >= 3, "the member strip is painted");
+  assert.ok(panel.querySelector("[data-open-members]"), "See all members");
+  assert.match(panel.textContent, /Group media/, "the media section is labelled");
+});
+
+test("the same hub layout is what every role gets — nothing in it is role-shaped", async () => {
+  /* A plain member: fewer rows, identical structure. The mockup is one surface
+     for admins, users and freelancers, so the columns and the sections must not
+     move — only the actions the database would refuse are left out. */
+  const world = makeWorld({
+    detail: { ...DETAIL, role: "member", canManage: false, isOwner: false }
+  });
+  await openGroupsTab(world);
+  const panel = world.root.querySelector("#grp-info-col");
+  assert.ok(panel.querySelector("[data-open-members]"), "members see the member strip");
+  assert.match(panel.textContent, /Group media/, "and the media grid");
+  assert.equal(panel.querySelector("[data-add-people]"), null, "but not the manager-only rows");
+  assert.ok(panel.querySelector("[data-leave-group]"), "and the way out of the group");
+  assert.ok(panel.querySelector("[data-toggle-mute]"), "mute is personal, so every member has it");
+  assert.ok(world.root.querySelector("#grp-search"), "and the header is the same");
+});
+
+test("a pinned message shows under the header and jumps to the message", async () => {
+  const world = makeWorld({
+    pinned: {
+      id: "m1",
+      body: "release notes for friday",
+      authorId: "user-b",
+      authorName: "Asha",
+      createdAt: new Date().toISOString()
+    }
+  });
+  await openGroupsTab(world);
+
+  const bar = world.root.querySelector("#grp-pin");
+  assert.equal(bar.hidden, false, "the pin bar is visible");
+  assert.match(bar.textContent, /release notes for friday/);
+  assert.equal(world.root.querySelector("#grp-pin-clear").hidden, false, "the owner may unpin it");
+
+  click(world.window, world.root.querySelector("#grp-pin-text"));
+  await settle();
+  assert.equal(count(world.calls, "group_get") >= 2, true, "clicking the pin re-opens the thread to it");
+});
+
+test("an admin can pin from a message, and unpin from the bar", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+
+  const pinButton = world.root.querySelector("[data-pin-msg]");
+  assert.ok(pinButton, "the pin affordance is on the bubbles");
+  click(world.window, pinButton);
+  await settle();
+  assert.deepEqual(lastArgs(world.calls, "group_pin"), { p_group: GROUP.id, p_message: "m1" });
+
+  click(world.window, world.root.querySelector("#grp-pin-clear"));
+  await settle();
+  assert.deepEqual(lastArgs(world.calls, "group_unpin"), { p_group: GROUP.id });
+});
+
+test("search asks the database for this group's messages", async () => {
+  const world = makeWorld({
+    searchHits: [
+      { id: "m2", body: "the banner is ready", createdAt: new Date().toISOString(), authorName: "Asha" }
+    ]
+  });
+  await openGroupsTab(world);
+
+  click(world.window, world.root.querySelector("#grp-search"));
+  assert.equal(world.root.querySelector("#grp-search-panel").hidden, false, "the search field opens");
+  const input = world.root.querySelector("#grp-search-input");
+  input.value = "banner";
+  input.dispatchEvent(new world.window.Event("input", { bubbles: true }));
+  await settle();
+
+  assert.deepEqual(lastArgs(world.calls, "group_messages_search"), {
+    p_group: GROUP.id,
+    p_query: "banner",
+    p_limit: 30
+  });
+  const hits = [...world.root.querySelectorAll("[data-search-hit]")];
+  assert.equal(hits.length, 1, "the hit is listed");
+  assert.match(hits[0].textContent, /the banner is ready/);
+});
+
+test("the header carries search, voice, video and more — and no group means no controls", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world);
+  for (const id of ["#grp-search", "#grp-call-voice", "#grp-call", "#grp-more"]) {
+    assert.equal(world.root.querySelector(id).hidden, false, `${id} is visible with a group open`);
+  }
+
+  const empty = makeWorld({ groups: [] });
+  await openGroupsTab(empty);
+  for (const id of ["#grp-call-voice", "#grp-call", "#grp-more"]) {
+    assert.equal(empty.root.querySelector(id).hidden, true, `${id} is hidden with nothing open`);
+  }
+  assert.equal(empty.root.querySelector("#grp-pin").hidden, true, "and there is no pin bar");
+});
+
+test("a member is offered Leave, which the owner never is", async () => {
+  const world = makeWorld({ detail: { ...DETAIL, role: "member", canManage: false, isOwner: false } });
+  await openGroupsTab(world);
+  const leave = world.root.querySelector("#grp-info-col [data-leave-group]");
+  assert.ok(leave, "the member has a way out");
+  assert.match(leave.textContent, /Leave group/);
 });

@@ -288,7 +288,7 @@ test("a refused channel is reported as refusal, not left connecting", async () =
   assert.match(String(call.state.error), /member/, "the message must point at membership");
 });
 
-test("a missing microphone is explained in words a person can act on", async () => {
+test("a refused microphone is explained in words a person can act on", async () => {
   installBrowser();
   globalThis.navigator.mediaDevices.getUserMedia = async () => {
     const error = new Error("denied");
@@ -297,7 +297,10 @@ test("a missing microphone is explained in words a person can act on", async () 
   };
   const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
   const call = createCall({ kind: "voice", topic: "call-dm:x", title: "Call", self: { userId: "x", name: "X" } });
-  await assert.rejects(() => call.join({ audioOnly: true }), /permission was refused/i);
+  /* No Permissions API in this fake browser, so the state is unknown and the
+     message names the one action that always works: allow it in site settings,
+     then retry. It must not say "permission was refused" as if it knows. */
+  await assert.rejects(() => call.join({ audioOnly: true }), /Site settings/i);
 });
 
 test("the seventh peer is told the meeting is full instead of degrading it", async () => {
@@ -332,4 +335,110 @@ test("ICE servers include STUN, and TURN only when configured", async () => {
   const servers = iceServers();
   assert.ok(servers.some((server) => String(server.urls).includes("stun:")), "public STUN must always be present");
   assert.equal(servers.length, 1, "no TURN until one is configured — the UI says so");
+});
+
+/* ---------------------------------------------------- the permission message */
+
+/**
+ * The bug this covers: "Microphone or camera permission was refused" was shown
+ * to people who had already allowed it. The cause was a blanket mapping of
+ * `NotAllowedError` onto "you refused" — which also describes a tab loaded
+ * before the grant, a blocked frame, and a page whose policy forbids capture.
+ * Each of those now gets its own words, because each has a different fix.
+ */
+
+function refuseWith(permissionState) {
+  installBrowser();
+  globalThis.navigator.permissions = {
+    query: async ({ name }) => ({ state: typeof permissionState === "function" ? permissionState(name) : permissionState })
+  };
+  globalThis.navigator.mediaDevices.getUserMedia = async () => {
+    const error = new Error("Permission denied");
+    error.name = "NotAllowedError";
+    throw error;
+  };
+}
+
+test("permission granted but the tab predates it asks for a reload, not a settings change", async () => {
+  refuseWith("granted");
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:stale", title: "Call", self: { userId: "x", name: "X" } });
+
+  const message = await call.join({ audioOnly: true }).then(
+    () => "",
+    (error) => String(error.message)
+  );
+  assert.match(message, /already allows the microphone/, "it says the permission is already on");
+  assert.match(message, /[Rr]eload/, "and the fix is a reload");
+  assert.doesNotMatch(message, /refused/i, "it must not accuse the user of refusing it");
+});
+
+test("a denied permission points at site settings", async () => {
+  refuseWith("denied");
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:denied", title: "Call", self: { userId: "x", name: "X" } });
+  await assert.rejects(() => call.join({ audioOnly: true }), /blocked for this site/i);
+});
+
+test("a page that never showed the prompt is told to press Retry", async () => {
+  refuseWith("prompt");
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:prompt", title: "Call", self: { userId: "x", name: "X" } });
+  await assert.rejects(() => call.join({ audioOnly: true }), /Retry/);
+});
+
+test("a browser with no Permissions API still gets a message with a next step", async () => {
+  installBrowser(); // navigator.permissions is deliberately absent, as in Safari
+  globalThis.navigator.mediaDevices.getUserMedia = async () => {
+    const error = new Error("denied");
+    error.name = "NotAllowedError";
+    throw error;
+  };
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:safari", title: "Call", self: { userId: "x", name: "X" } });
+  await assert.rejects(() => call.join({ audioOnly: true }), /Site settings/i);
+});
+
+test("a device held by another app is named as such, with Retry", async () => {
+  installBrowser();
+  globalThis.navigator.mediaDevices.getUserMedia = async () => {
+    const error = new Error("Device in use");
+    error.name = "NotReadableError";
+    throw error;
+  };
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:busy", title: "Call", self: { userId: "x", name: "X" } });
+  await assert.rejects(() => call.join({ audioOnly: true }), /another app or tab/i);
+});
+
+test("a stream whose tracks ended is never handed back as if it were live", async () => {
+  const { log } = installBrowser();
+  let asked = 0;
+  const real = globalThis.navigator.mediaDevices.getUserMedia;
+  globalThis.navigator.mediaDevices.getUserMedia = async (constraints) => {
+    asked += 1;
+    return real(constraints);
+  };
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:stale-stream", title: "Call", self: { userId: "x", name: "X" } });
+  await call.join({ audioOnly: true });
+  assert.equal(asked, 1);
+  call.leave();
+  assert.equal(log.tracks[0].stopped, true, "leaving stopped the microphone");
+
+  const second = createCall({ kind: "voice", topic: "call-dm:stale-stream-2", title: "Call", self: { userId: "x", name: "X" } });
+  await second.join({ audioOnly: true });
+  assert.equal(asked, 2, "the second call asked the browser again rather than reusing a dead stream");
+  second.leave();
+});
+
+test("the call object exposes what the browser said about the devices", async () => {
+  refuseWith("granted");
+  const { createCall } = await bundle(path.join(repo, "public/js/modules/messaging/webrtc.js"));
+  const call = createCall({ kind: "voice", topic: "call-dm:state", title: "Call", self: { userId: "x", name: "X" } });
+  assert.equal(typeof call.mediaState, "function", "mediaState is part of the call's contract");
+  const state = await call.mediaState();
+  assert.equal(state.microphone, "granted");
+  assert.equal(state.camera, "granted");
+  assert.equal(typeof state.secure, "boolean");
 });

@@ -38,6 +38,12 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ALLOWED_FILES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
 const QUICK_EMOJI = ["🙂", "👍", "🎉", "❤️", "🙏", "✨"];
 
+/** One line of a message, cut at `max`, for pin bars and search hits. */
+function oneLine(value, max = 120) {
+  const flat = String(value || "").replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
 async function rpc(name, args = {}) {
   if (!sb) throw new Error("Groups are not available right now.");
   const { data, error } = await sb.rpc(name, args);
@@ -97,10 +103,17 @@ function paintBody(body, mentions = []) {
 
 export default async function mountGroups(root, options = {}) {
   const wrap = document.createElement("div");
-  wrap.className = "chat group-chat";
+  wrap.className = "chat group-chat hub";
   wrap.innerHTML = `
-    <aside class="chat-pane chat-pane-list">
-      <div class="chat-pane-head">
+    <aside class="chat-pane chat-pane-list hub-rail">
+      <div class="hub-rail-head">
+        <div class="chat-pane-title">${icon("message-square", { size: 15 })}<span>Channels</span></div>
+      </div>
+      <div class="chat-list hub-channels" id="grp-channels">
+        <div class="chat-empty-line">Loading channels…</div>
+      </div>
+
+      <div class="hub-rail-head hub-rail-groups">
         <div class="chat-pane-title">${icon("users", { size: 15 })}<span>Groups</span></div>
         <div class="pane-head-actions">
           <button class="btn btn-primary btn-sm" type="button" id="grp-new">${icon("plus", { size: 13 })}New</button>
@@ -110,7 +123,7 @@ export default async function mountGroups(root, options = {}) {
           )}</button>
         </div>
       </div>
-      <div class="chat-list" id="grp-list"><div class="chat-empty-line">Loading groups…</div></div>
+      <div class="chat-list hub-groups" id="grp-list"><div class="chat-empty-line">Loading groups…</div></div>
     </aside>
 
     <section class="chat-pane chat-pane-thread">
@@ -123,11 +136,42 @@ export default async function mountGroups(root, options = {}) {
           </div>
         </div>
         <div class="pane-head-actions">
-          <button class="btn btn-ghost btn-sm" type="button" id="grp-call" hidden>
-            ${icon("video", { size: 13 })}<span>Meet</span>
+          <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-search"
+                  aria-label="Search this group" title="Search this group">${icon("search", { size: 14 })}</button>
+          <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-call-voice" hidden
+                  aria-label="Start a voice meeting" title="Start a voice meeting">${icon("phone", { size: 14 })}</button>
+          <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-call" hidden
+                  aria-label="Start a video meeting" title="Start a video meeting">${icon("video", { size: 14 })}</button>
+          <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-more" hidden
+                  aria-label="More group actions" title="More">${icon("ellipsis-vertical", { size: 14 })}</button>
+          <button class="btn btn-ghost btn-sm hub-info-switch" type="button" id="grp-info" hidden>
+            ${icon("info", { size: 13 })}<span>Details</span>
           </button>
-          <button class="btn btn-ghost btn-sm" type="button" id="grp-info" hidden>${icon("info", { size: 13 })}<span>Group info</span></button>
         </div>
+      </div>
+
+      <div class="hub-menu" id="grp-menu" hidden>
+        <button class="hub-menu-row" type="button" data-menu="info">${icon("info", { size: 13 })}<span>Group details</span></button>
+        <button class="hub-menu-row" type="button" data-menu="search">${icon("search", { size: 13 })}<span>Search messages</span></button>
+        <button class="hub-menu-row" type="button" data-menu="mute">${icon("bell", { size: 13 })}<span id="grp-menu-mute-label">Mute notifications</span></button>
+      </div>
+
+      <div class="hub-pin" id="grp-pin" hidden>
+        <span class="hub-pin-icon">${icon("map-pin", { size: 13 })}</span>
+        <div class="hub-pin-wrap">
+          <div class="hub-pin-label">Pinned message</div>
+          <button class="hub-pin-text" type="button" id="grp-pin-text"></button>
+        </div>
+        <button class="hub-pin-clear" type="button" id="grp-pin-clear" hidden
+                aria-label="Unpin this message" title="Unpin">${icon("x", { size: 13 })}</button>
+      </div>
+
+      <div class="hub-search" id="grp-search-panel" hidden>
+        <label class="sr-only" for="grp-search-input">Search this group</label>
+        <input class="input" id="grp-search-input" type="search" autocomplete="off"
+               placeholder="Search messages in this group…" />
+        <button class="btn btn-ghost btn-sm" type="button" id="grp-search-close" aria-label="Close search">${icon("x", { size: 13 })}</button>
+        <div class="hub-search-results" id="grp-search-results" role="list" hidden></div>
       </div>
 
       <div class="chat-messages" id="grp-messages">
@@ -154,7 +198,11 @@ export default async function mountGroups(root, options = {}) {
           placeholder="Write a message… type @ to mention somebody"></textarea>
         <button class="btn btn-primary chat-send" type="submit" id="grp-send">${icon("send", { size: 15 })}<span>Send</span></button>
       </form>
-    </section>`;
+    </section>
+
+    <aside class="hub-info" id="grp-info-col" aria-label="Details">
+      <div class="hub-info-empty">Open a group or a channel to see its details.</div>
+    </aside>`;
   root.appendChild(wrap);
 
   const listEl = qs("#grp-list", wrap);
@@ -168,10 +216,24 @@ export default async function mountGroups(root, options = {}) {
   const filesInput = qs("#grp-files", wrap);
   const pendingEl = qs("#grp-pending", wrap);
   const fileCountEl = qs("#grp-file-count", wrap);
+  const channelsEl = qs("#grp-channels", wrap);
+  const infoCol = qs("#grp-info-col", wrap);
+  const pinEl = qs("#grp-pin", wrap);
+  const pinTextEl = qs("#grp-pin-text", wrap);
+  const pinClearEl = qs("#grp-pin-clear", wrap);
+  const searchPanel = qs("#grp-search-panel", wrap);
+  const searchInput = qs("#grp-search-input", wrap);
+  const searchResults = qs("#grp-search-results", wrap);
 
   let me = null;
   let groups = [];
   let active = options.groupId || null;
+  /** "group" or "channel" — what the middle pane is currently showing. */
+  let view = "group";
+  let channels = [];
+  let activeChannel = null;
+  /** The group's one pinned message, or null. */
+  let pinned = null;
   let detail = null; // group_get payload for the open group
   let candidateCache = [];
   let popItems = [];
@@ -223,6 +285,132 @@ export default async function mountGroups(root, options = {}) {
     return groups;
   }
 
+  /* --------------------------------------------------------------- channels */
+
+  /**
+   * The public Community rooms, in the same rail as groups.
+   *
+   * They are text-only by design (`community_send` refuses attachments and the
+   * table has no column for them), so the composer hides its attach control
+   * when a channel is open rather than offering something that will be refused.
+   */
+  async function loadChannels() {
+    try {
+      const { data, error } = await sb
+        .from("community_channels")
+        .select("id,slug,name,description,sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw normalizeError(error);
+      channels = data || [];
+    } catch {
+      channels = [];
+    }
+    paintChannels();
+    return channels;
+  }
+
+  function paintChannels() {
+    if (!channels.length) {
+      channelsEl.innerHTML = `<div class="chat-empty-line">No public channels yet.</div>`;
+      return;
+    }
+    channelsEl.innerHTML = channels
+      .map(
+        (channel) => `<button class="chat-item hub-channel${view === "channel" && activeChannel?.slug === channel.slug ? " is-active" : ""}"
+          type="button" data-channel="${esc(channel.slug)}">
+          <span class="hub-channel-hash" aria-hidden="true">#</span>
+          <span class="chat-item-body">
+            <span class="chat-item-name">${esc(channel.name)}</span>
+            <span class="chat-item-snippet">${esc(channel.description || `#${channel.slug}`)}</span>
+          </span>
+        </button>`
+      )
+      .join("");
+  }
+
+  async function openChannel(slug) {
+    const channel = channels.find((row) => row.slug === slug);
+    if (!channel) return;
+    view = "channel";
+    activeChannel = channel;
+    active = null;
+    detail = null;
+    pinned = null;
+    pinEl.hidden = true;
+    closeSearch();
+    paintChannels();
+    paintList();
+    paintHead(null);
+    closeCall();
+    stopWatching();
+    watchedTopic = null;
+    const title = qs(".chat-thread-title", headEl);
+    const sub = qs(".chat-thread-sub", headEl);
+    if (title) title.textContent = `#${channel.name}`;
+    if (sub) sub.textContent = channel.description || "A public room — everyone on Shinzora can read it.";
+    paintChannelInfo(channel);
+    qs("#grp-search", wrap).hidden = true; // group search only — a room has no membership
+    const attachLabel = wrap.querySelector('label[for="grp-files"]');
+    if (attachLabel) attachLabel.hidden = true;
+    messagesEl.innerHTML = `<div class="chat-empty-line">Loading #${esc(channel.slug)}…</div>`;
+    formEl.hidden = false;
+    filesInput.disabled = true; // public rooms are text-only
+    try {
+      const rows = await rpc("community_messages_list", { p_channel: channel.slug, p_limit: 80 });
+      paintChannelThread(Array.isArray(rows) ? rows : []);
+      bodyEl.focus({ preventScroll: true });
+    } catch (error) {
+      messagesEl.innerHTML = `<div class="chat-empty-line">${esc(
+        error.message || "That channel could not be opened."
+      )}</div>`;
+    }
+  }
+
+  function paintChannelThread(rows) {
+    if (!rows.length) {
+      messagesEl.innerHTML = `<div class="chat-empty-line">Nothing in #${esc(
+        activeChannel.slug
+      )} yet. Say hello — everyone on Shinzora can read this room.</div>`;
+      return;
+    }
+    let lastAuthor = null;
+    messagesEl.innerHTML = rows
+      .map((message) => {
+        const mine = message.authorId === me;
+        const showWho = message.authorId !== lastAuthor;
+        lastAuthor = message.authorId;
+        return `<div class="bubble-row${mine ? " is-mine" : ""}" data-message="${esc(message.id)}">
+          ${showWho && !mine ? `<span class="bubble-avatar">${initials(message.authorName || "Member")}</span>` : ""}
+          <div class="bubble${mine ? " bubble-mine" : ""}">
+            ${mine || !showWho ? "" : `<div class="bubble-who">${esc(message.authorName || "Member")}</div>`}
+            <div class="bubble-text">${paintBody(message.body, [])}</div>
+            <div class="bubble-time" title="${esc(dateTime(message.createdAt))}">${esc(timeAgo(message.createdAt))}</div>
+          </div>
+        </div>`;
+      })
+      .join("");
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function paintChannelInfo(channel) {
+    infoCol.innerHTML = `
+      <div class="hub-info-section">
+        <div class="hub-info-avatar hub-info-channel-mark">#</div>
+        <div class="hub-info-name">${esc(channel.name)}</div>
+        <div class="hub-info-meta">Public channel · everyone can read it</div>
+      </div>
+      <div class="hub-info-section">
+        <div class="hub-info-label">About</div>
+        <p class="hub-info-desc">${esc(channel.description || `#${channel.slug}`)}</p>
+      </div>
+      <div class="hub-info-section">
+        <div class="hub-info-note">
+          ${icon("info", { size: 13 })}
+          <span>Public rooms are text only. Pictures, files and calls live in groups, where membership is enforced.</span>
+        </div>
+      </div>`;
+  }
+
   /* ----------------------------------------------------------------- thread */
   /** The first thing a new member sees: one sentence and one button. */
   function paintEmptyGroups() {
@@ -251,6 +439,10 @@ export default async function mountGroups(root, options = {}) {
       if (sub) sub.textContent = "Pick a group, or start one. Only members can read what is posted here.";
       infoBtn.hidden = true;
       qs("#grp-call", wrap).hidden = true;
+      qs("#grp-call-voice", wrap).hidden = true;
+      qs("#grp-more", wrap).hidden = true;
+      pinEl.hidden = true;
+      searchPanel.hidden = true;
       return;
     }
     avatarEl.hidden = false;
@@ -262,17 +454,27 @@ export default async function mountGroups(root, options = {}) {
     if (title) title.textContent = group.name;
     const count = (group.members || []).length;
     const role = ROLE_LABEL[group.role] || "Member";
+    /* "Active now" is honest: it counts members whose heartbeat put them inside
+       the last five minutes, the same window presence elsewhere uses. */
+    const online = (group.members || []).filter(
+      (row) => row.lastSeenAt && Date.now() - new Date(row.lastSeenAt).getTime() < 5 * 60 * 1000
+    ).length;
     if (sub) {
-      sub.textContent = `${count} member${count === 1 ? "" : "s"} · you are ${role.toLowerCase()}${
-        group.description ? ` · ${group.description}` : ""
-      }`;
+      sub.textContent = `${count} member${count === 1 ? "" : "s"}${
+        online ? ` · ${online} active now` : ""
+      } · you are ${role.toLowerCase()}${group.description ? ` · ${group.description}` : ""}`;
     }
     infoBtn.hidden = false;
     qs("#grp-call", wrap).hidden = false;
+    qs("#grp-call-voice", wrap).hidden = false;
+    qs("#grp-more", wrap).hidden = false;
   }
 
   async function open(id, focusMessageId = null) {
+    view = "group";
     active = id;
+    activeChannel = null;
+    paintChannels();
     paintList();
     messagesEl.innerHTML = `<div class="chat-empty-line">Loading…</div>`;
     formEl.hidden = true;
@@ -284,6 +486,15 @@ export default async function mountGroups(root, options = {}) {
       formEl.hidden = false;
       bodyEl.focus({ preventScroll: true });
       await rpc("group_mark_read", { p_group: id });
+      /* The details column and the pin bar belong to the same paint as the
+         thread: they describe what is on screen, so they must not lag behind an
+         older group's state. */
+      paintGroupInfo();
+      filesInput.disabled = false;
+      qs("#grp-search", wrap).hidden = false;
+      const attachLabel = wrap.querySelector('label[for="grp-files"]');
+      if (attachLabel) attachLabel.hidden = false;
+      await loadPin();
       watchThisGroup();
       await loadList();
     } catch (error) {
@@ -411,7 +622,10 @@ export default async function mountGroups(root, options = {}) {
       </a>`;
   }
 
+  let lastThread = [];
+
   async function paintThread(rows, focusMessageId = null) {
+    lastThread = rows;
     if (!rows.length) {
       messagesEl.innerHTML = `<div class="chat-empty-line">Nothing here yet. Say hello — the others will see it in their notifications.</div>`;
       return;
@@ -443,6 +657,12 @@ export default async function mountGroups(root, options = {}) {
             ${message.body ? `<div class="bubble-text">${paintBody(message.body, message.mentions)}</div>` : ""}
             ${attachments ? `<div class="grp-attachments">${attachments}</div>` : ""}
             <div class="bubble-time" title="${esc(dateTime(message.createdAt))}">${esc(timeAgo(message.createdAt))}</div>
+            ${
+              detail?.canManage
+                ? `<button class="bubble-pin" type="button" data-pin-msg="${esc(message.id)}"
+                     title="Pin this message" aria-label="Pin this message">${icon("map-pin", { size: 11 })}</button>`
+                : ""
+            }
           </div>
         </div>`;
       })
@@ -643,6 +863,15 @@ function insertAtCaret(field, text, start, end) {
     send.disabled = true;
     if (label && pending.length) label.textContent = "Sending…";
     try {
+      if (view === "channel" && activeChannel) {
+        /* Public rooms take text only — `community_send` enforces it, and the
+           attach control is disabled while one is open. */
+        await rpc("community_send", { p_channel: activeChannel.slug, p_body: body });
+        bodyEl.value = "";
+        hidePop();
+        await openChannel(activeChannel.slug);
+        return;
+      }
       const attachments = pending.length ? await uploadPending() : [];
       await rpc("group_send", { p_group: active, p_body: body, p_attachments: attachments });
       bodyEl.value = "";
@@ -681,7 +910,7 @@ function insertAtCaret(field, text, start, end) {
     currentCall = null;
   }
 
-  async function joinMeeting({ ringing = false } = {}) {
+  async function joinMeeting({ ringing = false, audioOnly = false } = {}) {
     if (!detail) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       toastError(
@@ -691,7 +920,7 @@ function insertAtCaret(field, text, start, end) {
     }
 
     const call = createCall({
-      kind: "video",
+      kind: audioOnly ? "voice" : "video",
       topic: callTopics.group(detail.id),
       title: detail.name,
       self: { userId: me, name: selfName() }
@@ -710,7 +939,7 @@ function insertAtCaret(field, text, start, end) {
     try {
       /* Somebody already in the room may not have a camera (they joined voice
          only), so falling back to audio is better than refusing to join. */
-      await call.join({ audioOnly: false });
+      await call.join({ audioOnly });
     } catch (error) {
       const message = String(error?.message || "");
       if (/camera|video/i.test(message)) {
@@ -777,6 +1006,177 @@ function insertAtCaret(field, text, start, end) {
   }
 
   on(qs("#grp-call", wrap), "click", () => joinMeeting());
+  on(qs("#grp-call-voice", wrap), "click", () => joinMeeting({ audioOnly: true }));
+
+  on(qs("#grp-search", wrap), "click", () => {
+    searchPanel.hidden = !searchPanel.hidden;
+    if (!searchPanel.hidden) searchInput.focus();
+    else closeSearch();
+  });
+  on(qs("#grp-search-close", wrap), "click", closeSearch);
+  on(searchInput, "input", runSearch);
+  delegate(searchResults, "click", "[data-search-hit]", (_event, button) => {
+    const hitId = button.getAttribute("data-search-hit");
+    closeSearch();
+    if (active && hitId) open(active, hitId);
+  });
+
+  const menuEl = qs("#grp-menu", wrap);
+  const menuMuteLabel = qs("#grp-menu-mute-label", wrap);
+
+  on(qs("#grp-more", wrap), "click", () => {
+    const mine = (detail?.members || []).find((row) => row.userId === me);
+    if (menuMuteLabel) menuMuteLabel.textContent = mine?.muted ? "Unmute notifications" : "Mute notifications";
+    menuEl.hidden = !menuEl.hidden;
+  });
+
+  on(document, "click", (event) => {
+    if (menuEl.hidden) return;
+    if (menuEl.contains(event.target) || event.target.closest?.("#grp-more")) return;
+    menuEl.hidden = true;
+  });
+
+  delegate(menuEl, "click", "[data-menu]", async (_event, button) => {
+    const choice = button.getAttribute("data-menu");
+    menuEl.hidden = true;
+    if (choice === "info") return openInfo();
+    if (choice === "search") {
+      searchPanel.hidden = false;
+      searchInput.focus();
+      return;
+    }
+    if (choice === "mute") {
+      const mine = (detail?.members || []).find((row) => row.userId === me);
+      if (!mine || !detail) return;
+      try {
+        await rpc("group_set_muted", { p_group: detail.id, p_muted: !mine.muted });
+        await open(detail.id);
+        await loadList();
+      } catch (error) {
+        toastError(error);
+      }
+    }
+  });
+
+  on(pinTextEl, "click", () => {
+    const focusId = pinTextEl.getAttribute("data-focus");
+    if (active && focusId) open(active, focusId);
+  });
+  on(pinClearEl, "click", () => setPin(null));
+  delegate(messagesEl, "click", "[data-pin-msg]", (_event, button) => {
+    const messageId = button.getAttribute("data-pin-msg");
+    if (messageId) setPin(messageId);
+  });
+
+  /**
+   * The details panel, always on screen for a group — the shape from the design
+   * reference. The same actions exist in the modal (`openInfo`) for narrow
+   * screens; both call the same RPCs, so neither can quietly disagree.
+   */
+  function paintGroupInfo() {
+    if (!detail) return;
+    const members = detail.members || [];
+    const mine = members.find((row) => row.userId === me) || null;
+    const media = [];
+    for (const message of lastThread || []) {
+      for (const file of message.attachments || []) {
+        if (String(file.mime || "").startsWith("image/")) media.push(file);
+      }
+    }
+
+    infoCol.innerHTML = `
+      <div class="hub-info-section hub-info-top">
+        <div class="hub-info-avatar">${avatarMarkup({
+          name: detail.name,
+          avatarUrl: detail.avatarUrl,
+          alt: `${detail.name} picture`
+        })}</div>
+        <div class="hub-info-name">${esc(detail.name)}</div>
+        <div class="hub-info-meta">${members.length} member${members.length === 1 ? "" : "s"} · ${
+      ROLE_LABEL[detail.role] || "Member"
+    }</div>
+        ${
+          detail.canManage
+            ? `<label class="hub-info-pic" for="hub-picture-inline" title="Change the group picture">
+                 ${icon("image", { size: 13 })}
+               </label>
+               <input id="hub-picture-inline" type="file" accept="image/png,image/jpeg,image/webp" hidden />`
+            : ""
+        }
+      </div>
+
+      ${
+        detail.description
+          ? `<div class="hub-info-section"><div class="hub-info-label">About</div>
+               <p class="hub-info-desc">${esc(detail.description)}</p></div>`
+          : ""
+      }
+
+      <div class="hub-info-section hub-info-actions">
+        ${detail.canManage || detail.allowMemberInvites
+          ? `<button class="hub-info-row" type="button" data-add-people>${icon("user-plus", { size: 15 })}<span>Add members</span></button>`
+          : ""}
+        ${detail.canManage ? `<button class="hub-info-row" type="button" data-edit-group>${icon("settings-2", { size: 15 })}<span>Group permissions</span></button>` : ""}
+        <button class="hub-info-row" type="button" data-toggle-mute>
+          ${icon(mine?.muted ? "bell-ring" : "bell", { size: 15 })}
+          <span>${mine?.muted ? "Unmute notifications" : "Mute notifications"}</span>
+          <span class="hub-info-switch${mine?.muted ? " is-on" : ""}" aria-hidden="true"></span>
+        </button>
+        ${detail.canManage ? `<button class="hub-info-row" type="button" data-edit-group>${icon("square-pen", { size: 15 })}<span>Edit description</span></button>` : ""}
+        ${
+          detail.isOwner
+            ? ""
+            : `<button class="hub-info-row is-danger" type="button" data-leave-group>${icon("log-out", { size: 15 })}<span>Leave group</span></button>`
+        }
+      </div>
+
+      <div class="hub-info-section">
+        <div class="hub-info-label">Members <span class="hub-info-count">${members.length}</span></div>
+        <div class="hub-member-strip">
+          ${members
+            .slice(0, 8)
+            .map(
+              (member) => `<button class="hub-member-chip" type="button" data-profile="${esc(
+                member.username || ""
+              )}" title="${esc(member.name || member.username || "Member")} · ${
+                ROLE_LABEL[member.role] || "Member"
+              }">
+                ${avatarMarkup({ name: member.name, avatarUrl: member.avatarUrl, alt: "" })}
+              </button>`
+            )
+            .join("")}
+          ${members.length > 8 ? `<span class="hub-member-more">+${members.length - 8}</span>` : ""}
+        </div>
+        <button class="hub-info-link" type="button" data-open-members>See all members ${icon("chevron-right", { size: 12 })}</button>
+      </div>
+
+      <div class="hub-info-section">
+        <div class="hub-info-label">Group media <span class="hub-info-count">${media.length}</span></div>
+        ${
+          media.length
+            ? `<div class="hub-media-grid">${media
+                .slice(0, 6)
+                .map(
+                  (file) => `<button class="hub-media-cell" type="button" data-media="${esc(file.path)}">
+                      <img alt="${esc(file.name || "Picture")}" data-media-src="${esc(file.path)}" />
+                    </button>`
+                )
+                .join("")}</div>
+              ${media.length > 6 ? `<button class="hub-info-link" type="button" data-open-media>See all ${media.length}</button>` : ""}`
+            : `<p class="hub-info-desc">Pictures shared in this group will appear here.</p>`
+        }
+      </div>`;
+
+    /* Media thumbnails are signed one by one; a grid of broken images is worse
+       than a grid that fills in a moment late. */
+    for (const img of infoCol.querySelectorAll("[data-media-src]")) {
+      const path = img.getAttribute("data-media-src");
+      attachmentUrl(path).then((url) => {
+        if (url) img.src = url;
+        else img.closest(".hub-media-cell")?.classList.add("is-broken");
+      });
+    }
+  }
 
   /* ------------------------------------------------------------- group info */
   function memberRow(member) {
@@ -1107,6 +1507,9 @@ function insertAtCaret(field, text, start, end) {
 
   /* ------------------------------------------------------------------ events */
   delegate(listEl, "click", "[data-group]", (_event, button) => open(button.getAttribute("data-group")));
+  delegate(channelsEl, "click", "[data-channel]", (_event, button) =>
+    openChannel(button.getAttribute("data-channel"))
+  );
   on(infoBtn, "click", openInfo);
 
   on(qs("#grp-refresh", wrap), "click", async () => {
@@ -1151,6 +1554,163 @@ function insertAtCaret(field, text, start, end) {
   on(qs("#grp-new", wrap), "click", createGroup);
   delegate(messagesEl, "click", "[data-new-group]", createGroup);
 
+  /* ------------------------------------------------------------------ pin */
+
+  /**
+   * Read the group's single pin and show the bar under the header.
+   *
+   * A pin survives as long as the message does — the column is
+   * `on delete set null` — so a bar with nothing behind it means nothing is
+   * pinned, not that something broke.
+   */
+  async function loadPin() {
+    pinned = null;
+    pinEl.hidden = true;
+    if (!detail) return;
+    try {
+      pinned = await rpc("group_pinned", { p_group: detail.id });
+    } catch {
+      pinned = null;
+    }
+    paintPin();
+  }
+
+  function paintPin() {
+    if (!pinned) {
+      pinEl.hidden = true;
+      pinTextEl.textContent = "";
+      pinClearEl.hidden = true;
+      return;
+    }
+    pinEl.hidden = false;
+    const body = String(pinned.body || "").trim();
+    pinTextEl.textContent = body ? oneLine(body, 120) : "(message removed)";
+    pinTextEl.setAttribute("data-focus", pinned.id);
+    pinClearEl.hidden = !detail?.canManage;
+  }
+
+  async function setPin(messageId) {
+    if (!detail) return;
+    try {
+      if (messageId) await rpc("group_pin", { p_group: detail.id, p_message: messageId });
+      else await rpc("group_unpin", { p_group: detail.id });
+      await loadPin();
+      await paintThread(lastThread);
+      toast({ title: messageId ? "Message pinned" : "Unpinned" }, { tone: "success" });
+    } catch (error) {
+      toastError(error);
+    }
+  }
+
+  /* --------------------------------------------------------------- search */
+
+  async function runSearch() {
+    const needle = searchInput.value.trim();
+    if (!detail || needle.length < 2) {
+      searchResults.hidden = true;
+      searchResults.innerHTML = "";
+      return;
+    }
+    try {
+      const rows = await rpc("group_messages_search", {
+        p_group: detail.id,
+        p_query: needle,
+        p_limit: 30
+      });
+      const list = Array.isArray(rows) ? rows : [];
+      searchResults.hidden = false;
+      searchResults.innerHTML = list.length
+        ? list
+            .map(
+              (row) => `<button class="hub-search-hit" type="button" role="listitem" data-search-hit="${esc(row.id)}">
+                <span class="hub-search-hit-who">${esc(row.authorName || "Member")} · ${esc(dateTime(row.createdAt))}</span>
+                <span class="hub-search-hit-body">${esc(oneLine(row.body || "", 140))}</span>
+              </button>`
+            )
+            .join("")
+        : `<div class="chat-empty-line">No message in this group contains “${esc(needle)}”.</div>`;
+    } catch (error) {
+      searchResults.hidden = false;
+      searchResults.innerHTML = `<div class="chat-empty-line">${esc(error?.message || "Search failed.")}</div>`;
+    }
+  }
+
+  function closeSearch() {
+    searchPanel.hidden = true;
+    searchResults.hidden = true;
+    searchResults.innerHTML = "";
+    searchInput.value = "";
+  }
+
+  /* ------------------------------------------------ the details panel actions */
+
+  delegate(infoCol, "click", "[data-add-people]", () => openAddPeople());
+  delegate(infoCol, "click", "[data-edit-group]", () => openEdit());
+  delegate(infoCol, "click", "[data-open-members]", () => openInfo());
+  delegate(infoCol, "click", "[data-open-media]", () => openInfo());
+  delegate(infoCol, "click", "[data-profile]", (_event, button) => {
+    const handle = button.getAttribute("data-profile");
+    if (handle) openProfile(handle);
+  });
+
+  delegate(infoCol, "click", "[data-toggle-mute]", async () => {
+    const mine = (detail?.members || []).find((row) => row.userId === me);
+    if (!mine || !detail) return;
+    try {
+      await rpc("group_set_muted", { p_group: detail.id, p_muted: !mine.muted });
+      await open(detail.id);
+      await loadList();
+    } catch (error) {
+      toastError(error);
+    }
+  });
+
+  delegate(infoCol, "click", "[data-leave-group]", async () => {
+    if (!detail) return;
+    const yes = await confirmDialog({
+      title: "Leave this group?",
+      desc: "You will stop receiving its messages and notifications.",
+      confirmLabel: "Leave"
+    });
+    if (!yes) return;
+    try {
+      const leftId = detail.id;
+      await rpc("group_leave", { p_group: leftId });
+      detail = null;
+      active = null;
+      infoCol.innerHTML = `<div class="hub-info-empty">You left that group.</div>`;
+      await loadList();
+      if (groups.length) await open(groups[0].id);
+      else {
+        paintHead(null);
+        paintEmptyGroups();
+      }
+    } catch (error) {
+      toastError(error);
+    }
+  });
+
+  on(infoCol, "click", async (event) => {
+    const cell = event.target.closest?.("[data-media]");
+    if (!cell) return;
+    const url = await attachmentUrl(cell.getAttribute("data-media"));
+    if (url) window.open(url, "_blank", "noopener");
+  });
+
+  on(infoCol, "change", async (event) => {
+    if (event.target.id !== "hub-picture-inline") return;
+    const file = event.target.files?.[0];
+    if (!file || !detail) return;
+    try {
+      await uploadPicture(file);
+      await open(detail.id);
+      await loadList();
+      toast({ title: "Group picture updated" }, { tone: "success" });
+    } catch (error) {
+      toastError(error);
+    }
+  });
+
   /* Mention chips open the person's profile. `@everyone` has nobody to open. */
   delegate(messagesEl, "click", ".mention[data-mention]", (_event, chip) => {
     const key = chip.getAttribute("data-mention");
@@ -1162,7 +1722,9 @@ function insertAtCaret(field, text, start, end) {
   try {
     const { data } = await sb.auth.getUser();
     me = data?.user?.id || null;
-    await loadList();
+    /* Channels and groups are both in the left rail, so they are read together:
+       a rail that fills in two stages looks broken for a moment. */
+    await Promise.all([loadList(), loadChannels()]);
     /* Another window (or the notification layer in this one) saw a group
        message. Reload the list so unread counts are honest, and only re-render
        a thread the member is actually looking at. */
@@ -1186,6 +1748,11 @@ function insertAtCaret(field, text, start, end) {
       ringDismiss?.();
     };
 
+    const wantedChannel = options.channel && channels.find((row) => row.slug === options.channel);
+    if (wantedChannel) {
+      await openChannel(wantedChannel.slug);
+      return { open, openChannel, refresh: loadList };
+    }
     const wanted = options.groupId && groups.find((group) => group.id === options.groupId);
     if (wanted) await open(wanted.id, options.messageId || null);
     else if (groups.length) await open(groups[0].id, options.messageId || null);
