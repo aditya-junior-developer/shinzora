@@ -170,6 +170,40 @@ test("app code never paints text with an inline literal white", async () => {
   assert.deepEqual(offenders, [], `inline white text: ${offenders.join(", ")}`);
 });
 
+test("status colours come from the theme, not from a dark-theme literal", async () => {
+  /* The same defect as white text: a pale red/green/amber chosen against a dark
+     page is unreadable on a near-white one. 40 such literals were in badges,
+     danger buttons, notice flags and the call failure line. `--ok`, `--warn`,
+     `--danger` and `--info` are defined per tone; these files must use them. */
+  const themed = ["app.css", "admin.css", "components.css", "views.css", "onboarding.css"];
+  const allowed = [".btn-primary", ":root[data-tone=\"light\"] .btn-primary", ".choice-mark", ".avatar",
+    "grp-head-avatar", ".call-avatar", "obs-marker", "gc-check", "pp-badge", ".check .box svg",
+    "track-dot", ".cm-send", ".skip-link",
+    /* solid fills in every tone: --violet, --grad-brand */
+    "dot-badge", "admin-avatar", "pp-flag"];
+  const offenders = [];
+  for (const name of themed) {
+    const css = await readFile(path.join(repo, "public/css", name), "utf8");
+    const lines = css.split("\n");
+    for (let index = 0; index < lines.length; index += 1) {
+      const match = lines[index].match(/(^|[;{\s])color:\s*(#[0-9a-fA-F]{3,8})\s*;/);
+      if (!match) continue;
+      let start = index;
+      while (start > 0 && !/^[.#:@\[a-z*]/i.test(lines[start])) start -= 1;
+      const selector = lines[start].trim();
+      if (selector.includes("btn-primary") || allowed.some((a) => selector.includes(a))) continue;
+      offenders.push(`${name}: ${selector} (${match[2]})`);
+    }
+  }
+  assert.deepEqual(offenders, [], `literal colours on themed surfaces: ${offenders.join(", ")}`);
+});
+
+test("the call failure line and the call diagnostics follow the theme", async () => {
+  const css = await readFile(path.join(repo, "public/css/views.css"), "utf8");
+  assert.match(css, /\.call-notice\.is-bad \{[^}]*var\(--danger\)/, "the failure notice uses --danger");
+  assert.match(css, /\.call-diag \{/, "the ICE diagnostics strip is styled");
+});
+
 test("no view links to a hash route the router cannot serve", async () => {
   /* The freelancer dashboard's "Add skills" and every other button on it used
      `#/app/?view=…`. This router never handled hash paths, so the click changed

@@ -47,7 +47,9 @@
     "test:functions:remote": "node scripts/smoke-functions.mjs --remote",
     "test:fn-unit": "deno test --allow-env supabase/functions/_shared/gemini.test.ts",
     "gallery": "node scripts/build-gallery.mjs",
-    "test:groups": "node tests/groups-rbac.test.mjs && node tests/groups-push.test.mjs && node tests/groups-files.test.mjs && node tests/groups-view.test.mjs && node tests/calls.test.mjs"
+    "test:groups": "node tests/groups-rbac.test.mjs && node tests/groups-push.test.mjs && node tests/groups-files.test.mjs && node tests/groups-view.test.mjs && node tests/calls.test.mjs",
+    "test:call": "node tests/call-negotiation.mjs",
+    "turn:check": "node scripts/turn-check.mjs"
   },
   "keywords": [
     "shinzora",

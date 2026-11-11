@@ -246,3 +246,43 @@ test("a call notification does not ring for the call this tab is already in", as
   assert.match(surface, /setActiveCallTopic\(call\.state\.topic\)/, "opening a call marks its topic");
   assert.match(surface, /setActiveCallTopic\(null\)/, "leaving it clears the mark");
 });
+
+/* --------------------------------------------------------- the negotiation */
+
+test("ICE candidates are queued until there is a remote description", async () => {
+  /* addIceCandidate() before setRemoteDescription() rejects with
+     InvalidStateError; every rejection used to be swallowed, so each side threw
+     away the other's addresses and the call showed tiles and carried nothing. */
+  const engine = await readFile(path.join(repo, "public/js/modules/messaging/webrtc.js"), "utf8");
+  assert.match(engine, /function queueCandidate/, "candidates are queued");
+  assert.match(engine, /pendingCandidates\.push\(candidate\)/, "the queue is filled");
+  assert.match(engine, /function flushCandidates/, "the queue is drained once a remote description exists");
+  assert.match(engine, /await flushCandidates\(entry\)/, "drained when the remote description is applied");
+  /* and never applied straight away */
+  assert.equal(/\n\s*connection\.addIceCandidate\(new RTCIceCandidate\(payload\.candidate\)\)\.catch/.test(engine), false,
+    "no candidate is applied before the remote description exists");
+});
+
+test("only one side offers, so two peers cannot glare", async () => {
+  const engine = await readFile(path.join(repo, "public/js/modules/messaging/webrtc.js"), "utf8");
+  /* The newcomer waits for the offer instead of making one. */
+  const here = engine.slice(engine.indexOf('message.event === "here"'), engine.indexOf('message.event === "offer"'));
+  assert.match(here, /fallbackTimer/, "the newcomer waits, with a fallback");
+  /* Any offer the newcomer makes has to be inside the fallback timer. */
+  const firstOffer = here.search(/callPeer\(/);
+  const timer = here.search(/setTimeout\(/);
+  assert.ok(firstOffer > 0, "the newcomer can still offer eventually");
+  assert.ok(timer > 0 && timer < firstOffer, "but only after the fallback delay");
+  /* And a peer with an offer in flight cannot make another. */
+  assert.match(engine, /if \(entry\.offered \|\| entry\.answered\) return;/, "one offer per peer");
+});
+
+test("the call asks the server for a relay before building a peer connection", async () => {
+  const engine = await readFile(path.join(repo, "public/js/modules/messaging/webrtc.js"), "utf8");
+  const joinIndex = engine.indexOf("await prepareRelay()");
+  const channelIndex = engine.indexOf("channel = sb.channel(topic");
+  assert.ok(joinIndex > 0, "prepareRelay is called in join()");
+  assert.ok(channelIndex > joinIndex, "and before the channel and the peer connections exist");
+  assert.match(engine, /functions\.invoke\("turn-credentials"/, "the relay comes from the turn-credentials function");
+  assert.match(engine, /stun:stun\.cloudflare\.com:3478/, "more than one STUN resolver");
+});

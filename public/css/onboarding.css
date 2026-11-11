@@ -660,8 +660,8 @@
 }
 .ob-handle .input { padding-left: 30px; }
 
-.field-hint.is-ok { color: #34d399; }
-.field-hint.is-warn { color: #fbbf24; }
+.field-hint.is-ok { color: var(--ok); }
+.field-hint.is-warn { color: var(--warn); }
 .field-hint.is-muted { color: var(--text-dim); }
 
 .ob-check {

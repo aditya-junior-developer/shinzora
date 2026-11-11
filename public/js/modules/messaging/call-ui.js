@@ -18,7 +18,7 @@
 import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { avatarMarkup } from "../../lib/avatar.js";
-import { toastError } from "../../ui/toast.js";
+import { toast, toastError } from "../../ui/toast.js";
 import { connectedTone, endedTone } from "./ringtone.js";
 import { stopCallRinging, setActiveCallTopic } from "../../ui/notify.js";
 
@@ -75,6 +75,7 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
 
     <div class="call-stage" id="call-stage"></div>
     <div class="call-notice" id="call-notice" hidden></div>
+    <div class="call-diag" id="call-diag" hidden></div>
 
     <footer class="call-controls">
       <button class="call-btn" type="button" data-call-mute aria-pressed="false" title="Microphone">
@@ -99,6 +100,7 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
 
   const stage = qs("#call-stage", wrap);
   const notice = qs("#call-notice", wrap);
+  const diag = qs("#call-diag", wrap);
   const timerEl = qs("#call-timer", wrap);
   const muteBtn = qs("[data-call-mute]", wrap);
   const cameraBtn = qs("[data-call-camera]", wrap);
@@ -192,7 +194,9 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
     } else if (state.status === "connecting") {
       notice.hidden = false;
       notice.className = "call-notice";
-      notice.innerHTML = `${icon("loader-circle", { size: 14 })}<span>Connecting…</span>`;
+      notice.innerHTML = `${icon("loader-circle", { size: 14 })}<span>Connecting…${
+        state.relay?.kind === "none" ? " Direct connection only — no relay is set up for this deployment." : ""
+      }</span>`;
     } else if (peerCount === 0) {
       notice.hidden = false;
       notice.className = "call-notice";
@@ -203,6 +207,22 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
       }</span>`;
     } else {
       notice.hidden = true;
+    }
+
+    /* A call that will not connect is much easier to fix when the panel says
+       what ICE actually gathered: a direct address, a public address, or a
+       relay. "Failed" alone is not a diagnosis. */
+    const relay = state.relay || { kind: "none" };
+    const cand = state.candidates || { host: 0, srflx: 0, relay: 0 };
+    const gathered = `host ${cand.host || 0} · public ${cand.srflx || 0} · relay ${cand.relay || 0}`;
+    diag.hidden = !(state.status === "live" || state.status === "failed" || peerCount > 0);
+    if (!diag.hidden) {
+      diag.innerHTML =
+        `<span>${icon("activity", { size: 12 })}Relay: <b>${esc(relay.kind)}</b> · ICE ${esc(gathered)}</span>` +
+        (relay.kind === "none"
+          ? `<span class="call-diag-hint">Direct connections only — across two different networks this needs a relay.</span>`
+          : "") +
+        `<button class="btn btn-ghost btn-sm" type="button" data-call-copy>Copy</button>`;
     }
 
     /* Level meter on your own voice tile. A silent call looks like a broken
@@ -265,6 +285,24 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
       button.textContent = "Retry";
     }
   });
+  delegate(diag, "click", "[data-call-copy]", async () => {
+    const state = call.state;
+    const report = [
+      `relay: ${state.relay?.kind || "none"}${state.relay?.reason ? ` (${state.relay.reason})` : ""}`,
+      `ice: host ${state.candidates?.host || 0}, public ${state.candidates?.srflx || 0}, relay ${state.candidates?.relay || 0}`,
+      `status: ${state.status}`,
+      `peers: ${state.peers?.length || 0}`,
+      `kind: ${state.kind}`,
+      `error: ${state.error || "-"}`
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(report);
+      toast({ title: "Copied", message: "Paste this wherever you are reporting the call." });
+    } catch {
+      toastError(new Error("The clipboard is blocked in this browser."));
+    }
+  });
+
   on(qs("[data-call-minimise]", wrap), "click", () => {
     minimised = !minimised;
     wrap.classList.toggle("is-minimised", minimised);

@@ -101,7 +101,17 @@ function installBrowser({ refuseSubscribe = false } = {}) {
     getSenders() { return this.senders; }
     async createOffer() { log.offers += 1; return { type: "offer", sdp: "v=0 offer" }; }
     async createAnswer() { log.answers += 1; return { type: "answer", sdp: "v=0 answer" }; }
-    async setLocalDescription(description) { this.localDescription = description; }
+    /* The real API moves the signalling state forward here, and the engine
+       depends on it: an answer may only be applied while we have a local offer
+       outstanding, and a rollback returns the connection to stable. A fake that
+       left the state at "stable" would pass a broken engine. */
+    async setLocalDescription(description) {
+      this.localDescription = description;
+      const type = description?.type;
+      if (type === "offer") this.signalingState = "have-local-offer";
+      else if (type === "answer") this.signalingState = "stable";
+      else if (type === "rollback") this.signalingState = "stable";
+    }
     async setRemoteDescription(description) { this.remoteDescription = description; this.signalingState = "stable"; }
     async addIceCandidate(candidate) { log.ice.push(candidate); }
     addEventListener(name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); }

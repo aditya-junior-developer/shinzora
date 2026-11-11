@@ -104,7 +104,7 @@
 .btn-danger {
   background: rgba(251, 113, 133, 0.14);
   border-color: rgba(251, 113, 133, 0.34);
-  color: #ffc2cb;
+  color: var(--danger);
 }
 .btn-danger:hover {
   background: rgba(251, 113, 133, 0.22);
@@ -114,7 +114,7 @@
 .btn-success {
   background: rgba(52, 211, 153, 0.14);
   border-color: rgba(52, 211, 153, 0.32);
-  color: #a7f3d0;
+  color: var(--ok);
 }
 .btn-success:hover {
   background: rgba(52, 211, 153, 0.22);
@@ -657,22 +657,22 @@
   background: currentColor;
 }
 .badge-ok {
-  color: #6ee7b7;
+  color: var(--ok);
   background: var(--ok-dim);
   border-color: rgba(52, 211, 153, 0.26);
 }
 .badge-warn {
-  color: #fcd34d;
+  color: var(--warn);
   background: var(--warn-dim);
   border-color: rgba(251, 191, 36, 0.26);
 }
 .badge-danger {
-  color: #fda4af;
+  color: var(--danger);
   background: var(--danger-dim);
   border-color: rgba(251, 113, 133, 0.26);
 }
 .badge-info {
-  color: #93c5fd;
+  color: var(--info);
   background: var(--info-dim);
   border-color: rgba(96, 165, 250, 0.26);
 }
@@ -959,10 +959,10 @@
   color: var(--lavender);
 }
 .menu-item-danger {
-  color: #fda4af;
+  color: var(--danger);
 }
 .menu-item-danger .ico {
-  color: #fda4af;
+  color: var(--danger);
 }
 .menu-item-danger:hover {
   background: rgba(251, 113, 133, 0.14);
@@ -1154,31 +1154,31 @@
 .alert-info {
   border-color: rgba(96, 165, 250, 0.3);
   background: rgba(96, 165, 250, 0.08);
-  color: #cfe4ff;
+  color: var(--info);
 }
 .alert-info .ico { color: var(--info); }
 .alert-warn {
   border-color: rgba(251, 191, 36, 0.3);
   background: rgba(251, 191, 36, 0.07);
-  color: #fde9b8;
+  color: var(--warn);
 }
 .alert-warn .ico { color: var(--warn); }
 .alert-danger {
   border-color: rgba(251, 113, 133, 0.32);
   background: rgba(251, 113, 133, 0.08);
-  color: #ffd6dc;
+  color: var(--danger);
 }
 .alert-danger .ico { color: var(--danger); }
 .alert-ok {
   border-color: rgba(52, 211, 153, 0.3);
   background: rgba(52, 211, 153, 0.07);
-  color: #c8f7e4;
+  color: var(--ok);
 }
 .alert-ok .ico { color: var(--ok); }
 .alert-violet {
   border-color: var(--line-violet);
   background: rgba(124, 58, 237, 0.1);
-  color: #ddd0ff;
+  color: var(--violet-soft);
 }
 .alert-violet .ico { color: var(--violet-soft); }
 

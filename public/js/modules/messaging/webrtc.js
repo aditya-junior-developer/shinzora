@@ -30,9 +30,30 @@ import { releaseTopic } from "../../lib/live-channel.js";
 
 const MAX_PEERS = 6;
 
-/** ICE servers: public STUN, plus TURN only when it has been configured. */
+/* --------------------------------------------------------------- ICE servers */
+
+/* STUN is free, unlimited, and enough when two people can reach each other.
+   Several public resolvers rather than one, because a single blocked host is
+   the difference between a call that connects and one that does not. */
+const STUN_URLS = [
+  "stun:stun.l.google.com:19302",
+  "stun:stun1.l.google.com:19302",
+  "stun:stun.cloudflare.com:3478",
+  "stun:stun.nextcloud.com:3478"
+];
+
+/* A TURN server minted for this session by the `turn-credentials` function.
+   Kept in memory only, with the expiry, so a long meeting refreshes it instead
+   of failing when the credential ages out. */
+let relay = { iceServers: [], expiresAt: 0, kind: "none", reason: null };
+let relayPending = null;
+
+/** ICE servers: public STUN, plus a relay when one is configured. */
 export function iceServers() {
-  const servers = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+  const servers = [{ urls: [...STUN_URLS] }];
+
+  /* A deployment that sets its own TURN url in the environment wins: no
+     function, no minting, no expiry to think about. */
   const url = env.turnUrl;
   if (url) {
     servers.push({
@@ -40,11 +61,59 @@ export function iceServers() {
       username: env.turnUser || undefined,
       credential: env.turnCredential || undefined
     });
+    return servers;
   }
+
+  for (const entry of relay.iceServers) servers.push(entry);
   return servers;
 }
 
-export const turnConfigured = () => Boolean(env.turnUrl);
+/** Is a relay actually available right now? Drives the honest UI line. */
+export const turnConfigured = () => Boolean(env.turnUrl) || relay.iceServers.length > 0;
+
+/** What the call surface and the diagnostics panel report. */
+export const relayState = () => ({ kind: env.turnUrl ? "environment" : relay.kind, reason: relay.reason });
+
+/**
+ * Ask the server for a relay credential, at most once per session (and again
+ * when the previous one is close to expiring).
+ *
+ * Failure is not fatal and never silent: a call with STUN only still works
+ * between most home networks, and the UI says which of the two it got.
+ */
+export async function prepareRelay() {
+  if (env.turnUrl) return { kind: "environment", iceServers: [] };
+  if (relay.iceServers.length && Date.now() < relay.expiresAt - 60000) return relayState();
+  if (relayPending) return relayPending;
+
+  relayPending = (async () => {
+    try {
+      const { data, error } = await sb.functions.invoke("turn-credentials", { method: "POST", body: {} });
+      if (error) throw error;
+      const list = Array.isArray(data?.iceServers) ? data.iceServers : [];
+      const usable = list.filter((entry) => entry && entry.urls);
+      relay = usable.length
+        ? {
+            iceServers: usable.map((entry) => ({
+              urls: entry.urls,
+              username: entry.username || undefined,
+              credential: entry.credential || undefined
+            })),
+            expiresAt: Date.now() + Math.max(300, Number(data?.ttl) || 3600) * 1000,
+            kind: data?.relay || "turn",
+            reason: null
+          }
+        : { iceServers: [], expiresAt: 0, kind: "none", reason: data?.reason || "not_configured" };
+    } catch (error) {
+      relay = { iceServers: [], expiresAt: 0, kind: "none", reason: String(error?.message || "unreachable") };
+    } finally {
+      relayPending = null;
+    }
+    return relayState();
+  })();
+
+  return relayPending;
+}
 
 /**
  * @typedef {object} CallOptions
@@ -70,6 +139,11 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
     cameraOn: kind === "video",
     screenSharing: false,
     peers: new Map(), // userId -> { name, stream, connection, state }
+    /* What ICE actually managed to gather, per candidate type. A call that
+       fails with zero relay candidates and strict NATs on both sides is a
+       diagnosis, not a mystery — the surface can say so. */
+    candidates: { host: 0, srflx: 0, prflx: 0, relay: 0 },
+    relay: relayState(),
     startedAt: null,
     error: null,
     limitReached: false
@@ -234,9 +308,73 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
   function peerEntry(userId, name = "Someone") {
     if (!state.peers.has(userId)) {
-      state.peers.set(userId, { name, stream: null, connection: null, state: "new", remoteAudio: null });
+      state.peers.set(userId, {
+        name,
+        stream: null,
+        connection: null,
+        state: "new",
+        remoteAudio: null,
+        /* ICE candidates that arrived before the remote description existed.
+           Dropping them is silent and fatal — see queueCandidate(). */
+        pendingCandidates: [],
+        remoteReady: false,
+        offered: false,
+        answered: false
+      });
     }
     return state.peers.get(userId);
+  }
+
+  /**
+   * Hold an ICE candidate until the remote description is applied.
+   *
+   * `addIceCandidate()` before `setRemoteDescription()` rejects with
+   * InvalidStateError, and every one of those rejections used to be swallowed:
+   * both sides gathered addresses, neither side kept the other's, and the call
+   * showed its tiles and never carried a frame. This is the most common way a
+   * WebRTC call "connects" without connecting.
+   */
+  function queueCandidate(entry, candidate) {
+    if (!candidate) return;
+    if (!entry.remoteReady || !entry.connection?.remoteDescription) {
+      entry.pendingCandidates.push(candidate);
+      return;
+    }
+    entry.connection.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+  }
+
+  async function flushCandidates(entry) {
+    if (!entry.connection?.remoteDescription) return;
+    entry.remoteReady = true;
+    const queued = entry.pendingCandidates.splice(0);
+    for (const candidate of queued) {
+      try {
+        await entry.connection.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch {
+        /* a candidate the peer has already forgotten — the rest still apply */
+      }
+    }
+  }
+
+  /**
+   * The sentence a failed connection deserves.
+   *
+   * "Connection failed" sends people to their Wi-Fi settings. The truth is
+   * narrower: either the two networks cannot see each other and there is no
+   * relay between them, or there is one and it did not answer.
+   */
+  function connectionHint() {
+    const relay = relayState();
+    const gathered = state.candidates;
+    if (relay.kind === "none") {
+      return gathered.relay > 0
+        ? "The relay answered but the call did not connect. Press Retry."
+        : "These two networks cannot reach each other directly, and no relay (TURN) is set up on this deployment. On the same Wi-Fi this works; across networks it needs a relay. Press Retry, or join from the same network.";
+    }
+    if (gathered.relay === 0) {
+      return `A relay is configured (${relay.kind}) but no relay address was gathered, so it could not be used. Check the relay credentials, then press Retry.`;
+    }
+    return "The call could not connect through the relay. Press Retry — this is usually a momentary network problem.";
   }
 
   function newConnection(userId, name) {
@@ -249,7 +387,11 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
     for (const track of localStream?.getTracks() || []) connection.addTrack(track, localStream);
 
     connection.onicecandidate = (event) => {
-      if (event.candidate) send("ice", { to: userId, candidate: event.candidate.toJSON() });
+      if (!event.candidate) return;
+      const type = event.candidate.type || "host";
+      if (type in state.candidates) state.candidates[type] += 1;
+      emit();
+      send("ice", { to: userId, candidate: event.candidate.toJSON() });
     };
 
     connection.ontrack = (event) => {
@@ -265,8 +407,10 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       emit();
       if (connection.connectionState === "failed") {
         /* One failed peer is a network problem between two people, not the end
-           of the call: the others can still hear you. Say so on that tile. */
+           of the call: the others can still hear you. Say so on that tile,
+           and say which kind of problem it is. */
         entry.state = "failed";
+        state.error = connectionHint();
         emit();
       }
     };
@@ -290,20 +434,53 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       emit();
       return;
     }
+    const entry = peerEntry(userId, name);
+    /* One offer per peer per call. A second offer while the first is in flight
+       is glare: both sides end up in "have-local-offer" and neither can answer. */
+    if (entry.offered || entry.answered) return;
+    entry.offered = true;
+
     const connection = newConnection(userId, name);
-    const offer = await connection.createOffer();
-    await connection.setLocalDescription(offer);
-    send("offer", { to: userId, sdp: connection.localDescription });
+    try {
+      const offer = await connection.createOffer();
+      await connection.setLocalDescription(offer);
+      send("offer", { to: userId, sdp: connection.localDescription });
+    } catch (error) {
+      entry.offered = false;
+      state.error = error?.message || "The call could not be started.";
+      emit();
+    }
   }
 
   async function answerPeer(userId, name, sdp) {
+    const entry = peerEntry(userId, name);
+
+    /* The same offer twice is harmless to ignore; answering it twice is not. */
+    if (entry.answered && entry.connection?.remoteDescription) return;
+    entry.answered = true;
+
     const connection = newConnection(userId, name);
-    await connection.setRemoteDescription(new RTCSessionDescription(sdp));
-    const answer = await connection.createAnswer();
-    await connection.setLocalDescription(answer);
-    send("answer", { to: userId, sdp: connection.localDescription });
-    /* The newcomer already has our tracks; we need theirs, which arrive with the
-       offer's transceivers once the answer is applied. */
+    try {
+      /* If we had already produced our own offer, step back before taking
+         theirs — the polite side of perfect negotiation. */
+      if (connection.signalingState === "have-local-offer") {
+        try {
+          await connection.setLocalDescription({ type: "rollback" });
+        } catch {
+          /* older browsers roll back implicitly in setRemoteDescription */
+        }
+      }
+      await connection.setRemoteDescription(new RTCSessionDescription(sdp));
+      await flushCandidates(entry);
+      const answer = await connection.createAnswer();
+      await connection.setLocalDescription(answer);
+      send("answer", { to: userId, sdp: connection.localDescription });
+      /* The newcomer already has our tracks; we need theirs, which arrive with
+         the offer's transceivers once the answer is applied. */
+    } catch (error) {
+      entry.answered = false;
+      throw error;
+    }
   }
 
   /* ------------------------------------------------------- signalling */
@@ -321,7 +498,10 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       const peer = peerEntry(from, payload.name || "Someone");
 
       if (message.event === "hello") {
-        /* Somebody joined: tell them who is already here and offer to them. */
+        /* Somebody joined: tell them who is already here, and offer to them.
+           Only the side that was already in the room offers — that is the whole
+           tie-break. Both sides offering was glare, and glare is why two people
+           could sit in the same room and never see each other. */
         send("here", { to: from });
         if (state.status === "live" || state.status === "connecting") {
           callPeer(from, peer.name).catch(() => {});
@@ -330,12 +510,19 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       }
 
       if (message.event === "here") {
-        /* We joined and found them first — offer, so exactly one side calls. */
-        callPeer(from, peer.name).catch(() => {});
+        /* We are the newcomer: wait for their offer, and only offer ourselves if
+           nothing arrives. Two offers at once is the bug this replaces. */
+        if (peer.offered || peer.answered) return;
+        clearTimeout(peer.fallbackTimer);
+        peer.fallbackTimer = setTimeout(() => {
+          if (peer.answered || peer.connection?.remoteDescription) return;
+          callPeer(from, peer.name).catch(() => {});
+        }, 4000);
         return;
       }
 
       if (message.event === "offer") {
+        clearTimeout(peer.fallbackTimer);
         answerPeer(from, peer.name, payload.sdp).catch((error) => {
           setStatus("failed", error?.message || "The connection could not be answered.");
         });
@@ -344,17 +531,22 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
       if (message.event === "answer") {
         const connection = peer.connection;
-        if (connection && connection.signalingState !== "stable") {
-          connection.setRemoteDescription(new RTCSessionDescription(payload.sdp)).catch(() => {});
-        }
+        if (!connection) return;
+        /* An answer is only meaningful once we have made an offer. Applying it
+           in any other state throws and leaves the peer connection stuck. */
+        if (connection.signalingState !== "have-local-offer") return;
+        connection
+          .setRemoteDescription(new RTCSessionDescription(payload.sdp))
+          .then(() => flushCandidates(peer))
+          .catch((error) => {
+            setStatus("failed", error?.message || "The answer could not be applied.");
+          });
         return;
       }
 
       if (message.event === "ice") {
-        const connection = peer.connection;
-        if (connection && payload.candidate) {
-          connection.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(() => {});
-        }
+        /* Queued until there is a remote description to attach it to. */
+        queueCandidate(peer, payload.candidate);
         return;
       }
 
@@ -379,6 +571,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
   }
 
   function leavePeer(userId) {
+    clearTimeout(state.peers.get(userId)?.fallbackTimer);
     const entry = state.peers.get(userId);
     if (!entry) return;
     try {
@@ -404,6 +597,11 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
          back the channel it already stores under a topic, and adding handlers
          to that one throws (or never subscribes). */
       await releaseTopic(sb, topic);
+      /* A relay has to be known before the first peer connection is built:
+         ICE servers cannot be added to one that has already started gathering. */
+      await prepareRelay();
+      state.relay = relayState();
+      emit();
       channel = sb.channel(topic, { config: { private: true, broadcast: { self: false } } });
       bindChannel(channel);
 

@@ -204,7 +204,7 @@
   box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.18);
 }
 .sidebar-link.is-active .ico {
-  color: #e2d5ff;
+  color: var(--violet-soft);
 }
 .sidebar-link.is-active::before {
   content: "";
@@ -234,7 +234,7 @@
 .sidebar-link .link-badge.warn {
   background: rgba(251, 191, 36, 0.2);
   border-color: rgba(251, 191, 36, 0.35);
-  color: #fde68a;
+  color: var(--warn);
 }
 
 /* --------------------------------------------------------------------------
@@ -857,7 +857,7 @@ body.drawer-open {
   border: 1px solid rgba(251, 191, 36, 0.32);
   background: rgba(251, 191, 36, 0.07);
   font-size: var(--fs-sm);
-  color: #fbe7b4;
+  color: var(--warn);
   line-height: 1.55;
 }
 .setup-banner .ico {
