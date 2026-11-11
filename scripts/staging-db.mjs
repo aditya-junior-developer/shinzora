@@ -97,6 +97,47 @@ const SCAFFOLD = `
       create publication supabase_realtime;
     end if;
   end $$;
+
+  -- Supabase Vault: where 0038 keeps the shared secret the push trigger presents.
+  -- A bare PostgreSQL has no vault, so this is the smallest thing a migration
+  -- can call: create a secret, list its plaintext, nothing to unlock.
+  create schema if not exists vault;
+  create table if not exists vault.secrets (
+    id uuid primary key default gen_random_uuid(),
+    name text unique,
+    description text,
+    secret text,
+    created_at timestamptz not null default now()
+  );
+  create or replace view vault.decrypted_secrets as
+    select id, name, description, secret as decrypted_secret, created_at from vault.secrets;
+  create or replace function vault.create_secret(secret text, name text, description text default null)
+  returns uuid language sql as $$
+    insert into vault.secrets (secret, name, description) values (secret, name, description) returning id
+  $$;
+
+  -- pg_net: the outbound HTTP queue. The real extension performs the request;
+  -- this one records it, so a test can assert *what would have been sent* —
+  -- which is the part the trigger owns. Nothing is fetched either way.
+  create schema if not exists net;
+  create table if not exists net.requests (
+    id bigserial primary key,
+    url text not null,
+    headers jsonb not null default '{}'::jsonb,
+    body jsonb not null default '{}'::jsonb,
+    timeout_milliseconds integer,
+    at timestamptz not null default now()
+  );
+  create or replace function net.http_post(
+    url text,
+    headers jsonb default '{}'::jsonb,
+    body jsonb default '{}'::jsonb,
+    timeout_milliseconds integer default 5000
+  ) returns bigint language sql as $$
+    insert into net.requests (url, headers, body, timeout_milliseconds)
+    values (url, headers, body, timeout_milliseconds)
+    returning id
+  $$;
 `;
 
 /* ----------------------------------------------------------------- shims ---
@@ -110,6 +151,12 @@ const SHIMS = [
   {
     match: /create extension if not exists "?pgcrypto"?;/gi,
     replace: "-- [staging] pgcrypto shimmed: gen_random_uuid() has been core since PG13"
+  },
+  {
+    /* pg_net is a Supabase-managed extension. The scaffold above provides the
+       one function the migrations call, so the extension statement is skipped. */
+    match: /create extension if not exists pg_net with schema extensions;/gi,
+    replace: "-- [staging] pg_net shimmed: net.http_post() is a no-op in the scaffold"
   }
 ];
 

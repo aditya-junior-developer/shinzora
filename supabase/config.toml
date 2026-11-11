@@ -58,6 +58,13 @@ verify_jwt = true
 [functions.integrations]
 verify_jwt = true
 
+# Called by the database (a trigger on `notifications`), never by a browser.
+# There is no user JWT to verify, so authentication is the x-push-key shared
+# secret from Supabase Vault — checked with push_hook_ok(), which only the
+# service role may execute.
+[functions.push]
+verify_jwt = false
+
 [functions.admin]
 verify_jwt = true
 

@@ -38,6 +38,9 @@ const EXPECTATIONS = {
   payments: { auth: true },
   domains: { auth: true },
   integrations: { auth: true },
+  /* verify_jwt is off (the caller is a database trigger), so the shared secret
+     in x-push-key is what authenticates it. No key ⇒ 401. */
+  push: { auth: true },
   // A webhook is authenticated by an HMAC signature, not a session. With no
   // secret configured the honest answer is 503 "unconfigured", never 200.
   "payments-webhook": { auth: false, allow: [503] }
