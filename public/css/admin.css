@@ -225,6 +225,33 @@ body.drawer-open {
   color: var(--text-2);
 }
 
+/* The operator's own photo at the end of the bar. The holder is the circle, so
+   the image is clipped here instead of inside a second, differently-sized
+   avatar span. */
+#admin-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--grad-brand);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+#admin-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
 .admin-body {
   padding: var(--s-5);
   display: flex;

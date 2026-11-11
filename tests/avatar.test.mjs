@@ -30,7 +30,7 @@ const repo = path.resolve(here, "..");
 const read = (rel) => readFileSync(path.join(repo, rel), "utf8");
 
 const AVATAR = await import(pathToFileURL(path.join(repo, "public/js/lib/avatar.js")).href);
-const { avatarMarkup, usableAvatar } = AVATAR;
+const { avatarMarkup, avatarImage, paintAvatar, usableAvatar } = AVATAR;
 
 const PHOTO = "https://example.supabase.co/storage/v1/object/public/avatars/u/avatar-1.jpg";
 
@@ -94,7 +94,7 @@ const SURFACES = [
 for (const [file, label] of SURFACES) {
   test(`${label} draws the photo when there is one`, () => {
     const source = read(file);
-    assert.match(source, /avatarMarkup\(|avatar\(/, `${file} renders no avatar through the shared helper`);
+    assert.match(source, /avatarMarkup\(|paintAvatar\(|\bavatar\(/, `${file} renders no avatar through the shared helper`);
     /* Hand-rolled initials are exactly the bug: they cannot show a photo. */
     const body = source.replace(/\/\*[\s\S]*?\*\//g, "");
     assert.doesNotMatch(
@@ -107,8 +107,8 @@ for (const [file, label] of SURFACES) {
 
 test("components.avatar takes a photo URL", () => {
   const source = read("public/js/modules/dashboard/components.js");
-  assert.match(source, /export function avatar\(name, email, size = "", avatarUrl = null\)/);
-  assert.match(source, /avatarMarkup\(\{ name, email, avatarUrl, size \}\)/);
+  assert.match(source, /export function avatar\(name, email, size = "", avatarUrl = null, fit = "cover"\)/);
+  assert.match(source, /avatarMarkup\(\{ name, email, avatarUrl, size, fit \}\)/);
 });
 
 test("the shared renderer is one module, not a copy per screen", () => {
@@ -154,4 +154,90 @@ test("the logo card uses the name already typed on the page", () => {
   const settings = read("public/js/modules/dashboard/views/settings.js");
   assert.match(settings, /qs\("#biz-name"\)\?\.value\?\.trim\(\)/, "uploading a logo first is still a dead end");
   assert.match(settings, /if \(typed\) patch\.name = typed;/);
+});
+
+/* ------------------------------------------------- painted into a circle */
+
+test("paintAvatar fills the existing circle instead of nesting a second one", () => {
+  /* The bug this exists for: the topbar ships `<span class="avatar avatar-sm">`
+     and the code set its innerHTML to a whole avatar — a 34px circle inside a
+     26px one, clipped by the outer radius. The photo came out zoomed and pushed
+     off centre, with the brand gradient showing at the edge. */
+  const node = {
+    className: "avatar avatar-sm",
+    innerHTML: "SZ",
+    classList: {
+      state: new Set(),
+      toggle(name, on) { if (on) this.state.add(name); else this.state.delete(name); },
+      contains(name) { return this.state.has(name); }
+    }
+  };
+  paintAvatar(node, { name: "Aditya Sharma", avatarUrl: PHOTO });
+  assert.match(node.innerHTML, /^<img /, "the circle did not become the image");
+  assert.doesNotMatch(node.innerHTML, /<span class="avatar"/, "a second avatar was nested inside the first");
+  assert.equal(node.className, "avatar avatar-sm", "the element's own size class was replaced");
+  assert.doesNotMatch(node.innerHTML, />AS</, "the initials are still behind the photo");
+
+  paintAvatar(node, { name: "Aditya Sharma", avatarUrl: null });
+  assert.equal(node.innerHTML, "AS", "removing the photo did not restore the initials");
+});
+
+test("paintAvatar refuses an unsafe URL and escapes what it paints", () => {
+  const node = () => ({
+    innerHTML: "",
+    classList: { state: new Set(), toggle(n, on) { if (on) this.state.add(n); else this.state.delete(n); }, contains(n) { return this.state.has(n); } }
+  });
+  const unsafe = node();
+  paintAvatar(unsafe, { name: "A B", avatarUrl: "javascript:alert(1)" });
+  assert.equal(unsafe.innerHTML, "AB", "an unsafe URL reached the DOM");
+
+  const named = node();
+  paintAvatar(named, { name: 'Ann <script> Lee', avatarUrl: null });
+  assert.doesNotMatch(named.innerHTML, /<script>/, "the initials were not escaped");
+});
+
+test("the topbar and the sidebar paint in place, never nest", () => {
+  const shell = read("public/js/modules/dashboard/shell.js");
+  assert.match(shell, /paintAvatar\(wsAvatar,/, "the workspace badge still wraps another circle");
+  assert.match(shell, /paintAvatar\(accAvatar,/, "the account badge still wraps another circle");
+  /* Assigning a whole avatar into an element that is already one is the bug. */
+  assert.doesNotMatch(shell, /(wsAvatar|accAvatar)\.innerHTML = avatarMarkup\(/);
+
+  const admin = read("public/js/modules/admin/shell.js");
+  assert.match(admin, /paintAvatar\(host,/);
+  assert.doesNotMatch(admin, /host\.innerHTML = avatarMarkup\(/);
+});
+
+test("a business logo is contained, not cropped", () => {
+  const html = avatarMarkup({ name: "Klyro", avatarUrl: PHOTO, fit: "contain" });
+  assert.match(html, /class="avatar is-logo"/, "the logo modifier is missing");
+  /* A person keeps the crop. */
+  assert.doesNotMatch(avatarMarkup({ name: "A B", avatarUrl: PHOTO }), /is-logo/);
+  assert.match(read("public/js/modules/dashboard/shell.js"), /fit: "contain"/);
+  assert.match(read("public/css/components.css"), /\.avatar\.is-logo img\s*\{[^}]*object-fit:\s*contain/);
+});
+
+test("the image is centred and fills its circle", () => {
+  const css = read("public/css/components.css");
+  const rule = css.slice(css.indexOf(".avatar img {"), css.indexOf("}", css.indexOf(".avatar img {")));
+  assert.match(rule, /object-fit:\s*cover/);
+  assert.match(rule, /object-position:\s*center center/, "the crop is not centred, so a face can land in a corner");
+  assert.match(rule, /display:\s*block/, "an inline image sits a pixel low on its baseline");
+  assert.match(rule, /width:\s*100%/);
+  assert.match(rule, /height:\s*100%/);
+});
+
+test("the admin bar gives its photo a circle of its own", () => {
+  const css = read("public/css/admin.css");
+  const block = css.slice(css.indexOf("#admin-avatar {"), css.indexOf("}", css.indexOf("#admin-avatar {")));
+  assert.match(block, /border-radius:\s*50%/);
+  assert.match(block, /overflow:\s*hidden/);
+  assert.match(css, /#admin-avatar img\s*\{[^}]*object-position:\s*center center/);
+});
+
+test("avatarImage is only the image, for a caller that owns the circle", () => {
+  const html = avatarImage(PHOTO, "Profile photo");
+  assert.match(html, /^<img /);
+  assert.doesNotMatch(html, /<span/);
+  assert.match(html, /alt="Profile photo"/);
 });

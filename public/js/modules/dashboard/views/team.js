@@ -82,7 +82,7 @@ function paint(root) {
     })}
     <div class="team-head card">
       <div class="card-body team-head-body">
-        ${avatar(business.name, undefined, "lg", business.logo_url || business.logoUrl)}
+        ${avatar(business.name, undefined, "lg", business.logo_url || business.logoUrl, "contain")}
         <div>
           <div class="team-head-name">${esc(business.name || "Business")}</div>
           <div class="mk-note"><span id="team-count">${members.length} ${members.length === 1 ? "member" : "members"}</span> · you are the ${esc(business.role || "member")}</div>

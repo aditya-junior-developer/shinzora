@@ -14,7 +14,7 @@ import { sb, normalizeError, getSession } from "../../lib/supabase.js";
 import { markAllNotificationsRead, markNotificationRead, notifications as fetchNotifications, uid } from "./data.js";
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
 import { createSidebar } from "../../ui/sidebar.js";
-import { avatarMarkup } from "../../lib/avatar.js";
+import { paintAvatar } from "../../lib/avatar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 
 export const NAV = [
@@ -222,17 +222,20 @@ export function paintIdentity() {
   if (wsPlan) wsPlan.textContent = state.isAdmin ? "Administrator" : `${plan().name} plan`;
   if (wsAvatar) {
     /* The workspace badge is the business: its logo when one is uploaded, its
-       initials otherwise. The account badge beside it is the person. */
-    wsAvatar.innerHTML = avatarMarkup({
+       initials otherwise. Painted into the existing circle rather than wrapping
+       another one around it — see paintAvatar(). A logo is contained, not
+       cropped, so the whole mark stays visible and centred. */
+    paintAvatar(wsAvatar, {
       name,
       email: state.user?.email,
       avatarUrl: state.business?.logo_url,
-      alt: state.business?.name || "Workspace"
+      alt: state.business?.name || "Workspace",
+      fit: "contain"
     });
   }
   if (accName) accName.textContent = state.profile?.full_name || "Account";
   if (accAvatar) {
-    accAvatar.innerHTML = avatarMarkup({
+    paintAvatar(accAvatar, {
       name: state.profile?.full_name,
       email: state.user?.email,
       avatarUrl: state.profile?.avatar_url,

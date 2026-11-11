@@ -7,7 +7,7 @@ import { icon } from "../../lib/icons.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { skeletonView, setupNotice } from "../dashboard/components.js";
 import { createSidebar } from "../../ui/sidebar.js";
-import { avatarMarkup } from "../../lib/avatar.js";
+import { paintAvatar } from "../../lib/avatar.js";
 import { peopleMeta } from "./api.js";
 
 /* The navigation column, created by bindShell(). */
@@ -162,11 +162,12 @@ export function bindShell({ user, role }) {
     const host = qs("#admin-avatar");
     if (!host || !user?.id) return;
     const row = (await peopleMeta([user.id])).get(user.id);
-    host.innerHTML = avatarMarkup({
+    /* The holder is the circle (`.admin-who #admin-avatar`), so the photo is
+       painted into it rather than nested inside a second avatar span. */
+    paintAvatar(host, {
       name: row?.full_name || user?.email,
       email: user?.email,
-      avatarUrl: row?.avatar_url,
-      size: "sm"
+      avatarUrl: row?.avatar_url
     });
   })();
 

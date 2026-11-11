@@ -135,8 +135,8 @@ export function skeletonView(rows = 4) {
  * `profiles.avatar_url`, but the renderer only ever knew how to draw initials,
  * so three screens disagreed about what a person looked like.
  */
-export function avatar(name, email, size = "", avatarUrl = null) {
-  return avatarMarkup({ name, email, avatarUrl, size });
+export function avatar(name, email, size = "", avatarUrl = null, fit = "cover") {
+  return avatarMarkup({ name, email, avatarUrl, size, fit });
 }
 
 export function metaRow(parts) {

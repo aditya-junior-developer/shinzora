@@ -25,20 +25,42 @@ import { initials } from "./format.js";
  * @param {string} [options.size]        "sm" | "lg" | "xl" | "" (default)
  * @param {string} [options.className]   extra classes on the wrapper
  * @param {string} [options.alt]         alt text; defaults to the name
+ * @param {"cover"|"contain"} [options.fit] how the image fills the circle
  */
-export function avatarMarkup({ name = "", email = "", avatarUrl = null, size = "", className = "", alt = "" } = {}) {
+export function avatarMarkup({ name = "", email = "", avatarUrl = null, size = "", className = "", alt = "", fit = "cover" } = {}) {
   const variant = !size ? "" : size.startsWith("avatar-") ? size : `avatar-${size}`;
-  const cls = ["avatar", variant, className].filter(Boolean).join(" ");
-  const label = initials(name || email || "SZ");
-  const url = typeof avatarUrl === "string" ? avatarUrl.trim() : "";
+  const url = usableAvatar(avatarUrl) ? avatarUrl.trim() : "";
+  const fitClass = url && fit === "contain" ? "is-logo" : "";
+  const cls = ["avatar", variant, fitClass, className].filter(Boolean).join(" ");
 
-  /* Only an http(s) URL or a same-origin path is ever put in a src. A stored
-     value is data from the database, and an avatar is not a place to discover
-     that someone saved `javascript:`. */
-  const safe = /^(https?:\/\/|\/)/i.test(url) ? url : "";
-  if (!safe) return `<span class="${cls}">${esc(label)}</span>`;
+  if (!url) return `<span class="${cls}">${esc(initials(name || email || "SZ"))}</span>`;
 
-  return `<span class="${cls}"><img src="${esc(safe)}" alt="${esc(alt || name || "Profile photo")}" loading="lazy" decoding="async" /></span>`;
+  return `<span class="${cls}">${avatarImage(url, alt || name || "Profile photo")}</span>`;
+}
+
+/** The <img> on its own, for a caller that already owns the circle. */
+export function avatarImage(url, alt = "Profile photo") {
+  return `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy" decoding="async" />`;
+}
+
+/**
+ * Paint an avatar INTO an element that is already the circle.
+ *
+ * The topbar and the sidebar ship their own `<span class="avatar avatar-sm">`
+ * in the HTML. Returning `avatarMarkup()` into one of those produced
+ * `<span class="avatar avatar-sm"><span class="avatar">…</span></span>`: a
+ * second circle at the *default* 34px, inside a 26px one, clipped by the outer
+ * border-radius. The photo came out zoomed and pushed off centre and the brand
+ * gradient showed at the edge — reported as "I want the pfp in the centre".
+ *
+ * So the markup helpers are for holders, and this is for the real thing: it
+ * touches contents and one state class, never nesting a circle in a circle.
+ */
+export function paintAvatar(node, { name = "", email = "", avatarUrl = null, alt = "", fit = "cover" } = {}) {
+  if (!node) return;
+  const url = usableAvatar(avatarUrl) ? avatarUrl.trim() : "";
+  node.classList.toggle("is-logo", Boolean(url) && fit === "contain");
+  node.innerHTML = url ? avatarImage(url, alt || name || "Profile photo") : esc(initials(name || email || "SZ"));
 }
 
 /** True when a stored value can be used as an image source. */
