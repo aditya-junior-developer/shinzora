@@ -4228,6 +4228,28 @@ html {
 .meeting-linkbox { display: flex; flex-direction: column; gap: 6px; }
 .meeting-linkbox label { font-size: var(--fs-2xs); font-weight: 650; color: var(--text-2); }
 .meeting-linkrow { display: flex; gap: 8px; }
+/* Every text field on the meetings surface uses the theme's own input tokens.
+   The name field used to fall back to the browser's white default, which read
+   as a broken control on the dark theme. */
+.meeting-start input[type="text"],
+.meeting-lobby input[type="text"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.meeting-start input[type="text"]::placeholder {
+  color: var(--text-4);
+}
+.meeting-start input[type="text"]:focus {
+  outline: none;
+  border-color: var(--line-violet);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+}
 .meeting-linkrow input {
   flex: 1 1 auto;
   min-width: 0;

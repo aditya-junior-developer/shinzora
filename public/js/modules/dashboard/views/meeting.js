@@ -121,7 +121,7 @@ async function paintStart(host) {
       </div>
       <div class="field">
         <label for="meeting-title">Meeting name</label>
-        <input id="meeting-title" name="title" type="text" maxlength="120" required placeholder="Weekly design review" autocomplete="off" />
+        <input class="input" id="meeting-title" name="title" type="text" maxlength="120" required placeholder="Weekly design review" autocomplete="off" />
       </div>
       <div class="field">
         <label>Type</label>
