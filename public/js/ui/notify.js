@@ -159,6 +159,17 @@ export function setActiveCallTopic(topic) {
 
 let ringBanner = null;
 
+/* How to actually answer a ring. Registered by
+   modules/messaging/incoming-call.js, which owns the call engine; this file
+   must not import it, or the notification layer and the call stack would
+   depend on each other. Without a handler the banner can still open the page
+   the call lives on, which is the honest fallback. */
+let callAnswerer = null;
+
+export function setCallAnswerer(handler) {
+  callAnswerer = handler && typeof handler.answer === "function" ? handler : null;
+}
+
 /** Is there a ring on screen for this topic already? */
 function ringShowing(topic) {
   return ringBanner && ringBanner.topic === topic && document.body.contains(ringBanner.node);
@@ -185,24 +196,95 @@ function showRingBanner({ row, meta, name, kind, expiresAt }) {
       <div class="ring-title">${esc(name)} is calling</div>
       <div class="ring-sub">${esc(meta.groupName || (kind === "video" ? "Video meeting" : "Voice call"))}</div>
     </div>
-    <button class="btn btn-primary btn-sm" type="button" data-ring-join>Join</button>
-    <button class="btn btn-ghost btn-sm" type="button" data-ring-dismiss aria-label="Dismiss">${icon("x", { size: 13 })}</button>`;
+    <button class="btn btn-primary btn-sm" type="button" data-ring-accept>Accept</button>
+    <button class="btn btn-ghost btn-sm" type="button" data-ring-decline>Decline</button>`;
   document.body.append(node);
   requestAnimationFrame(() => node.classList.add("is-in"));
 
   const stopTone = ringForCall(expiresAt);
+  let missedTimer = null;
   const close = () => {
     stopTone();
+    clearTimeout(missedTimer);
     node.remove();
     if (ringBanner?.node === node) ringBanner = null;
+    if (ringBanner === null) {
+      /* nothing else is ringing */
+    }
   };
   ringBanner = { node, topic: meta.callTopic, close };
 
-  on(qs("[data-ring-join]", node), "click", () => {
+  /* Nobody pressed anything before the invite expired. Saying "missed call"
+     is the truthful end of a ring — the banner disappearing on its own looks
+     like the app forgot, and leaves the member unsure whether they missed
+     somebody. */
+  missedTimer = setTimeout(() => {
+    stopTone();
+    const still = document.body.contains(node);
+    if (!still) return;
+    node.classList.add("is-missed");
+    node.innerHTML = `
+      <span class="ring-mark">${icon("phone-missed", { size: 16 })}</span>
+      <div class="ring-copy">
+        <div class="ring-title">Missed call</div>
+        <div class="ring-sub">${esc(name)} · ${esc(meta.groupName || (kind === "video" ? "Video call" : "Voice call"))}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="button" data-ring-dismiss>Dismiss</button>`;
+    on(qs("[data-ring-dismiss]", node), "click", close);
+    /* The stored notification is the record; mark it read so the badge clears
+       and the inbox shows it as seen rather than pending. */
+    markCallNotificationRead(meta.callTopic).catch(() => {});
+  }, Math.max(1000, expiresAt - Date.now()));
+
+  const acceptBtn = qs("[data-ring-accept]", node);
+  on(acceptBtn, "click", async () => {
+    /* Answering must stay inside the click: the microphone prompt and the
+       audio unlock both depend on the user gesture. */
+    acceptBtn.disabled = true;
+    acceptBtn.textContent = "Connecting…";
+    if (callAnswerer) {
+      try {
+        const joined = await callAnswerer.answer(row);
+        if (joined) close();
+        else {
+          acceptBtn.disabled = false;
+          acceptBtn.textContent = "Accept";
+        }
+      } catch (error) {
+        toastError(error);
+        acceptBtn.disabled = false;
+        acceptBtn.textContent = "Accept";
+      }
+      return;
+    }
+    /* No call engine on this page (a stripped build). Turning the ring into a
+       navigation at least lands on the surface that can place the call. */
+    const base = String(row.link || "/app/?view=messages&tab=groups");
+    const link = `${base}${base.includes("?") ? "&" : "?"}answer=${encodeURIComponent(meta.callTopic || "")}`;
     close();
-    if (row.link) location.assign(row.link);
+    location.assign(link);
   });
-  on(qs("[data-ring-dismiss]", node), "click", close);
+
+  on(qs("[data-ring-decline]", node), "click", async () => {
+    close();
+    try {
+      if (callAnswerer?.decline) await callAnswerer.decline(row);
+      else await markCallNotificationRead(meta.callTopic);
+    } catch {
+      /* the ring is already gone; nothing else to do */
+    }
+  });
+}
+
+/** Stop the stored ring for this topic, so a reload does not ring again. */
+async function markCallNotificationRead(topic) {
+  if (!topic) return false;
+  try {
+    await rpc("call_invite_acknowledge", { p_topic: topic });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /* ------------------------------------------------------------- in-app notice */

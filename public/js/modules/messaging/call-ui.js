@@ -21,6 +21,7 @@ import { avatarMarkup } from "../../lib/avatar.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { connectedTone, endedTone } from "./ringtone.js";
 import { stopCallRinging, setActiveCallTopic } from "../../ui/notify.js";
+import { sb, normalizeError } from "../../lib/supabase.js";
 
 let active = null;
 
@@ -73,7 +74,10 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
       </button>
     </header>
 
-    <div class="call-stage" id="call-stage"></div>
+    <div class="call-body">
+      <div class="call-stage" id="call-stage"></div>
+      <aside class="call-people" id="call-people" aria-label="People in this call"></aside>
+    </div>
     <div class="call-notice" id="call-notice" hidden></div>
     <div class="call-diag" id="call-diag" hidden></div>
 
@@ -85,6 +89,9 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
         kind === "video"
           ? `<button class="call-btn" type="button" data-call-camera aria-pressed="true" title="Camera">
                ${icon("video", { size: 16 })}<span>Camera</span>
+             </button>
+             <button class="call-btn" type="button" data-call-flip title="Switch camera">
+               ${icon("refresh-cw", { size: 16 })}<span>Flip</span>
              </button>
              <button class="call-btn" type="button" data-call-screen title="Share screen">
                ${icon("monitor", { size: 16 })}<span>Share</span>
@@ -99,6 +106,7 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
   document.body.append(wrap);
 
   const stage = qs("#call-stage", wrap);
+  const peopleEl = qs("#call-people", wrap);
   const notice = qs("#call-notice", wrap);
   const diag = qs("#call-diag", wrap);
   const timerEl = qs("#call-timer", wrap);
@@ -108,6 +116,10 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
   let minimised = false;
   let timer = null;
   let levelTimer = null;
+  /* Declared with the other timers: `watchInvite()` runs during setup, and a
+     `let` further down the function would be in its dead zone — which is a
+     thrown error, not a silent no-op. */
+  let inviteTimer = null;
 
   function tileMarkup({ id, label, stream, state: peerState, muted, cameraOn, mine }) {
     const showVideo = kind === "video" && stream && cameraOn !== false;
@@ -120,8 +132,14 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
         <figcaption class="call-name">
           <span>${esc(label)}${mine ? " · you" : ""}</span>
           ${peerState === "failed" ? `<span class="call-badge is-bad">network</span>` : ""}
+          ${peerState === "connecting" || peerState === "new" ? `<span class="call-badge">connecting…</span>` : ""}
           ${muted ? `<span class="call-badge">muted</span>` : ""}
         </figcaption>
+        ${
+          showVideo && !mine
+            ? `<button class="call-tile-fs" type="button" data-tile-fullscreen="${esc(id)}" aria-label="Full screen ${esc(label)}">${icon("maximize-2", { size: 14 })}</button>`
+            : ""
+        }
       </figure>`;
   }
 
@@ -183,6 +201,31 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
     }
 
     const peerCount = state.peers.length;
+
+    /* The participant list is presence, not media: somebody who has joined but
+       whose peer connection is still negotiating appears here immediately. */
+    const everyone = [
+      { userId: "self", name: `${self.name || "You"}`, muted: state.muted, cameraOn: state.cameraOn, mine: true },
+      ...(state.others || [])
+    ];
+    wrap.classList.toggle("has-people", everyone.length > 1);
+    if (peopleEl) {
+      peopleEl.innerHTML = `
+        <div class="call-people-head">${icon("users", { size: 13 })}<span>${everyone.length} in the call</span></div>
+        <ul class="call-people-list">
+          ${everyone
+            .map(
+              (person) => `<li class="call-person${person.mine ? " is-self" : ""}">
+                <span class="call-person-name">${esc(person.name)}${person.mine ? " · you" : ""}</span>
+                <span class="call-person-flags">
+                  ${person.muted ? icon("mic-off", { size: 12 }) : icon("mic", { size: 12 })}
+                  ${kind === "video" && person.cameraOn === false ? icon("video-off", { size: 12 }) : ""}
+                </span>
+              </li>`
+            )
+            .join("")}
+        </ul>`;
+    }
     if (state.status === "failed") {
       notice.hidden = false;
       notice.className = "call-notice is-bad";
@@ -191,6 +234,10 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
       notice.innerHTML = `${icon("triangle-alert", { size: 14 })}<span>${esc(
         state.error || "The call could not connect."
       )}</span><button class="btn btn-secondary btn-sm" type="button" data-call-retry>Retry</button>`;
+    } else if (state.status === "reconnecting") {
+      notice.hidden = false;
+      notice.className = "call-notice";
+      notice.innerHTML = `${icon("loader-circle", { size: 14 })}<span>Reconnecting… the network changed. Your microphone is still open.</span>`;
     } else if (state.status === "connecting") {
       notice.hidden = false;
       notice.className = "call-notice";
@@ -241,6 +288,7 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
   }
 
   call.setListener(paint);
+  watchInvite();
 
   on(muteBtn, "click", () => call.toggleMute());
   if (cameraBtn) {
@@ -265,7 +313,47 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
     });
   }
 
-  on(leaveBtn, "click", () => call.leave("You left the call."));
+  const flipBtn = qs("[data-call-flip]", wrap);
+  if (flipBtn) {
+    on(flipBtn, "click", async () => {
+      const facing = await call.switchCamera();
+      /* No second camera is a fact about the device, not an error. */
+      if (facing === "environment") {
+        toast({ title: "Back camera", message: "Using the rear camera." });
+      } else if (facing === "user") {
+        toast({ title: "Front camera", message: "Using the front camera." });
+      } else {
+        toast({ title: "One camera", message: "This device does not report a second camera to switch to." });
+      }
+    });
+  }
+
+  /* Double-click or the tile button puts a remote video full screen. */
+  delegate(stage, "click", "[data-tile-fullscreen]", async (event, button) => {
+    const tile = button.closest("[data-tile]");
+    const video = tile?.querySelector("video");
+    if (!video) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await (video.requestFullscreen?.() || tile.requestFullscreen?.());
+    } catch {
+      /* iOS refuses element fullscreen; the tile is already as large as it gets */
+    }
+  });
+  delegate(stage, "dblclick", ".call-video", async (event, video) => {
+    if (video.closest("[data-tile]")?.getAttribute("data-tile") === "self") return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await (video.requestFullscreen?.() || video.closest(".call-tile")?.requestFullscreen?.());
+    } catch {
+      /* not supported here */
+    }
+  });
+
+  on(leaveBtn, "click", () => {
+    announceMissed();
+    call.leave("You left the call.");
+  });
 
   delegate(notice, "click", "[data-call-retry]", async (event, button) => {
     button.disabled = true;
@@ -312,6 +400,61 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
     );
   });
 
+  /* ------------------------------------------------------- invite outcomes
+     The other side of a ring. Declining, answering and ignoring all end in a
+     different state for the caller, and a panel that shows "waiting…" for all
+     three is a panel that leaves somebody ringing a phone that was put down. */
+  async function inviteState() {
+    const topic = call.state.topic;
+    if (!topic || !/^call-(dm|group):/.test(topic)) return null;
+    if (!sb) return null;
+    const { data, error } = await sb.rpc("call_invite_state", { p_topic: topic });
+    if (error) return null;
+    return data?.found ? data : null;
+  }
+
+  function watchInvite() {
+    clearInterval(inviteTimer);
+    inviteTimer = setInterval(async () => {
+      const state = call.state;
+      const waiting = state.peers.length === 0 && !["ended", "failed"].includes(state.status);
+      if (!waiting) return;
+      const info = await inviteState();
+      if (!info) return;
+      const declined = info.declined || [];
+      const accepted = info.accepted || [];
+      if (accepted.length || declined.length === 0) return;
+      /* Somebody said no, and nobody has said yes. Say it plainly; offer the
+         retry the caller would want (a second invite is a new ring). */
+      notice.hidden = false;
+      notice.className = "call-notice";
+      notice.innerHTML = `${icon("phone-missed", { size: 14 })}<span>${esc(
+        declined.map((person) => person.name).join(", ")
+      )} declined. Nobody else is ringing.</span>`;
+    }, 5000);
+  }
+
+  /**
+   * The caller hung up and nobody ever answered.
+   *
+   * Writing a missed call is the only honest record for the person who was
+   * rung — otherwise they open the app later, see nothing, and cannot tell
+   * whether they missed somebody.
+   */
+  async function announceMissed() {
+    const topic = call.state.topic;
+    if (!topic || !/^call-(dm|group):/.test(topic) || !sb) return;
+    try {
+      const { data, error } = await sb.rpc("call_invite_state", { p_topic: topic });
+      if (error || !data?.found) return;
+      if (data.startedBy !== self.userId) return;
+      if ((data.accepted || []).length) return;
+      await sb.rpc("call_invite_missed", { p_topic: topic });
+    } catch {
+      /* a missed-call notice is a courtesy, never a reason to block a hang-up */
+    }
+  }
+
   timer = setInterval(() => {
     const { status, startedAt } = call.state;
     if (status === "live" && startedAt) timerEl.textContent = formatDuration(Date.now() - startedAt);
@@ -322,7 +465,9 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
   }, 500);
 
   function destroy() {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     clearInterval(timer);
+    clearInterval(inviteTimer);
     clearInterval(levelTimer);
     call.setListener(null);
     call.leave("The call ended.");

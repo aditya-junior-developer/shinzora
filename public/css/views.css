@@ -4109,3 +4109,172 @@ html {
 .poll-option-row { display: flex; gap: 6px; align-items: center; }
 .poll-option-row .input { flex: 1 1 auto; min-width: 0; }
 .poll-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-2); }
+
+/* ==========================================================================
+   Calling & meetings (round 5)
+   --------------------------------------------------------------------------
+   Everything here is drawn from theme tokens so a light theme keeps its
+   contrast. No colour is hardcoded except the near-black stage, which is the
+   convention for video: a light tile behind a camera feed looks like a bug.
+   ========================================================================== */
+
+.call-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+}
+.call-surface.has-people .call-body { grid-template-columns: 1fr 172px; }
+
+.call-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--s-3);
+  border-left: 1px solid var(--line);
+  background: var(--panel-2);
+  max-height: min(58vh, 460px);
+  overflow-y: auto;
+  font-size: var(--fs-2xs);
+}
+.call-people:empty { display: none; }
+.call-people-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 700;
+}
+.call-people-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.call-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text-2);
+}
+.call-person.is-self { border-color: var(--line-violet-soft); color: var(--text); }
+.call-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-person-flags { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); }
+
+.call-tile-fs {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  /* Theme tokens, not a white glyph on a dark scrim: in a light theme the
+     scrim was the only thing making this legible, and hardcoded colours are a
+     defect wherever they appear. */
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.call-tile:hover .call-tile-fs,
+.call-tile-fs:focus-visible { opacity: 1; }
+
+.ring-banner.is-missed .ring-mark {
+  background: var(--panel-3);
+  color: var(--text-3);
+  animation: none;
+}
+.ring-banner[data-ring-accept],
+.ring-banner .btn { white-space: nowrap; }
+
+/* ------------------------------------------------------------------ meetings */
+
+.meeting-start,
+.meeting-lobby,
+.meeting-missing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.meeting-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.meeting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+}
+.meeting-row-title { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.meeting-row-sub { font-size: var(--fs-2xs); color: var(--text-3); }
+
+.meeting-linkbox { display: flex; flex-direction: column; gap: 6px; }
+.meeting-linkbox label { font-size: var(--fs-2xs); font-weight: 650; color: var(--text-2); }
+.meeting-linkrow { display: flex; gap: 8px; }
+.meeting-linkrow input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--fs-2xs);
+}
+.meeting-hint { color: var(--danger, #f87171); }
+
+.meeting-live { display: flex; flex-direction: column; gap: 8px; margin-bottom: var(--s-3); }
+.meeting-live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+}
+.meeting-live-id { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; font-size: var(--fs-sm); }
+.meeting-live-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.meeting-code {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+.call-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+.badge.is-good { border-color: var(--line-violet-soft); color: var(--lavender); }
+
+@media (max-width: 720px) {
+  .call-body { grid-template-columns: 1fr !important; }
+  .call-people { border-left: 0; border-top: 1px solid var(--line); max-height: 140px; }
+  .meeting-live-bar { flex-direction: column; align-items: flex-start; }
+}

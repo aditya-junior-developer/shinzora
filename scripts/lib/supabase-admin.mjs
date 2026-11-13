@@ -142,7 +142,8 @@ export const APPLICATION_TABLES = [
      their notification settings. */
   "community_groups", "community_group_members", "community_mentions",
   "group_polls", "group_poll_votes",
-  "notification_preferences", "push_subscriptions", "call_invites"
+  "notification_preferences", "push_subscriptions", "call_invites",
+  "call_responses", "meetings", "meeting_attendees"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

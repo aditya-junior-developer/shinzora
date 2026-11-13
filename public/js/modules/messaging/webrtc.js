@@ -130,6 +130,8 @@ export async function prepareRelay() {
  */
 export function createCall({ kind, topic, title, self, onState = () => {} }) {
   let listener = onState;
+  let reconnectTimer = null;
+  let restartAttempts = 0;
   const state = {
     kind,
     topic,
@@ -143,6 +145,11 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
        fails with zero relay candidates and strict NATs on both sides is a
        diagnosis, not a mystery — the surface can say so. */
     candidates: { host: 0, srflx: 0, prflx: 0, relay: 0 },
+    /* Who else is in the room, from Realtime presence. This is the participant
+       list: it survives a peer whose media connection is still negotiating, and
+       it carries their mute and camera state. */
+    others: [],
+    facing: "user",
     relay: relayState(),
     startedAt: null,
     error: null,
@@ -241,7 +248,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false
+        video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: state.facing } : false
       });
       return localStream;
     } catch (error) {
@@ -485,6 +492,36 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
   /* ------------------------------------------------------- signalling */
 
+  /**
+   * Presence is the participant list, and it is separate from the media mesh on
+   * purpose: somebody whose peer connection is still negotiating is still *in
+   * the room*, and a list that only counted connected peers would hide them and
+   * look like they never arrived.
+   *
+   * Bound before `subscribe()`: supabase-js refuses handlers added after a
+   * channel is subscribed, and a silently unbound presence handler is exactly
+   * the "participants never appear" defect.
+   */
+  function bindPresence(ch) {
+    try {
+      ch.on("presence", { event: "sync" }, () => {
+        const room = ch.presenceState?.() || {};
+        state.others = Object.values(room)
+          .flat()
+          .filter((person) => person && person.userId && person.userId !== self.userId)
+          .map((person) => ({
+            userId: person.userId,
+            name: person.name || "Someone",
+            muted: Boolean(person.muted),
+            cameraOn: Boolean(person.cameraOn)
+          }));
+        emit();
+      });
+    } catch {
+      /* an older build of supabase-js without presence metadata */
+    }
+  }
+
   function bindChannel(ch) {
     ch.on("broadcast", { event: "*" }, (message) => {
       const payload = message?.payload || {};
@@ -604,6 +641,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       emit();
       channel = sb.channel(topic, { config: { private: true, broadcast: { self: false } } });
       bindChannel(channel);
+      bindPresence(channel);
 
       await new Promise((resolve, reject) => {
         /* The ring-and-wait is over: a join that has not opened in ten seconds
@@ -634,6 +672,36 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       state.startedAt = Date.now();
       setStatus("live");
       send("hello", {});
+
+      /* Now that the channel is open, say who we are. Reading presence is bound
+         before subscribe — a handler added afterwards never fires. */
+      try {
+        await channel.track({ userId: self.userId, name: self.name, muted: state.muted, cameraOn: state.cameraOn });
+      } catch {
+        /* presence is a nicety; the call works without it */
+      }
+
+      /* A media path that drops is not a call that ended. Two attempts at an
+         ICE restart, then the surface says it is reconnecting instead of
+         pretending everything is fine. */
+      reconnectTimer = setInterval(() => {
+        if (closed) return;
+        const states = [...state.peers.values()].map((peer) => peer.connection?.connectionState);
+        const struggling = states.some((value) => value === "disconnected" || value === "failed");
+        if (!struggling) {
+          if (state.status === "reconnecting" && states.some((value) => value === "connected")) {
+            setStatus("live");
+            state.error = null;
+          }
+          return;
+        }
+        if (restartAttempts >= 2) {
+          setStatus("failed", connectionHint());
+          return;
+        }
+        restartAttempts += 1;
+        restartIce().catch(() => {});
+      }, 4000);
 
       /* Someone has to notice a peer that never connects, otherwise the call
          looks "live" while a tile stays black forever. */
@@ -670,6 +738,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       track.enabled = !state.muted;
     });
     send("mute", { muted: state.muted, cameraOn: state.cameraOn });
+    trackPresence();
     emit();
     return state.muted;
   }
@@ -682,8 +751,90 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       track.enabled = state.cameraOn;
     });
     send("mute", { muted: state.muted, cameraOn: state.cameraOn });
+    trackPresence();
     emit();
     return state.cameraOn;
+  }
+
+  /** Re-publish our own presence so the participant list is current. */
+  function trackPresence() {
+    try {
+      channel?.track?.({ userId: self.userId, name: self.name, muted: state.muted, cameraOn: state.cameraOn });
+    } catch {
+      /* presence not available on this channel */
+    }
+  }
+
+  /**
+   * Swap the front and back camera.
+   *
+   * Only meaningful on a device that has both — a laptop answers "no other
+   * camera" and that is a valid answer, not a failure. The outgoing track is
+   * replaced on every peer sender rather than the stream being rebuilt, so the
+   * connection is not renegotiated mid-call.
+   */
+  async function switchCamera() {
+    if (state.kind !== "video") return state.facing;
+    if (!navigator.mediaDevices?.getUserMedia) return state.facing;
+    const next = state.facing === "user" ? "environment" : "user";
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: next }, audio: false });
+    } catch {
+      /* One camera, or the other one is busy: keep the current one and say so
+         through the return value rather than tearing the call down. */
+      return state.facing;
+    }
+    const [track] = stream.getVideoTracks();
+    if (!track) return state.facing;
+
+    for (const entry of state.peers.values()) {
+      const sender = entry.connection?.getSenders().find((candidate) => candidate.track?.kind === "video");
+      if (sender) await sender.replaceTrack(track).catch(() => {});
+    }
+    /* Swap the local preview over to the new camera and stop the old one. */
+    const previous = localStream?.getVideoTracks?.() || [];
+    if (localStream) {
+      for (const old of previous) {
+        localStream.removeTrack?.(old);
+        old.stop();
+      }
+      localStream.addTrack(track);
+    }
+    state.facing = next;
+    track.enabled = state.cameraOn;
+    emit();
+    return next;
+  }
+
+  /**
+   * An ICE restart, for the case a call survives the signalling channel but the
+   * media path dies: Wi-Fi roamed, a laptop slept, a network changed under the
+   * call. Without this the connection sits in "disconnected" until it times
+   * out and the user sees a call that froze, which they read as broken.
+   */
+  async function restartIce() {
+    if (closed) return false;
+    let restarted = false;
+    for (const [userId, entry] of state.peers) {
+      const connection = entry.connection;
+      if (!connection) continue;
+      const alive = ["connected", "disconnected", "failed"].includes(connection.connectionState);
+      if (!alive) continue;
+      try {
+        const offer = await connection.createOffer({ iceRestart: true });
+        await connection.setLocalDescription(offer);
+        send("offer", { to: userId, sdp: connection.localDescription, restart: true });
+        restarted = true;
+      } catch {
+        /* the next rung of the ladder is the reconnect timer below */
+      }
+    }
+    if (restarted) {
+      state.status = "reconnecting";
+      emit();
+    }
+    return restarted;
   }
 
   /** Replace the outgoing video track with a screen share, and back again. */
@@ -748,6 +899,9 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
   function cleanup() {
     clearInterval(statsTimer);
     statsTimer = null;
+    clearInterval(reconnectTimer);
+    reconnectTimer = null;
+    restartAttempts = 0;
     send("bye", {});
     for (const userId of [...state.peers.keys()]) leavePeer(userId);
     localStream?.getTracks().forEach((track) => track.stop());
@@ -789,6 +943,8 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
     leave,
     toggleMute,
     toggleCamera,
+    switchCamera,
+    restartIce,
     toggleScreenShare,
     ownLevel,
     getLocalStream: () => localStream,

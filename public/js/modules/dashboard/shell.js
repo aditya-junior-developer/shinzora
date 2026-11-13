@@ -17,6 +17,7 @@ import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 import { initNotifications, presentNotification } from "../../ui/notify.js";
+import { registerIncomingCalls } from "../messaging/incoming-call.js";
 import { openLiveChannel, closeLiveChannel } from "../../lib/live-channel.js";
 
 export const NAV = [
@@ -55,6 +56,7 @@ export const NAV = [
       { id: "marketing", label: "Request for Extra Service", icon: "megaphone" },
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
+      { id: "meeting", label: "Meetings", icon: "video" },
       { id: "analytics", label: "Analytics", icon: "chart-line" }
     ]
   },
@@ -87,7 +89,8 @@ export const AGENT_NAV = [
       { id: "find-team", label: "Find Team", icon: "users-round" },
       { id: "team", label: "Team", icon: "users" },
       { id: "community", label: "Community", icon: "messages-square" },
-      { id: "messages", label: "Messages", icon: "messages-square" }
+      { id: "messages", label: "Messages", icon: "messages-square" },
+      { id: "meeting", label: "Meetings", icon: "video" }
     ]
   },
   {
@@ -604,6 +607,9 @@ export function subscribeNotifications() {
      subscription. Nothing here asks for browser permission — that only happens
      when somebody presses "Turn on" in settings. */
   initNotifications({ onChange: () => refreshNotificationBadge() }).catch(() => {});
+  /* Rings can arrive on any page, so the answer handler is registered with the
+     notification layer here rather than inside the messages view. */
+  registerIncomingCalls();
   listenForServiceWorkerMessages();
   /* Opening this twice (a re-mount, a reconnect) used to race the asynchronous
      removal of the previous channel and throw "cannot add postgres_changes

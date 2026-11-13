@@ -26,6 +26,10 @@ export default async function render(root, ctx = {}) {
   const params = new URLSearchParams(location.search);
   if (ctx.params?.has?.("c") && !params.has("c")) params.set("c", ctx.params.get("c"));
 
+  /* The ring banner's fallback (a page with no call engine) arrives here with
+     `?answer=<topic>`; answering is the same database check either way. */
+  const answerTopic = params.get("answer");
+
   const conversationId = params.get("c");
   let groupId = params.get("group");
   let messageId = params.get("message");
@@ -45,6 +49,12 @@ export default async function render(root, ctx = {}) {
       </button>
     </div>
     <div id="messages-mount"></div>`;
+
+  if (answerTopic) {
+    import("../../messaging/incoming-call.js")
+      .then(({ answerCall }) => answerCall(answerTopic, { kind: params.get("kind") || "voice" }))
+      .catch(() => {});
+  }
 
   const bar = qs(".messages-tabs", root);
   const mount = qs("#messages-mount", root);
