@@ -99,7 +99,10 @@ export function dataTable({ columns, rows, empty = "Nothing here yet.", rowKey =
       const cells = columns
         .map((col) => {
           const value = col.render ? col.render(row) : esc(row[col.key] ?? "—");
-          return `<td${col.className ? ` class="${col.className}"` : ""}>${value}</td>`;
+          /* `data-label` is what the phone layout uses to print the column name
+             beside each value once the header row is gone. Without it a stacked
+             table on a small screen is a list of values with no meaning. */
+          return `<td data-label="${esc(col.label)}"${col.className ? ` class="${col.className}"` : ""}>${value}</td>`;
         })
         .join("");
       return `<tr data-row="${esc(row[rowKey] ?? "")}">${cells}</tr>`;
@@ -140,7 +143,10 @@ export function avatar(name, email, size = "", avatarUrl = null, fit = "cover") 
 }
 
 export function metaRow(parts) {
-  return `<div class="project-meta">${parts.filter(Boolean).join('<span aria-hidden="true">·</span>')}</div>`;
+  /* The separator carries a class so the phone layout can hide it: a "·" that
+     wraps to the start of a line reads as a bullet with nothing to introduce. */
+  const real = parts.filter((part) => part && String(part).replace(/<[^>]*>/g, "").trim().length);
+  return `<div class="project-meta">${real.join('<span class="meta-sep" aria-hidden="true">·</span>')}</div>`;
 }
 
 export const fmt = { timeAgo, date, money, statusLabel };

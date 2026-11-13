@@ -205,17 +205,17 @@ export default async function render(root) {
           <tbody>${visible
             .map(
               (row) => `<tr data-open="${esc(row.id)}" style="cursor:pointer">
-                <td>
+                <td data-label="Subject">
                   <div class="cell-strong">${esc(row.subject)}
                     ${row.escalated_at ? `<span class="badge badge-warn">Escalated</span>` : ""}
                     ${row.auto_reply ? `<span class="badge badge-neutral">Auto-reply</span>` : ""}
                   </div>
                   <div class="cell-sub clamp-2" style="max-width:420px">${esc((row.message || "").slice(0, 120))}</div>
                 </td>
-                <td>${esc(row.ticket_type === "platform" ? "Shinzora" : "Customer")}</td>
-                <td><span class="badge badge-${row.priority === "urgent" ? "danger" : row.priority === "high" ? "warn" : "neutral"}">${esc(row.priority || "normal")}</span></td>
-                <td>${statusBadge(row.status)}</td>
-                <td class="dim">${esc(timeAgo(row.updated_at || row.created_at))}</td>
+                <td data-label="Type">${esc(row.ticket_type === "platform" ? "Shinzora" : "Customer")}</td>
+                <td data-label="Priority"><span class="badge badge-${row.priority === "urgent" ? "danger" : row.priority === "high" ? "warn" : "neutral"}">${esc(row.priority || "normal")}</span></td>
+                <td data-label="Status">${statusBadge(row.status)}</td>
+                <td data-label="Updated" class="dim">${esc(timeAgo(row.updated_at || row.created_at))}</td>
                 <td class="cell-actions">
                   ${row.status === "open" ? `<button class="btn btn-ghost btn-sm" data-resolve="${esc(row.id)}">Resolve</button>` : ""}
                 </td>

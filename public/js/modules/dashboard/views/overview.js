@@ -114,12 +114,12 @@ export default async function render(root) {
                   <tbody>${data.projects
                     .map(
                       (project) => `<tr>
-                        <td><div class="cell-strong">${esc(project.name)}</div>${
+                        <td data-label="Project"><div class="cell-strong">${esc(project.name)}</div>${
                         project.slug ? `<div class="cell-sub mono">${esc(project.slug)}</div>` : ""
                       }</td>
-                        <td>${esc(project.type)}</td>
-                        <td>${statusBadge(project.status)}</td>
-                        <td class="dim">${esc(timeAgo(project.updated_at))}</td>
+                        <td data-label="Type">${esc(project.type)}</td>
+                        <td data-label="Status">${statusBadge(project.status)}</td>
+                        <td class="dim" data-label="Updated">${esc(timeAgo(project.updated_at))}</td>
                         <td class="cell-actions"><a class="btn btn-ghost btn-sm" href="/app/?view=${
                           project.type === "app" ? "app-builder" : "website-builder"
                         }&id=${esc(project.id)}">Open</a></td>

@@ -250,19 +250,19 @@ export default async function render(root) {
           <tbody>${visible
             .map(
               (row) => `<tr>
-                <td>
+                <td data-label="Product">
                   <div class="cell-strong">${esc(row.name)}</div>
                   ${row.description ? `<div class="cell-sub clamp-2" style="max-width:320px">${esc(row.description)}</div>` : ""}
                 </td>
-                <td class="mono dim">${esc(row.sku || "—")}</td>
-                <td>${esc(money(row.price, row.currency || "INR"))}</td>
-                <td>
+                <td class="mono dim" data-label="SKU">${esc(row.sku || "—")}</td>
+                <td data-label="Price">${esc(money(row.price, row.currency || "INR"))}</td>
+                <td data-label="Stock">
                   <span class="badge ${Number(row.stock) <= 0 ? "badge-danger" : Number(row.stock) <= 5 ? "badge-warn" : "badge-ok"}">
                     ${Number(row.stock) <= 0 ? "Out of stock" : `${row.stock} in stock`}
                   </span>
                 </td>
-                <td>${statusBadge(row.status || "active")}</td>
-                <td class="dim">${esc(timeAgo(row.updated_at || row.created_at))}</td>
+                <td data-label="Status">${statusBadge(row.status || "active")}</td>
+                <td class="dim" data-label="Updated">${esc(timeAgo(row.updated_at || row.created_at))}</td>
                 <td class="cell-actions">
                   <button class="btn btn-ghost btn-sm" data-stock="${esc(row.id)}">Stock</button>
                   <button class="btn btn-ghost btn-sm" data-edit="${esc(row.id)}">Edit</button>

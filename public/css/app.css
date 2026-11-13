@@ -1140,3 +1140,401 @@ body.drawer-open {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   Mobile layout, round 6
+   --------------------------------------------------------------------------
+   A phone is not a narrow desktop. Three things broke these views at 390px:
+
+     1. Flex and grid children default to `min-width: auto`, so one long word,
+        one wide table or one fixed-width child widened its column and pushed
+        the whole page sideways — the layout could not shrink at all.
+     2. Tables kept a 620px min-width and simply hung off the right edge.
+     3. Filter chips and segmented controls were 28–32px tall, under the 36px a
+        thumb needs.
+
+   Every rule here is scoped so the desktop layout is untouched.
+   ========================================================================== */
+
+/* --------------------------------------------------- 1. everything can shrink */
+.stack,
+.row,
+.card,
+.card-head,
+.card-body,
+.kpi-card,
+.stat,
+.panel,
+.split,
+.grid-2 > *,
+.grid-3 > *,
+.grid-4 > *,
+.grid-main-side > * {
+  min-width: 0;
+}
+.grid-main-side {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1120px) {
+  .grid-main-side {
+    grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr);
+  }
+}
+/* Long words and long references wrap instead of stretching their column. */
+.card-title,
+.card-sub,
+.page-desc,
+.kv dd,
+td,
+th,
+.stat-value,
+.plan-price,
+.badge {
+  overflow-wrap: anywhere;
+}
+
+/* The stepper: the counter is the ::before, so the text is one flex item and
+   cannot be split into columns. */
+.pay-step > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* ------------------------------------------------- 2. tables become card lists */
+/* Below 720px a six-column table is unreadable at any font size, so each row
+   becomes a small card: the header row goes away and every cell prints its own
+   column name from `data-label`. Same markup, same data, no horizontal scroll
+   and nothing hidden. */
+@media (max-width: 720px) {
+  .table-wrap {
+    overflow-x: visible;
+  }
+  .table {
+    min-width: 0;
+    display: block;
+    font-size: var(--fs-xs);
+  }
+  .table thead {
+    display: none;
+  }
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: auto;
+  }
+  .table tbody tr {
+    position: relative;
+    margin: var(--s-2) var(--s-3);
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .table tbody tr:first-child {
+    margin-top: var(--s-3);
+  }
+  .table tbody tr:last-child {
+    margin-bottom: var(--s-3);
+  }
+  .table tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: 4px 0;
+    border-bottom: 0;
+    text-align: right;
+  }
+  .table tbody td::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--text-3);
+    font-size: var(--fs-2xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  /* A cell with no column name (an action button, a checkbox) gets the full
+     row and sits on its own line. */
+  .table tbody td:not([data-label]) {
+    display: block;
+    text-align: left;
+  }
+  .table tbody td:empty {
+    display: none;
+  }
+  .table tbody td.cell-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .table tbody td.cell-actions::before {
+    content: none;
+  }
+  .table tbody td.cell-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .table tbody td .badge {
+    flex: none;
+  }
+}
+
+/* ------------------------------------------------------ 3. thumb-sized controls */
+@media (max-width: 720px), (pointer: coarse) {
+  .segmented button,
+  .chip,
+  .filter-chip,
+  .messages-tab {
+    min-height: 36px;
+  }
+  .btn-sm {
+    min-height: 36px;
+  }
+  .btn-icon {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  /* Cards breathe a little less: on a phone, padding is screen real estate. */
+  .app-content {
+    padding-inline: clamp(0.75rem, 0.4rem + 1vw, 1rem);
+  }
+  .card-head,
+  .card-body {
+    padding-inline: var(--s-4);
+  }
+  .page-head {
+    gap: var(--s-3);
+  }
+  .page-title {
+    font-size: 1.35rem;
+  }
+}
+
+/* An icon button that grows a word on a phone. Hidden on desktop, where the
+   icon sits in a row of labelled buttons and the label would be noise. */
+.btn-word {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Rows that hold a label, some copy and a button
+   --------------------------------------------------------------------------
+   `.service-row` here is a flex row; on a phone the copy column shrank to
+   nothing and the button group kept its width, so "Request" hung off the right
+   edge of a 390px screen. The button group wraps onto its own line instead.
+   -------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .service-row,
+  .setting-row {
+    flex-wrap: wrap;
+  }
+  .service-row > .grow,
+  .setting-row > .grow {
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .service-row > .notif-icon,
+  .setting-row > .notif-icon {
+    order: 1;
+  }
+  /* The amount + action group: full width, right aligned, on its own line. */
+  .service-row > .row.gap-2,
+  .setting-row > .row.gap-2 {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  .service-row .btn,
+  .setting-row .btn {
+    flex: 0 0 auto;
+  }
+
+  /* Project cards: four actions in one row never fit; they wrap and share the
+     width evenly, which also makes every one of them a comfortable target. */
+  .project-actions {
+    flex-wrap: wrap;
+  }
+  .project-actions .btn,
+  .project-actions .btn-icon {
+    flex: 1 1 calc(50% - var(--s-2));
+    justify-content: center;
+  }
+
+  /* A card header with a badge beside a wrapping subtitle reads as two
+     unrelated columns; stack it. */
+  .card-head:has(> .badge) {
+    flex-wrap: wrap;
+  }
+  .card-head:has(> .badge) > .badge {
+    margin-left: auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Stat cards on a phone: two up, not one per screen
+   --------------------------------------------------------------------------
+   A stack of six full-width stat cards is four screens of scrolling before any
+   content appears. At 390px two fit comfortably; below 360px they go back to
+   one because the value ("Not configured") needs the width.
+   -------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-3);
+  }
+  .grid-3 {
+    gap: var(--s-3);
+  }
+  .stat {
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-md);
+  }
+  .stat-head {
+    margin-bottom: 6px;
+  }
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .stat-label .ico {
+    flex: none;
+  }
+  .stat-value {
+    font-size: 1.22rem;
+  }
+  .stat-value small {
+    font-size: 0.66em;
+  }
+  .stat-foot {
+    margin-top: 5px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .stat-foot .ico {
+    flex: none;
+  }
+}
+@media (max-width: 359px) {
+  .grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* --------------------------------------------------------------------------
+   Icon-only buttons keep a 36px box on touch
+   --------------------------------------------------------------------------
+   `.btn-icon.btn-sm` is deliberately 30px on a desktop, where a mouse can hit
+   it. On a phone the refresh button in the Groups header was 28×36: a real
+   target, but narrower than the 36px a thumb needs, and the fix belongs in
+   CSS rather than in every view that uses the class.
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px), (pointer: coarse) {
+  .btn-icon,
+  .btn-icon.btn-sm {
+    --btn-h: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+/* The hub's icon buttons in a conversation header are 28px squares on a
+   desktop; on a phone that is below the 36px a fingertip needs, and these are
+   the search, voice, video and menu controls of the inbox itself. */
+@media (max-width: 900px), (pointer: coarse) {
+  .hub-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .pane-head-actions {
+    gap: 2px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Project card meta line
+   --------------------------------------------------------------------------
+   The meta row wraps on a phone, and once it wraps the "·" separators end up
+   at the start of a line with nothing before them ("· just now"). Below 720px
+   the separator is replaced by a gap, which reads the same and cannot orphan.
+   -------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .project-meta {
+    gap: var(--s-2) var(--s-3);
+  }
+  .project-meta > .meta-sep {
+    display: none;
+  }
+  .project-meta > span:not(.meta-sep) {
+    position: relative;
+  }
+  .project-meta > span:not(.meta-sep) ~ span:not(.meta-sep)::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * var(--s-3) + 3px);
+    top: 50%;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+  }
+  /* The delete button is a 36px icon; alone on the last line it centred
+     itself, which reads as a stray control. It sits at the right instead. */
+  .project-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+  }
+  .project-actions > .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  /* The delete control is icon-only on a desktop, where it sits beside four
+     labelled buttons and the icon is unambiguous. On a phone it is alone on its
+     line, so it says what it does — and stays at the far edge, away from the
+     buttons a thumb reaches for. */
+  .project-actions > .btn-icon {
+    grid-column: 1 / -1;
+    width: auto;
+    min-width: 36px;
+    padding-inline: 10px;
+    gap: 6px;
+    justify-self: end;
+    margin: 0 !important;
+    color: var(--text-3);
+  }
+  .project-actions > .btn-icon:hover {
+    color: var(--danger);
+  }
+  .project-actions .btn-word {
+    display: inline;
+  }
+  .project-actions > .badge {
+    justify-self: start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Long labels inside a flex row
+   --------------------------------------------------------------------------
+   A suggestion chip carries a whole sentence ("What should my homepage say for
+   a premium fashion label?"). A flex item's automatic minimum is its content,
+   so the chip refused to shrink and hung off the right edge of the composer.
+   Allowed to shrink and to wrap, it becomes a two-line button instead.
+   -------------------------------------------------------------------------- */
+.chat-suggestions .chip,
+.chip {
+  max-width: 100%;
+}
+@media (max-width: 900px) {
+  .chat-suggestions .chip {
+    height: auto;
+    min-height: 36px;
+    padding: 8px 12px;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.35;
+  }
+}

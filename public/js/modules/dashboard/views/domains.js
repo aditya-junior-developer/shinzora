@@ -189,10 +189,10 @@ export default async function render(root) {
                     <tbody>${orderRows
                       .map(
                         (order) => `<tr>
-                          <td class="cell-strong">${esc(order.domain_name)}</td>
-                          <td>${esc(money(order.price, order.currency || "INR"))}</td>
-                          <td>${statusBadge(order.status)}</td>
-                          <td class="dim">${esc(timeAgo(order.created_at))}</td>
+                          <td class="cell-strong" data-label="Domain">${esc(order.domain_name)}</td>
+                          <td data-label="Price">${esc(money(order.price, order.currency || "INR"))}</td>
+                          <td data-label="Status">${statusBadge(order.status)}</td>
+                          <td class="dim" data-label="Created">${esc(timeAgo(order.created_at))}</td>
                           <td class="cell-actions">
                             ${
                               order.status === "pending_payment"

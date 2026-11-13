@@ -34,6 +34,8 @@
     "test:prelaunch-ai": "node tests/prelaunch-ai.test.mjs",
     "test:browser": "node tests/browser/flows.mjs",
     "test:layout": "node tests/browser/sweep.mjs",
+    "test:mobile": "node tests/browser/mobile-views.mjs",
+    "test:mobile:app": "node tests/browser/mobile-app.mjs",
     "test:visual": "node tests/browser/visual.mjs",
     "test:install": "node tests/browser/install-flow.mjs",
     "test:shell": "node tests/browser/shell.mjs",

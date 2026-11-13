@@ -164,11 +164,11 @@ export default async function render(root) {
                     <tbody>${paymentRows
                       .map(
                         (row) => `<tr>
-                          <td class="cell-strong mono">${esc(row.reference || row.id.slice(0, 8).toUpperCase())}</td>
-                          <td>${esc(prettyPurpose(row.purpose))}</td>
-                          <td>${esc(money(row.amount, row.currency || "INR"))}</td>
-                          <td>${statusBadge(row.status)}</td>
-                          <td class="dim">${esc(timeAgo(row.created_at))}</td>
+                          <td class="cell-strong mono" data-label="Reference">${esc(row.reference || row.id.slice(0, 8).toUpperCase())}</td>
+                          <td data-label="Purpose">${esc(prettyPurpose(row.purpose))}</td>
+                          <td data-label="Amount">${esc(money(row.amount, row.currency || "INR"))}</td>
+                          <td data-label="Status">${statusBadge(row.status)}</td>
+                          <td class="dim" data-label="Created">${esc(timeAgo(row.created_at))}</td>
                           <td class="cell-actions">
                             ${
                               row.status === "pending"
@@ -193,10 +193,10 @@ export default async function render(root) {
           <div class="card-head"><div class="card-title">How payment works</div></div>
           <div class="card-body">
             <ol class="pay-steps">
-              <li class="pay-step"><span class="pay-step-num">1</span><div><strong>Create the request.</strong> We generate a reference, an amount and a UPI QR for the exact service.</div></li>
-              <li class="pay-step"><span class="pay-step-num">2</span><div><strong>Pay and submit the reference.</strong> Send the UPI transaction ID (UTR) so the payment can be matched.</div></li>
-              <li class="pay-step"><span class="pay-step-num">3</span><div><strong>Verification.</strong> A person checks the UPI statement, or a signed provider webhook confirms it.</div></li>
-              <li class="pay-step"><span class="pay-step-num">4</span><div><strong>Activation.</strong> Your plan, project or service is activated only after verification.</div></li>
+              <li class="pay-step"><div><strong>Create the request.</strong> We generate a reference, an amount and a UPI QR for the exact service.</div></li>
+              <li class="pay-step"><div><strong>Pay and submit the reference.</strong> Send the UPI transaction ID (UTR) so the payment can be matched.</div></li>
+              <li class="pay-step"><div><strong>Verification.</strong> A person checks the UPI statement, or a signed provider webhook confirms it.</div></li>
+              <li class="pay-step"><div><strong>Activation.</strong> Your plan, project or service is activated only after verification.</div></li>
             </ol>
             <div class="alert alert-warn" style="margin-top:var(--s-4);font-size:var(--fs-2xs)">
               ${icon("shield-alert", { size: 14 })}

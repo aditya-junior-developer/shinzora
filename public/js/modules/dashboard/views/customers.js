@@ -112,17 +112,17 @@ export default async function render(root) {
               const orders = ordersFor(row);
               const spend = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
               return `<tr data-view="${esc(row.id)}" style="cursor:pointer">
-                <td>
+                <td data-label="Customer">
                   <div class="row gap-3">
                     <span class="avatar avatar-sm">${esc(initials(row.name || row.email))}</span>
                     <div><div class="cell-strong">${esc(row.name || "Unnamed")}</div>
                     ${row.city ? `<div class="cell-sub">${esc(row.city)}</div>` : ""}</div>
                   </div>
                 </td>
-                <td>${esc(row.email || "—")}<div class="cell-sub">${esc(row.phone || "")}</div></td>
-                <td>${orders.length}</td>
-                <td>${esc(money(spend))}</td>
-                <td class="dim">${esc(timeAgo(row.created_at))}</td>
+                <td data-label="Contact">${esc(row.email || "—")}<div class="cell-sub">${esc(row.phone || "")}</div></td>
+                <td data-label="Orders">${orders.length}</td>
+                <td data-label="Spend">${esc(money(spend))}</td>
+                <td class="dim" data-label="Since">${esc(timeAgo(row.created_at))}</td>
                 <td class="cell-actions">
                   <button class="btn btn-ghost btn-sm btn-icon" data-delete="${esc(row.id)}" aria-label="Delete customer">${icon("trash-2", { size: 13 })}</button>
                 </td>

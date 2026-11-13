@@ -190,7 +190,7 @@ export default async function render(root, ctx) {
                    <button class="btn btn-ghost btn-sm" data-unpublish="${esc(project.id)}">Unpublish</button>`
                 : `<span class="badge badge-neutral">${esc(statusLabel(project.status))}</span>`
             }
-            <button class="btn btn-ghost btn-sm btn-icon" data-delete="${esc(project.id)}" aria-label="Delete project" style="margin-left:auto">${icon("trash-2", { size: 13 })}</button>
+            <button class="btn btn-ghost btn-sm btn-icon" data-delete="${esc(project.id)}" aria-label="Delete project" style="margin-left:auto">${icon("trash-2", { size: 13 })}<span class="btn-word">Delete</span></button>
           </div>
         </article>`;
       })

@@ -95,12 +95,12 @@ export default async function render(root) {
           <tbody>${visible
             .map(
               (row) => `<tr data-view="${esc(row.id)}" style="cursor:pointer">
-                <td class="cell-strong">${esc(row.order_number || row.id.slice(0, 8))}</td>
-                <td>${esc(row.customer_name || "—")}<div class="cell-sub">${esc(row.customer_email || "")}</div></td>
-                <td>${(row.items || []).length}</td>
-                <td>${esc(money(row.total_amount, row.currency || "INR"))}</td>
-                <td>${statusBadge(row.status)}</td>
-                <td class="dim">${esc(timeAgo(row.placed_at || row.created_at))}</td>
+                <td class="cell-strong" data-label="Order">${esc(row.order_number || row.id.slice(0, 8))}</td>
+                <td data-label="Customer">${esc(row.customer_name || "—")}<div class="cell-sub">${esc(row.customer_email || "")}</div></td>
+                <td data-label="Items">${(row.items || []).length}</td>
+                <td data-label="Total">${esc(money(row.total_amount, row.currency || "INR"))}</td>
+                <td data-label="Status">${statusBadge(row.status)}</td>
+                <td class="dim" data-label="Placed">${esc(timeAgo(row.placed_at || row.created_at))}</td>
                 <td class="cell-actions">
                   ${
                     row.status !== "delivered" && row.status !== "cancelled"

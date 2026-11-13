@@ -4278,3 +4278,14 @@ html {
   .call-people { border-left: 0; border-top: 1px solid var(--line); max-height: 140px; }
   .meeting-live-bar { flex-direction: column; align-items: flex-start; }
 }
+
+/* In a conversation header the icon buttons are 28px squares on a desktop. On
+   a phone that is below the 36px a fingertip needs, and these are the search,
+   voice, video and menu controls of the inbox itself — so they grow here,
+   after the desktop rule, where nothing can override them. */
+@media (max-width: 900px), (pointer: coarse) {
+  .hub-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
