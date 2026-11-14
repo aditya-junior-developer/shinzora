@@ -1,0 +1,82 @@
+{
+  "label": "before",
+  "base": "http://127.0.0.1:4180",
+  "runs": 3,
+  "network": "1.6 Mbit/s, 150 ms RTT",
+  "cpu": "4x",
+  "measuredAt": "2026-11-14T09:07:46.039Z",
+  "results": {
+    "landing": {
+      "cold": {
+        "fcp": 1264,
+        "lcp": 1264,
+        "cls": 0.07237537777026426,
+        "tbt": 1653,
+        "dcl": 2081,
+        "load": 2083.7999999999884,
+        "ready": 2688,
+        "inp": 1088,
+        "bytes": 279966,
+        "jsBytes": 146848,
+        "cssBytes": 36768,
+        "imgBytes": 10701,
+        "fontBytes": 71052,
+        "requests": 37,
+        "errors": 0
+      },
+      "repeat": {
+        "fcp": 704,
+        "lcp": 704,
+        "cls": 0.000016126068999993664,
+        "tbt": 1478,
+        "dcl": 769.2999999999884,
+        "load": 770.5999999999767,
+        "ready": 1218,
+        "inp": 264,
+        "bytes": 552,
+        "jsBytes": 0,
+        "cssBytes": 0,
+        "imgBytes": 0,
+        "fontBytes": 0,
+        "requests": 37,
+        "errors": 0
+      }
+    },
+    "app-overview": {
+      "cold": {
+        "fcp": 1160,
+        "lcp": 1160,
+        "cls": 0.00024844225053115244,
+        "tbt": 97,
+        "dcl": 2439.2000000000116,
+        "load": 2440.7000000000116,
+        "ready": 2999,
+        "inp": 976,
+        "bytes": 350372,
+        "jsBytes": 221362,
+        "cssBytes": 57966,
+        "imgBytes": 10701,
+        "fontBytes": 49138,
+        "requests": 102,
+        "errors": 0
+      },
+      "repeat": {
+        "fcp": 1156,
+        "lcp": 1156,
+        "cls": 0.00024844225053115244,
+        "tbt": 21,
+        "dcl": 2438.4000000000233,
+        "load": 2439.2999999999884,
+        "ready": 2970,
+        "inp": null,
+        "bytes": 350230,
+        "jsBytes": 221362,
+        "cssBytes": 57966,
+        "imgBytes": 10701,
+        "fontBytes": 49138,
+        "requests": 100,
+        "errors": 0
+      }
+    }
+  }
+}
