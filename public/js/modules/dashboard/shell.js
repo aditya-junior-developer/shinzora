@@ -493,15 +493,21 @@ const NOTIF_ICONS = {
 /** Rows currently rendered in the drawer, so a click can find its link. */
 let notificationRows = [];
 
-export async function refreshNotificationBadge() {
-  if (!sb || !uid()) return;
-  const { count } = await sb.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", uid()).is("read_at", null);
-  state.unreadNotifications = count || 0;
+/* Paint the unread count that is already in state (identity loading fetches it
+   with the profile), without a second round trip. */
+export function paintNotificationBadge() {
   const badges = [qs("#notif-badge"), qs("[data-notif-badge]")].filter(Boolean);
   badges.forEach((badge) => {
     badge.textContent = String(state.unreadNotifications);
     badge.classList.toggle("hidden", state.unreadNotifications === 0);
   });
+}
+
+export async function refreshNotificationBadge() {
+  if (!sb || !uid()) return;
+  const { count } = await sb.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", uid()).is("read_at", null);
+  state.unreadNotifications = count || 0;
+  paintNotificationBadge();
 }
 
 function notifMarkup(row) {

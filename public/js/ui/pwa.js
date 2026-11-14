@@ -68,7 +68,10 @@ export function registerServiceWorker() {
     location.reload();
   });
 
-  window.addEventListener("load", () => {
+  /* Register once the page has loaded. Pages whose boot waits on the network
+     (the dashboard) call this after the load event has already fired, so the
+     listener alone would never run and the worker would never install. */
+  const register = () => {
     navigator.serviceWorker
       .register("/sw.js", { scope: "/" })
       .then((registration) => {
@@ -80,7 +83,9 @@ export function registerServiceWorker() {
         });
       })
       .catch((error) => console.warn("[shinzora] service worker registration failed:", error?.message));
-  });
+  };
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register, { once: true });
 }
 
 function dismissedRecently() {

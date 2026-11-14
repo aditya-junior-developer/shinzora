@@ -15,7 +15,7 @@ import { hydrateIcons } from "../lib/icons.js";
 import { qs, param } from "../lib/dom.js";
 import { requireSession, watchSession, logoutEverywhere } from "../lib/guard.js";
 import { loadIdentity, state, shellIdentity, applyShellIdentity } from "../lib/store.js";
-import { renderSidebar, paintIdentity, bindChrome, subscribeNotifications, refreshNotificationBadge } from "../modules/dashboard/shell.js";
+import { renderSidebar, paintIdentity, bindChrome, subscribeNotifications, paintNotificationBadge } from "../modules/dashboard/shell.js";
 import { start as startRouter, currentView, landingView } from "../modules/dashboard/router.js";
 import { paintBootFailure, paintIdentityWarning } from "../modules/dashboard/boot-error.js";
 import { initInstallPrompt } from "../ui/pwa.js";
@@ -103,9 +103,10 @@ async function boot() {
 
   let identityError = gate.identityError || null;
 
-  /* The guard already loaded identity once; repeat only when it succeeded, so
-     a failure is not paid for twice on a slow connection. */
-  if (!identityError) {
+  /* The guard has already loaded identity (one profile, business, subscription,
+     onboarding and notification round trip). Load again only when it did not,
+     so every dashboard open does not pay for the same six queries twice. */
+  if (!identityError && !gate.identityLoaded) {
     try {
       await loadIdentity({ force: true });
     } catch (error) {
@@ -137,7 +138,7 @@ async function boot() {
   }
   step("icons", () => hydrateIcons());
 
-  step("notifications badge", () => refreshNotificationBadge());
+  step("notifications badge", () => paintNotificationBadge());
   step("notifications", () => subscribeNotifications());
   step("session watch", () => watchSession(() => logoutEverywhere()));
   step("install prompt", () => initInstallPrompt());

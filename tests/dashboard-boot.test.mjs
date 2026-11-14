@@ -86,6 +86,7 @@ async function loadBoot({ gate, identityThrows = false, routerThrows = false }) 
       export function bindChrome() {}
       export async function subscribeNotifications() {}
       export async function refreshNotificationBadge() {}
+      export function paintNotificationBadge() {}
     `,
     router: `
       export const DEFAULT_VIEW = "overview";

@@ -138,7 +138,9 @@ export async function requireSession(opts = {}) {
   }
 
   hideBootOverlay();
-  return { session, ok: true };
+  /* identityLoaded lets the caller skip its own identity fetch: the guard has
+     just made the one request that the whole page reads from. */
+  return { session, ok: true, identityLoaded: true };
 }
 
 /** Used on auth pages: bounce already-signed-in users to their workspace. */
