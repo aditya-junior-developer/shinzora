@@ -22,6 +22,7 @@
 // ============================================================================
 
 import { json, fail, preflight } from "../_shared/http.ts";
+import { getCaller } from "../_shared/auth.ts";
 
 const KEY_ID = Deno.env.get("CLOUDFLARE_TURN_KEY_ID") ?? "";
 const API_TOKEN = Deno.env.get("CLOUDFLARE_TURN_API_TOKEN") ?? "";
@@ -68,6 +69,11 @@ Deno.serve(async (req) => {
   const options = preflight(req);
   if (options) return options;
   if (req.method !== "POST" && req.method !== "GET") return fail(405, "method_not_allowed", "Use POST.");
+
+  /* Only a signed-in member may ask for relay credentials. The platform accepts
+     the public anon key as a valid JWT, so the check happens here, before any
+     secret is read or any credential is minted. */
+  if (!(await getCaller(req))) return fail(401, "not_authenticated", "Sign in to start a call.");
 
   if (!KEY_ID || !API_TOKEN) {
     /* Not an error: the app is simply not configured for relayed calls yet, and
