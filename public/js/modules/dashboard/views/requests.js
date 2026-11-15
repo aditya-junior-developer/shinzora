@@ -1,138 +1,240 @@
 /* ==========================================================================
-   Shinzora — Service requests
-   The customer side of a service order: what was asked for, who is handling
-   it, where it is, and what happens next. Everything here is read back from
-   the service_requests table — no status is invented in the browser, and a
-   request with no assigned owner says so instead of guessing.
+   Shinzora — Request Services (customer side)
+   A request is a request, not a purchase: the customer picks one of ten
+   services, states a budget in rupees, and a specialist contacts them within
+   24 hours. Nothing is charged here and nothing is described as available
+   beyond the ten categories listed in config/request-services.js.
+
+   The confirmation message is shown only after the database has accepted the
+   row. Status is read back from service_requests; the browser never invents
+   one.
    ========================================================================== */
 
 import { qs, qsa, esc, delegate } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { timeAgo, dateTime, money } from "../../../lib/format.js";
+import { timeAgo, dateTime } from "../../../lib/format.js";
 import { serviceRequests, logActivity, isSchemaMissing } from "../data.js";
 import { normalizeError, sb } from "../../../lib/supabase.js";
 import { state } from "../../../lib/store.js";
-import { pageHead, setupNotice, emptyState, skeletonView, chip, statusBadge, statCard } from "../components.js";
-import { formDialog } from "../../../ui/modal.js";
-import { toast, toastError } from "../../../ui/toast.js";
+import { pageHead, setupNotice, emptyState, skeletonView, chip, statCard } from "../components.js";
+import { fieldError } from "../../../ui/form.js";
+import { toastError } from "../../../ui/toast.js";
+import {
+  REQUEST_CATEGORIES,
+  REQUEST_STATUSES,
+  CONFIRMATION_MESSAGE,
+  OTHERS_MAX_CHARS,
+  categoryById,
+  statusById,
+  validateRequest
+} from "../../../config/request-services.js";
 
-/* The services a customer can ask for without a payment first. Anything that
-   has a fixed price is bought from Billing; it lands here as a request once
-   the payment is verified, so this catalogue is deliberately the "talk to a
-   human" list. */
-const CATALOGUE = [
-  { value: "website_setup", label: "Managed website setup" },
-  { value: "brand_kit", label: "Brand kit and copywriting" },
-  { value: "store_setup", label: "Store and catalogue setup" },
-  { value: "google_listing", label: "Get listed on Google" },
-  { value: "custom", label: "Something else" }
-];
+/* Rows written before 0055 use older status names. Show them as their
+   current equivalent; the database migration already converted stored rows. */
+const LEGACY_STATUS = { requested: "submitted", approved: "under_review", cancelled: "rejected" };
+const normalizeStatus = (s) => statusById(s)?.id || LEGACY_STATUS[s] || "submitted";
+const OPEN = new Set(["submitted", "under_review", "in_progress"]);
 
-const SERVICE_LABEL = Object.fromEntries(CATALOGUE.map((s) => [s.value, s.label]));
-
-/* The steps a live request moves through. Terminal states end the track. */
-const TRACK = [
-  { id: "requested", label: "Requested", desc: "We have your request and it is queued." },
-  { id: "approved", label: "Approved", desc: "Shinzora accepted the scope and assigned an owner." },
-  { id: "in_progress", label: "In progress", desc: "Work is under way on this request." },
-  { id: "completed", label: "Completed", desc: "Delivered and closed." }
-];
-const TERMINAL = { rejected: "Rejected", cancelled: "Cancelled", completed: "Completed" };
-const OPEN_STATUSES = ["requested", "approved", "in_progress"];
+const categoryLabel = (row) => categoryById(row.service_type)?.label || row.title || "Service request";
 
 function reference(row) {
   return row.reference || `SR-${String(row.id || "").slice(0, 8).toUpperCase()}`;
 }
 
-function label(row) {
-  if (row.title) return row.title;
-  return SERVICE_LABEL[row.service_type] || String(row.service_type || "Service request").replace(/_/g, " ");
+/* The 24-hour target is respond_by (0055). Older rows only have due_at. */
+function targetOf(row) {
+  const raw = row.respond_by || row.due_at;
+  if (!raw) return null;
+  const at = new Date(raw);
+  if (Number.isNaN(at.getTime())) return null;
+  const overdue = OPEN.has(normalizeStatus(row.status)) && at.getTime() < Date.now();
+  return { at, overdue, text: dateTime(raw) };
 }
 
-/* A due date is only "overdue" while the request is still open. Once it is
-   completed or cancelled the date is history, not a warning. */
-function dueMeta(row) {
-  if (!row.due_at) return null;
-  const due = new Date(row.due_at);
-  const overdue = OPEN_STATUSES.includes(row.status) && due.getTime() < Date.now();
-  return { due, overdue, text: dateTime(row.due_at) };
-}
-
-function track(row) {
-  const reached = TRACK.findIndex((step) => step.id === row.status);
-  if (TERMINAL[row.status]) {
-    return `<ol class="track track-${row.status === "completed" ? "done" : "stopped"}">${TRACK.slice(0, 3)
-      .map(
-        (step, i) => `<li class="track-step ${i <= 1 ? "is-done" : "is-pending"}">
-          <span class="track-dot">${i <= 1 ? icon("check", { size: 11 }) : ""}</span>
-          <span class="track-label">${esc(step.label)}</span>
-        </li>`
-      )
-      .join("")}<li class="track-step is-final">
-        <span class="track-dot">${icon(row.status === "completed" ? "check" : "x", { size: 11 })}</span>
-        <span class="track-label">${esc(TERMINAL[row.status])}</span>
-      </li></ol>`;
+/* Five steps. Rejected ends the track early at the last step with a red end. */
+function track(status) {
+  const steps = REQUEST_STATUSES.filter((s) => s.id !== "rejected");
+  if (status === "rejected") {
+    const reviewed = steps.slice(0, 2);
+    return `<ol class="track track-stopped" aria-label="Request progress">
+      ${reviewed
+        .map(
+          (s) => `<li class="track-step is-done"><span class="track-dot">${icon("check", { size: 11 })}</span>
+          <span class="track-label">${esc(s.label)}</span></li>`
+        )
+        .join("")}
+      <li class="track-step is-final"><span class="track-dot">${icon("x", { size: 11 })}</span>
+        <span class="track-label">Rejected</span></li></ol>`;
   }
-  return `<ol class="track">${TRACK.map((step, i) => {
-    const done = reached > i;
-    const current = reached === i;
-    return `<li class="track-step ${done ? "is-done" : current ? "is-current" : "is-pending"}"${
-      current ? ' aria-current="step"' : ""
-    }>
-      <span class="track-dot">${done ? icon("check", { size: 11 }) : current ? '<span class="pulse"></span>' : ""}</span>
-      <span class="track-label">${esc(step.label)}</span>
-    </li>`;
-  }).join("")}</ol>`;
+  const reached = statusById(status)?.step ?? 0;
+  const current = statusById(status)?.id;
+  return `<ol class="track${status === "completed" ? " track-done" : ""}" aria-label="Request progress">${steps
+    .map((s, i) => {
+      const done = status === "completed" ? true : reached > i;
+      const here = !done && current === s.id;
+      const cls = done ? "is-done" : here ? "is-current" : "is-pending";
+      return `<li class="track-step ${cls}"${here ? ' aria-current="step"' : ""}>
+        <span class="track-dot">${done ? icon("check", { size: 11 }) : here ? '<span class="pulse"></span>' : ""}</span>
+        <span class="track-label">${esc(s.label)}</span></li>`;
+    })
+    .join("")}</ol>`;
 }
 
-function trackNote(row) {
-  const step = TRACK.find((s) => s.id === row.status);
-  if (step) return step.desc;
-  if (row.status === "rejected") return "Shinzora could not take this on. The note below explains why.";
-  if (row.status === "cancelled") return "This request was cancelled. Nothing further is scheduled.";
-  return "";
-}
+const STATUS_NOTE = {
+  submitted: "We have your request. A specialist will connect with you within 24 hours.",
+  under_review: "A specialist is reviewing your requirements and budget.",
+  in_progress: "Work is under way on this request.",
+  completed: "Delivered and closed. Thank you for working with Shinzora.",
+  rejected: "We could not take this on. The note below explains why."
+};
 
 function card(row) {
-  const due = dueMeta(row);
-  return `<article class="card request-card" data-id="${esc(row.id)}">
+  const status = normalizeStatus(row.status);
+  const meta = statusById(status);
+  const target = targetOf(row);
+  const budget = row.budget_inr != null ? `₹${Number(row.budget_inr).toLocaleString("en-IN")}` : "";
+  return `<article class="card request-card svc-reveal" data-id="${esc(row.id)}">
     <div class="card-head">
       <div>
-        <div class="card-title">${esc(label(row))}</div>
-        <div class="muted small">${esc(reference(row))} · raised ${esc(timeAgo(row.created_at))}</div>
+        <div class="card-title">${esc(categoryLabel(row))}</div>
+        <div class="muted small">${esc(reference(row))} · submitted ${esc(timeAgo(row.created_at))}</div>
       </div>
-      <div class="row gap-2" style="align-items:center">
-        ${due && due.overdue ? chip("Overdue", { tone: "danger", iconName: "circle-alert" }) : ""}
-        ${row.amount ? chip(money(row.amount), { tone: "neutral" }) : ""}
-        ${statusBadge(row.status)}
+      <div class="row gap-2" style="align-items:center;flex-wrap:wrap">
+        ${target?.overdue ? chip("Past 24 h", { tone: "danger", iconName: "circle-alert" }) : ""}
+        ${budget ? chip(`Budget ${budget}`, { tone: "neutral" }) : ""}
+        <span class="badge badge-${meta.tone}"><span class="dot"></span>${esc(meta.label)}</span>
       </div>
     </div>
     <div class="card-body stack gap-4">
-      ${track(row)}
-      <p class="muted small" style="margin:0">${esc(trackNote(row))}</p>
+      ${track(status)}
+      <p class="muted small" style="margin:0">${esc(STATUS_NOTE[status])}</p>
       ${
-        due
-          ? `<div class="field-hint" style="margin:0">${icon(due.overdue ? "circle-alert" : "calendar", {
-              size: 12
-            })} Target ${esc(due.text)}${due.overdue ? " — running past the target, we will follow up." : ""}</div>`
+        target && OPEN.has(status)
+          ? `<div class="field-hint" style="margin:0">${icon(target.overdue ? "circle-alert" : "clock", { size: 12 })} Contact by ${esc(target.text)}${
+              target.overdue ? " — this has passed, and we will follow up." : ""
+            }</div>`
           : ""
       }
-      ${row.details ? `<p class="request-details" style="margin:0">${esc(row.details)}</p>` : ""}
+      ${row.custom_description ? `<p class="request-details" style="margin:0;white-space:pre-wrap">${esc(row.custom_description)}</p>` : ""}
       ${
         row.admin_note
-          ? `<div class="notice notice-info"><div class="notice-body"><strong>Note from Shinzora</strong><p style="margin:4px 0 0">${esc(
-              row.admin_note
-            )}</p></div></div>`
+          ? `<div class="svc-callout is-info"><strong>Note from Shinzora</strong><p>${esc(row.admin_note)}</p></div>`
           : ""
       }
       <div class="row gap-2">
-        <button class="btn btn-secondary btn-sm" data-action="message" data-id="${esc(row.id)}">${icon("message-square", {
-          size: 14
-        })}Message us about this</button>
-        <a class="btn btn-ghost btn-sm" href="/docs/#services">${icon("book-open", { size: 14 })}How this works</a>
+        <button class="btn btn-secondary btn-sm" data-action="message" data-id="${esc(row.id)}">${icon("message-square", { size: 14 })}Message us about this</button>
       </div>
     </div>
   </article>`;
+}
+
+function statsMarkup(rows) {
+  const st = rows.map((r) => normalizeStatus(r.status));
+  const open = st.filter((s) => OPEN.has(s)).length;
+  return `
+    ${statCard({ label: "Open", value: open, iconName: "route", foot: `${st.filter((s) => s === "in_progress").length} in progress` })}
+    ${statCard({ label: "Awaiting review", value: st.filter((s) => s === "under_review" || s === "submitted").length, iconName: "inbox", foot: "waiting for a specialist" })}
+    ${statCard({ label: "Completed", value: st.filter((s) => s === "completed").length, iconName: "circle-check", foot: "all time" })}
+    ${statCard({ label: "Total", value: rows.length, iconName: "file-text", foot: "including closed" })}`;
+}
+
+function listMarkup(rows) {
+  return `<h2 class="section-title" style="margin:0">Your requests</h2>${
+    rows.length
+      ? rows.map(card).join("")
+      : emptyState({
+          icon: "route",
+          title: "No requests yet",
+          desc: "Choose a service on the left. Your requests appear here with each step of their progress."
+        })
+  }`;
+}
+
+function tileMarkup(cat, selected) {
+  return `<label class="svc-tile${selected ? " is-selected" : ""}" data-tile="${esc(cat.id)}">
+    <input type="radio" name="service" value="${esc(cat.id)}" class="svc-radio"${selected ? " checked" : ""}>
+    <span class="svc-tile-icon">${icon(cat.icon, { size: 18 })}</span>
+    <span class="svc-tile-text">
+      <span class="svc-tile-title">${esc(cat.label)}</span>
+      <span class="svc-tile-sub">${esc(cat.summary)}</span>
+    </span>
+    <span class="svc-tile-tick" aria-hidden="true">${icon("check", { size: 12 })}</span>
+  </label>`;
+}
+
+function formMarkup() {
+  const name = state.profile?.full_name || "";
+  const email = state.user?.email || "";
+  const phone = state.profile?.phone || "";
+  return `<section class="card svc-form-card svc-reveal" id="request-form" aria-labelledby="request-form-title">
+    <div class="card-head">
+      <div>
+        <div class="card-title" id="request-form-title">Request a service</div>
+        <div class="muted small">Choose one. A specialist will connect with you within 24 hours to discuss your requirements and budget.</div>
+      </div>
+    </div>
+    <form class="card-body stack gap-5" id="svc-form" novalidate>
+      <fieldset class="svc-fieldset">
+        <legend class="field-label svc-legend">Service</legend>
+        <div class="svc-grid" role="radiogroup" aria-label="Service">
+          ${REQUEST_CATEGORIES.map((cat) => tileMarkup(cat, false)).join("")}
+        </div>
+        <div class="field-error" data-error="category" role="alert"></div>
+      </fieldset>
+
+      <div class="svc-others" id="svc-others" hidden>
+        <div class="field" data-field="description">
+          <label class="field-label" for="svc-description">Describe what you need</label>
+          <textarea class="input" id="svc-description" name="description" rows="4" maxlength="${OTHERS_MAX_CHARS}"
+            placeholder="What should be delivered, for whom, and by when? Links and references help."></textarea>
+          <div class="field-hint"><span id="svc-count">0</span> / ${OTHERS_MAX_CHARS} · at least 10 characters</div>
+          <div class="field-error"></div>
+        </div>
+      </div>
+
+      <div class="svc-two">
+        <div class="field" data-field="budget">
+          <label class="field-label" for="svc-budget">Expected budget (₹)</label>
+          <div class="svc-money">
+            <span class="svc-money-sign" aria-hidden="true">₹</span>
+            <input class="input" id="svc-budget" name="budget" type="text" inputmode="decimal" autocomplete="off"
+              placeholder="5000" aria-describedby="svc-budget-hint">
+          </div>
+          <div class="field-hint" id="svc-budget-hint">In Indian rupees. Up to ₹10,00,00,000.</div>
+          <div class="field-error"></div>
+        </div>
+        <div class="field" data-field="name">
+          <label class="field-label" for="svc-name">Your name</label>
+          <input class="input" id="svc-name" name="name" type="text" autocomplete="name" value="${esc(name)}" maxlength="120">
+          <div class="field-error"></div>
+        </div>
+        <div class="field" data-field="email">
+          <label class="field-label" for="svc-email">Email</label>
+          <input class="input" id="svc-email" name="email" type="email" autocomplete="email" value="${esc(email)}" maxlength="254">
+          <div class="field-error"></div>
+        </div>
+        <div class="field" data-field="phone">
+          <label class="field-label" for="svc-phone">Phone <span class="optional">optional</span></label>
+          <input class="input" id="svc-phone" name="phone" type="tel" autocomplete="tel" value="${esc(phone)}" maxlength="20">
+          <div class="field-error"></div>
+        </div>
+      </div>
+
+      <div class="row gap-3 svc-actions">
+        <button class="btn btn-primary" type="submit" id="svc-submit">${icon("send", { size: 14 })}<span>Submit request</span></button>
+        <span class="muted small">No payment is taken here. We contact you first.</span>
+      </div>
+      <div class="svc-confirm" id="svc-confirm" role="status" aria-live="polite" hidden></div>
+    </form>
+  </section>`;
+}
+
+function validateContact({ name, email, phone }) {
+  const errors = {};
+  if (name.trim().length < 2) errors.name = "Enter your name.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = "Enter a valid email address.";
+  if (phone.trim() && !/^[+\d][\d\s-]{6,18}$/.test(phone.trim())) errors.phone = "Enter a valid phone number, or leave it blank.";
+  return errors;
 }
 
 export default async function render(root) {
@@ -141,102 +243,161 @@ export default async function render(root) {
   let rows = [];
   try {
     const result = await serviceRequests(100);
-    /* The data layer normally hands back the rows; a mirror that answers with
-       { data } must not turn the whole page into a crash, so accept both. */
     rows = Array.isArray(result) ? result : Array.isArray(result?.data) ? result.data : [];
   } catch (error) {
-    root.innerHTML = `${pageHead({ title: "Service requests" })}${setupNotice(error, "Service requests")}`;
+    root.innerHTML = `${pageHead({ title: "Request Services" })}${setupNotice(error, "Request Services")}`;
     if (!isSchemaMissing(error)) console.error(error);
     return;
   }
 
-  const open = rows.filter((r) => OPEN_STATUSES.includes(r.status));
-  const closed = rows.filter((r) => !OPEN_STATUSES.includes(r.status));
 
   root.innerHTML = `
     ${pageHead({
-      title: "Service requests",
-      desc: "Work you have asked Shinzora to do, with its current stage and target date.",
-      actions: `<button class="btn btn-primary btn-sm" id="new-request">${icon("plus", { size: 14 })}Request a service</button>`
+      title: "Request Services",
+      desc: "Tell us what you need. A specialist confirms scope and budget with you, then you can follow every step here."
     })}
-    <div class="grid-4" style="margin-bottom:var(--s-4)">
-      ${statCard({ label: "Open requests", value: open.length, iconName: "route", foot: `${open.filter((r) => r.status === "in_progress").length} in progress` })}
-      ${statCard({ label: "Awaiting review", value: open.filter((r) => r.status === "requested").length, iconName: "inbox", foot: "queued for a human" })}
-      ${statCard({ label: "Completed", value: rows.filter((r) => r.status === "completed").length, iconName: "circle-check", foot: "all time" })}
-      ${statCard({ label: "Total raised", value: rows.length, iconName: "file-text", foot: "closed requests included" })}
-    </div>
-    <div class="stack gap-4" id="request-list">${
-      rows.length
-        ? `${open.length ? `<h2 class="section-title">Open</h2>${open.map(card).join("")}` : ""}
-           ${closed.length ? `<h2 class="section-title">Closed</h2>${closed.map(card).join("")}` : ""}`
-        : emptyState({
-            icon: "route",
-            title: "No service requests yet",
-            desc: "Ask Shinzora to build, set up or fix something and it will appear here with its progress.",
-            action: `<button class="btn btn-primary btn-sm" data-action="new">${icon("plus", { size: 14 })}Request a service</button>`
-          })
-    }</div>`;
+    <div class="grid-4 svc-stats" id="svc-stats" style="margin-bottom:var(--s-4)">${statsMarkup(rows)}</div>
+    <div class="svc-layout">
+      ${formMarkup()}
+      <div class="stack gap-4" id="request-list">${listMarkup(rows)}</div>
+    </div>`;
 
-  async function newRequest() {
-    const values = await formDialog({
-      title: "Request a service",
-      desc: "Tell us what you need. We reply within one working day, and the request appears here once it is raised.",
-      submitLabel: "Submit request",
-      fields: [
-        {
-          name: "service_type",
-          label: "Service",
-          type: "select",
-          required: true,
-          value: "website_setup",
-          options: CATALOGUE.map((s) => ({ value: s.value, label: s.label }))
-        },
-        { name: "title", label: "Short title", required: true, placeholder: "Homepage refresh for my store" },
-        {
-          name: "details",
-          label: "Details",
-          type: "textarea",
-          rows: 5,
-          required: true,
-          placeholder: "What should exist when this is done? Links, references and deadlines help."
-        }
-      ]
+  const form = qs("#svc-form", root);
+  const tiles = qsa(".svc-tile", root);
+  const others = qs("#svc-others", root);
+  const description = qs("#svc-description", root);
+  const count = qs("#svc-count", root);
+  const submit = qs("#svc-submit", root);
+  const confirm = qs("#svc-confirm", root);
+
+  /* Picking a tile marks it, reveals the text field only for Others, and moves
+     focus on to the next input so keyboard users do not have to hunt for it. */
+  function choose(id) {
+    tiles.forEach((t) => {
+      const on = t.dataset.tile === id;
+      t.classList.toggle("is-selected", on);
+      t.querySelector("input").checked = on;
     });
-    if (!values) return;
+    const needs = categoryById(id)?.needsDescription === true;
+    others.hidden = !needs;
+    if (needs) requestAnimationFrame(() => description.focus());
+    qs('[data-error="category"]', root).textContent = "";
+    confirm.hidden = true;
+  }
 
-    try {
-      const { data, error } = await sb
-        .from("service_requests")
-        .insert({
-          owner_id: state.user.id,
-          service_type: values.service_type,
-          title: values.title,
-          details: values.details,
-          status: "requested"
-        })
-        .select("*")
-        .single();
-      if (error) throw normalizeError(error);
+  tiles.forEach((tile) => tile.querySelector("input").addEventListener("change", (e) => choose(e.target.value)));
 
-      await logActivity("service_requested", "service_request", data?.id || null, {
-        service_type: values.service_type
-      }).catch(() => {});
+  description.addEventListener("input", () => {
+    count.textContent = String(description.value.length);
+    fieldError(description, "");
+  });
 
-      toast(
-        {
-          title: "Request submitted",
-          message: "It is queued for review and now visible in this list. We contact you within 24 hours on working days."
-        },
-        { tone: "success", duration: 8000 }
-      );
-      render(root);
-    } catch (error) {
-      toastError(normalizeError(error));
+  qs("#svc-budget", root).addEventListener("input", (e) => {
+    /* Keep only digits, commas and one decimal point, as the customer types. */
+    e.target.value = e.target.value.replace(/[^\d.,]/g, "");
+    fieldError(e.target, "");
+  });
+
+  ["#svc-name", "#svc-email", "#svc-phone"].forEach((sel) =>
+    qs(sel, root).addEventListener("input", (e) => fieldError(e.target, ""))
+  );
+
+  function showErrors(errors) {
+    const category = qs('[data-error="category"]', root);
+    category.textContent = errors.category || "";
+    const map = { budget: "#svc-budget", description: "#svc-description", name: "#svc-name", email: "#svc-email", phone: "#svc-phone" };
+    for (const [key, sel] of Object.entries(map)) {
+      fieldError(qs(sel, root), errors[key] || "");
+    }
+    const first = Object.keys(errors)[0];
+    if (first) {
+      const target = first === "category" ? tiles[0] : qs(map[first], root);
+      target?.focus?.();
     }
   }
 
-  delegate(root, "click", "#new-request", newRequest);
-  delegate(root, "click", '[data-action="new"]', newRequest);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    confirm.hidden = true;
+
+    const picked = form.querySelector('input[name="service"]:checked')?.value || "";
+    const contact = {
+      name: qs("#svc-name", root).value,
+      email: qs("#svc-email", root).value,
+      phone: qs("#svc-phone", root).value
+    };
+    const checked = validateRequest({
+      category: picked,
+      budget: qs("#svc-budget", root).value,
+      description: description.value
+    });
+    const errors = { ...checked.errors, ...validateContact(contact) };
+    if (Object.keys(errors).length) {
+      showErrors(errors);
+      return;
+    }
+    showErrors({});
+
+    const category = categoryById(picked);
+    const payload = {
+      owner_id: state.user.id,
+      service_type: checked.value.service_type,
+      title: category.label,
+      details: checked.value.custom_description,
+      custom_description: checked.value.custom_description,
+      budget_inr: checked.value.budget_inr,
+      contact_name: contact.name.trim(),
+      contact_email: contact.email.trim(),
+      contact_phone: contact.phone.trim() || null,
+      status: "submitted"
+    };
+
+    submit.disabled = true;
+    submit.setAttribute("aria-busy", "true");
+    submit.querySelector("span").textContent = "Submitting…";
+
+    try {
+      const { data, error } = await sb.from("service_requests").insert(payload).select("*").single();
+      if (error) throw normalizeError(error);
+
+      /* Only a row the database accepted gets the confirmation. */
+      await logActivity("service_requested", "service_request", data?.id || null, {
+        service_type: payload.service_type,
+        budget_inr: payload.budget_inr
+      }).catch(() => {});
+
+      confirm.innerHTML = `<div class="svc-callout is-ok"><span class="svc-callout-icon">${icon("circle-check", { size: 18 })}</span><p>${esc(CONFIRMATION_MESSAGE)}</p></div>`;
+      confirm.hidden = false;
+      confirm.classList.remove("is-shown");
+      requestAnimationFrame(() => confirm.classList.add("is-shown"));
+      form.reset();
+      tiles.forEach((t) => {
+        t.classList.remove("is-selected");
+        t.querySelector("input").checked = false;
+      });
+      others.hidden = true;
+      count.textContent = "0";
+      qs("#svc-name", root).value = contact.name;
+      qs("#svc-email", root).value = contact.email;
+      qs("#svc-phone", root).value = contact.phone;
+
+      /* Refresh the list from the database so the new row shows with its real reference. */
+      const fresh = await serviceRequests(100).catch(() => null);
+      const list = Array.isArray(fresh) ? fresh : Array.isArray(fresh?.data) ? fresh.data : null;
+      if (list) {
+        rows = list;
+        qs("#svc-stats", root).innerHTML = statsMarkup(rows);
+        qs("#request-list", root).innerHTML = listMarkup(rows);
+      }
+    } catch (error) {
+      toastError(normalizeError(error));
+    } finally {
+      submit.disabled = false;
+      submit.removeAttribute("aria-busy");
+      submit.querySelector("span").textContent = "Submit request";
+    }
+  });
+
   delegate(root, "click", '[data-action="message"]', (event, el) => {
     const row = rows.find((r) => r.id === el.dataset.id);
     const subject = `Question about ${row ? reference(row) : "my service request"}`;
@@ -245,6 +406,5 @@ export default async function render(root) {
 
   /* Deep link: /app/?view=requests&id=… scrolls to that request. */
   const wanted = new URLSearchParams(location.search).get("id");
-  if (wanted) qs(`.request-card[data-id="${CSS.escape(wanted)}"]`, root)?.scrollIntoView({ block: "center" });
-  qsa(".request-card", root).forEach((node) => node.classList.add("is-ready"));
+  if (wanted) qs(`.request-card[data-id="${CSS.escape(wanted)}"]`, root)?.scrollIntoView({ block: "center", behavior: "smooth" });
 }

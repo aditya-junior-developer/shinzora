@@ -12,20 +12,13 @@ import { emptyState } from "../../dashboard/components.js";
 import { openModal, confirmDialog, formDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
+import renderServiceRequests from "./service-requests.js";
 
 const PAYMENT_TABS = [
   { id: "awaiting_verification", label: "Awaiting verification" },
   { id: "pending", label: "Not paid" },
   { id: "verified", label: "Verified" },
   { id: "rejected", label: "Rejected / failed" },
-  { id: "all", label: "All" }
-];
-
-const SERVICE_TABS = [
-  { id: "requested", label: "Requested" },
-  { id: "approved", label: "Approved" },
-  { id: "in_progress", label: "In progress" },
-  { id: "completed", label: "Completed" },
   { id: "all", label: "All" }
 ];
 
@@ -44,7 +37,7 @@ function customerNote(note = "") {
 }
 
 export default async function render(root, { view }) {
-  if (view === "services") return renderServices(root);
+  if (view === "services") return renderServiceRequests(root);
   return renderPayments(root);
 }
 
@@ -327,149 +320,3 @@ async function renderPayments(root) {
  * object form threw inside the row template, which took down the entire table
  * and printed the TypeError into the cell.
  */
-function detailText(value, max = 140) {
-  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
-  return text.length > max ? `${text.slice(0, max)}…` : text;
-}
-
-async function renderServices(root) {
-  let tab = "requested";
-  let rows = [];
-
-  root.innerHTML = `
-    <div class="admin-head">
-      <div>
-        <h1>Service requests</h1>
-        <p>Managed work requested by customers: setup, brand kits, store builds and account actions. Approving records a decision; the work itself is tracked by status.</p>
-      </div>
-      <div class="admin-filters">
-        <div class="admin-tabs" id="service-tabs">
-          ${SERVICE_TABS.map((item) => `<button data-tab="${item.id}" class="${item.id === tab ? "is-active" : ""}">${esc(item.label)}</button>`).join("")}
-        </div>
-      </div>
-    </div>
-    <div class="admin-card">
-      <div class="admin-card-head">
-        <div><div class="admin-card-title">Requests</div><div class="admin-card-sub" id="service-count">Loading…</div></div>
-      </div>
-      <div id="service-table"></div>
-    </div>`;
-
-  await load();
-
-  on(qs("#service-tabs"), "click", (event) => {
-    const button = event.target.closest("[data-tab]");
-    if (!button) return;
-    tab = button.getAttribute("data-tab");
-    root.querySelectorAll("#service-tabs button").forEach((node) => node.classList.toggle("is-active", node === button));
-    load();
-  });
-
-  delegate(qs("#service-table"), "click", "[data-manage]", (_event, node) => {
-    const row = rows.find((item) => item.id === node.getAttribute("data-manage"));
-    if (row) manage(row);
-  });
-
-  async function load() {
-    try {
-      const response = await adminApi.serviceRequests({ status: tab });
-      rows = response.requests || [];
-      qs("#service-count").textContent = `${rows.length} request${rows.length === 1 ? "" : "s"}`;
-      paint();
-    } catch (error) {
-      safeSet("#service-table", `<div class="admin-empty">${esc(error.message)}</div>`);
-    }
-  }
-
-  function paint() {
-    safeSet("#service-table", rows.length
-      ? `<div class="table-wrap"><table class="table">
-          <thead><tr><th>Service</th><th>Customer</th><th>Amount</th><th>Status</th><th>Requested</th><th></th></tr></thead>
-          <tbody>${rows
-            .map(
-              (row) => `<tr>
-                <td>
-                  <div class="cell-strong">${esc(row.title || row.service_type)}</div>
-                  <div class="cell-sub" style="max-width:420px">${esc(detailText(row.details, 140))}</div>
-                </td>
-                <td>${esc(row.customer?.full_name || "—")}<div class="cell-sub">${esc(row.customer?.email || "")}</div></td>
-                <td>${row.amount ? esc(money(row.amount, "INR")) : "—"}</td>
-                <td><span class="badge badge-${row.status === "completed" ? "ok" : row.status === "rejected" ? "danger" : "warn"}">${esc(statusLabel(row.status))}</span></td>
-                <td class="dim">${esc(timeAgo(row.created_at))}</td>
-                <td class="cell-actions"><button class="btn btn-secondary btn-sm" data-manage="${esc(row.id)}">Manage</button></td>
-              </tr>`
-            )
-            .join("")}</tbody>
-        </table></div>`
-      : emptyState({ icon: "briefcase", title: "No requests in this state", desc: "Customers create these from Billing or Settings." }));
-  }
-
-  function manage(row) {
-    openModal({
-      title: row.title || row.service_type,
-      desc: `${row.customer?.email || ""} · ${dateTime(row.created_at)}`,
-      size: "lg",
-      body: `
-        <dl class="admin-kv">
-          <dt>Type</dt><dd>${esc(row.service_type)}</dd>
-          <dt>Status</dt><dd>${esc(statusLabel(row.status))}</dd>
-          <dt>Amount</dt><dd>${row.amount ? esc(money(row.amount, "INR")) : "—"}</dd>
-          <dt>Details</dt><dd style="white-space:pre-wrap">${esc(detailText(row.details, 1200))}</dd>
-          ${row.admin_note ? `<dt>Your note</dt><dd>${esc(row.admin_note)}</dd>` : ""}
-        </dl>`,
-      footer: `<button class="btn btn-ghost" data-modal-close>Close</button>
-               <button class="btn btn-secondary" id="reject-service">Reject</button>
-               <button class="btn btn-primary" id="advance-service">Advance status</button>`,
-      onMount: (dialog, controller) => {
-        qs("#advance-service", dialog).addEventListener("click", async () => {
-          controller.close();
-          const values = await formDialog({
-            title: "Update request",
-            fields: [
-              {
-                name: "status",
-                label: "New status",
-                type: "select",
-                value: nextServiceStatus(row.status),
-                options: ["approved", "in_progress", "completed", "cancelled"].map((value) => ({ value, label: statusLabel(value) }))
-              },
-              { name: "note", label: "Note to customer", type: "textarea", rows: 3 }
-            ],
-            submitLabel: "Update"
-          });
-          if (!values) return;
-          try {
-            await adminApi.serviceRequestUpdate({ id: row.id, status: values.status, note: values.note });
-            toast({ title: "Request updated" }, { tone: "success" });
-            await load();
-          } catch (error) {
-            toastError(error);
-          }
-        });
-
-        qs("#reject-service", dialog).addEventListener("click", async () => {
-          const ok = await confirmDialog({
-            title: "Reject this request?",
-            desc: "The customer is notified. No payment is refunded from here.",
-            confirmLabel: "Reject",
-            tone: "danger"
-          });
-          if (!ok) return;
-          controller.close();
-          try {
-            await adminApi.serviceRequestUpdate({ id: row.id, status: "rejected", note: "Rejected by administrator" });
-            toast({ title: "Request rejected" }, { tone: "success" });
-            await load();
-          } catch (error) {
-            toastError(error);
-          }
-        });
-      }
-    });
-  }
-
-  function nextServiceStatus(status) {
-    return { requested: "approved", approved: "in_progress", in_progress: "completed", completed: "completed", rejected: "approved", cancelled: "approved" }[status] || "in_progress";
-  }
-
-}

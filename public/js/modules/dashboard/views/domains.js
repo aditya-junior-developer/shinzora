@@ -364,7 +364,7 @@ export default async function render(root) {
         service_type: "domain_registration",
         title: `Domain registration — ${domain}`,
         details: `Domain: ${domain}\n\n${values.detail}\n\nContact: ${values.contact}`,
-        status: "requested"
+        status: "submitted"
       });
       if (error) throw normalizeError(error);
       toast({ title: "Request sent", message: `We will confirm the price for ${domain} before any payment.` }, { tone: "success" });

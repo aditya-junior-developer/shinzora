@@ -848,3 +848,15 @@ body.drawer-open {
     z-index: 70;
   }
 }
+
+/* Request Services — overdue and snippet states (0055). */
+.sr-overdue { color: var(--danger); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.sr-snippet {
+  max-width: 420px;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.admin-card table tr.is-overdue > td:first-child { box-shadow: inset 3px 0 0 var(--danger); }

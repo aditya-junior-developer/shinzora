@@ -876,17 +876,15 @@ async function finish() {
         owner_id: userId,
         service_type: "plan_upgrade",
         title: `Upgrade to ${planById(draft.plan).name}`,
-        details: {
+        /* details is a text column, so the structured record is stored as JSON text. */
+        details: JSON.stringify({
           requested_plan: draft.plan,
           listed_price: planById(draft.plan).priceMonthly,
           currency: "INR",
           business_name: isAgent() ? draft.agent.headline : draft.business.name
-        },
-        /* 'pending' is not a valid service_requests status — the CHECK allows
-           requested/approved/in_progress/completed/rejected/cancelled and the
-           insert policy demands the customer's own row start at 'requested'.
-           The old value failed for every paid plan. */
-        status: "requested"
+        }),
+        /* 0055: the customer's own row must start at 'submitted'. */
+        status: "submitted"
       });
     }
 

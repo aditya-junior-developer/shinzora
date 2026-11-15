@@ -1013,7 +1013,7 @@ export default async function render(root) {
           service_type: "account_deletion",
           title: "Account deletion request",
           details: `Requested from settings on ${new Date().toISOString()}`,
-          status: "requested"
+          status: "submitted"
         });
         if (error) throw normalizeError(error);
         await logActivity("account_deletion_requested", "profile", state.user.id, {});

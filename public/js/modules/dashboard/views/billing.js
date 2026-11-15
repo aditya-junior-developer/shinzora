@@ -360,7 +360,7 @@ export default async function render(root) {
         service_type: item.id,
         title: item.label,
         details: `${values.detail}\n\nContact: ${values.contact}`,
-        status: "requested"
+        status: "submitted"
       });
       if (error) throw normalizeError(error);
       toast({ title: "Request sent", message: "We will confirm the exact amount before payment." }, { tone: "success" });

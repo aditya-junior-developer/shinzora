@@ -142,7 +142,7 @@ async function overview() {
     count("projects"),
     count("projects", (q) => q.eq("status", "published")),
     count("payments", (q) => q.in("status", ["pending", "awaiting_verification"])),
-    count("service_requests", (q) => q.in("status", ["requested", "approved", "in_progress"])),
+    count("service_requests", (q) => q.in("status", ["submitted", "under_review", "in_progress"])),
     count("marketing_requests", (q) => q.in("status", ["submitted", "under_review", "more_information_required"])),
     count("support_tickets", (q) => q.eq("status", "open")),
     count("contact_messages", (q) => q.eq("status", "new")),
@@ -399,13 +399,13 @@ async function applyPaymentEffect(payment: Record<string, any>) {
       .select("id")
       .eq("owner_id", payment.owner_id)
       .eq("service_type", serviceType)
-      .in("status", ["requested", "approved"])
+      .in("status", ["submitted", "under_review"])
       .maybeSingle();
 
     if (existing) {
       await db
         .from("service_requests")
-        .update({ status: "approved", payment_id: payment.id, updated_at: new Date().toISOString() })
+        .update({ status: "under_review", payment_id: payment.id, updated_at: new Date().toISOString() })
         .eq("id", existing.id);
     } else {
       await db.from("service_requests").insert({
@@ -414,7 +414,7 @@ async function applyPaymentEffect(payment: Record<string, any>) {
         title: payment.label ?? serviceType,
         details: "Created automatically from a verified payment.",
         amount: payment.amount,
-        status: "approved",
+        status: "under_review",
         payment_id: payment.id
       });
     }
@@ -615,36 +615,49 @@ async function serviceRequests(body: Record<string, unknown>) {
   return json({ requests: (data ?? []).map((row) => ({ ...row, customer: owners.get(row.owner_id) ?? null })) });
 }
 
+/* 0055: the five statuses a request moves through. Anything else is refused. */
+const SERVICE_STATUSES = ["submitted", "under_review", "in_progress", "completed", "rejected"];
+
+/**
+ * Updates one Request Services row: status, optional note, optional assignee.
+ * The owner's notification is written by the service_requests_notify trigger,
+ * so this handler does not insert one itself. An assignee must be an existing
+ * administrator; a customer account cannot be assigned work.
+ */
 async function serviceRequestUpdate(adminId: string, body: Record<string, unknown>) {
   const id = clean(body.id, 64);
   const status = clean(body.status, 30);
-  const note = clean(body.note, 500);
-  const allowed = ["requested", "approved", "in_progress", "completed", "rejected", "cancelled"];
-  if (!id || !allowed.includes(status)) return fail(400, "invalid_input", "A valid request id and status are required.");
+  const hasNote = Object.prototype.hasOwnProperty.call(body, "note");
+  const note = hasNote ? clean(body.note, 2000) : null;
+  const hasAssignee = Object.prototype.hasOwnProperty.call(body, "assigned_to");
+  const assignee = hasAssignee ? clean(body.assigned_to, 64) : null;
+
+  if (!id || !SERVICE_STATUSES.includes(status)) {
+    return fail(400, "invalid_input", "A valid request id and status are required.", {
+      allowed: SERVICE_STATUSES
+    });
+  }
 
   const db = admin();
-  const { data, error } = await db
-    .from("service_requests")
-    .update({ status, admin_note: note || null, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select("*")
-    .single();
-  if (error) return fail(500, "admin_error", error.message);
 
-  await db.from("notifications").insert({
-    user_id: data.owner_id,
-    title: `Service request ${status.replace(/_/g, " ")}`,
-    body: `${data.title ?? data.service_type} — ${status.replace(/_/g, " ")}.${note ? ` ${note}` : ""}`,
-    type: "account",
-    link: "/app/?view=billing"
-  });
+  if (hasAssignee && assignee) {
+    const { data: staff } = await db.from("admin_users").select("user_id").eq("user_id", assignee).maybeSingle();
+    if (!staff) return fail(400, "invalid_input", "Assign the request to an administrator.");
+  }
+
+  const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+  if (hasNote) patch.admin_note = note || null;
+  if (hasAssignee) patch.assigned_to = assignee || null;
+
+  const { data, error } = await db.from("service_requests").update(patch).eq("id", id).select("*").single();
+  if (error) return fail(500, "admin_error", error.message);
 
   await db.from("customer_activity").insert({
     user_id: data.owner_id,
     action: "service_request_updated",
     entity_type: "service_request",
     entity_id: id,
-    meta: { status, admin_id: adminId }
+    meta: { status, admin_id: adminId, assigned_to: hasAssignee ? assignee || null : undefined }
   });
 
   return json({ ok: true, request: data });

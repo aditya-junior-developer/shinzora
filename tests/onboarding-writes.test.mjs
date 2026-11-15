@@ -176,18 +176,28 @@ const { rows: untouchedB } = await db.query(
 check("the other customer's subscription was never touched", untouchedB[0]?.business_id === null);
 await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${A}', false);`);
 
-/* The correct status now works for the paid-plan branch. */
+/* 0055: a customer's own request starts at 'submitted'. 'requested' is retired. */
+let retiredStatus = null;
+try {
+  await db.exec(`
+    insert into public.service_requests (owner_id, service_type, title, status)
+    values ('${A}', 'plan_upgrade', 'Upgrade to Pro', 'requested')`);
+} catch (error) {
+  retiredStatus = error.message;
+}
+check("the retired status 'requested' is refused for a new request", /check constraint|violates/i.test(String(retiredStatus)), String(retiredStatus || "the insert succeeded"));
+
 await db.exec(`
   insert into public.service_requests (owner_id, service_type, title, status)
-  values ('${A}', 'plan_upgrade', 'Upgrade to Pro', 'requested')`);
+  values ('${A}', 'plan_upgrade', 'Upgrade to Pro', 'submitted')`);
 const { rows: sr } = await db.query(`select status, owner_id from public.service_requests`);
-check("a paid-plan request is accepted at 'requested'", sr.length === 1 && sr[0].status === "requested");
+check("a paid-plan request is accepted at 'submitted'", sr.length === 1 && sr[0].status === "submitted");
 
 let foreignInsert = null;
 try {
   await db.exec(`
     insert into public.service_requests (owner_id, service_type, title, status)
-    values ('${B}', 'plan_upgrade', 'Not mine', 'requested')`);
+    values ('${B}', 'plan_upgrade', 'Not mine', 'submitted')`);
 } catch (error) {
   foreignInsert = error.message;
 }

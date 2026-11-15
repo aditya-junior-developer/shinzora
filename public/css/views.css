@@ -4311,3 +4311,141 @@ html {
     height: 36px;
   }
 }
+
+/* ==========================================================================
+   Request Services (P7) — customer form and tracker
+   Theme tokens only, so the page follows light and dark themes and any
+   premium palette. Motion is short and disabled for reduced-motion users.
+   ========================================================================== */
+.svc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+@media (min-width: 1180px) {
+  .svc-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .svc-layout > .stack { position: sticky; top: calc(var(--nav-h) + var(--s-4)); max-height: calc(100vh - var(--nav-h) - var(--s-8)); overflow: auto; padding-right: 2px; }
+}
+.svc-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.svc-legend { margin-bottom: var(--s-3); padding: 0; float: left; width: 100%; }
+.svc-legend + * { clear: both; }
+.svc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--s-3);
+}
+.svc-tile {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  cursor: pointer;
+  transition: border-color var(--t-base) var(--ease-out), background var(--t-base) var(--ease-out),
+    transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease-out);
+  min-width: 0;
+}
+.svc-tile:hover { border-color: var(--line-violet); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.svc-tile:focus-within { outline: 2px solid var(--violet); outline-offset: 2px; }
+.svc-tile.is-selected {
+  border-color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 12%, var(--panel));
+  box-shadow: var(--shadow-violet);
+}
+.svc-radio {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+.svc-tile-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--violet) 16%, transparent);
+  color: var(--violet);
+  transition: transform var(--t-base) var(--ease-spring);
+}
+.svc-tile:hover .svc-tile-icon { transform: scale(1.06); }
+.svc-tile-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-right: var(--s-4); }
+.svc-tile-title { font-size: var(--fs-sm); font-weight: 600; color: var(--text); line-height: 1.3; }
+.svc-tile-sub { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.4; }
+.svc-tile-tick {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  color: transparent;
+  transition: all var(--t-base) var(--ease-spring);
+}
+.svc-tile.is-selected .svc-tile-tick { background: var(--violet); border-color: var(--violet); color: var(--white); transform: scale(1.05); }
+.svc-others:not([hidden]) { animation: svc-in 0.32s var(--ease-out) both; }
+.svc-money { position: relative; }
+.svc-money .input { padding-left: 30px; }
+.svc-money-sign {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  font-weight: 600;
+  pointer-events: none;
+}
+.svc-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-4);
+}
+@media (max-width: 640px) {
+  .svc-two { grid-template-columns: minmax(0, 1fr); }
+  .svc-tile-tick { top: auto; bottom: var(--s-3); right: var(--s-3); }
+}
+.svc-actions { align-items: center; flex-wrap: wrap; }
+.svc-confirm[hidden] { display: none; }
+.svc-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text);
+}
+.svc-callout p { margin: 0; white-space: pre-wrap; }
+.svc-callout strong { display: block; margin-bottom: 4px; }
+.svc-callout.is-ok { border-color: var(--ok); background: var(--ok-dim); }
+.svc-callout.is-ok .svc-callout-icon { color: var(--ok); flex: 0 0 auto; margin-top: 2px; }
+.svc-callout.is-info { border-color: var(--line-violet); background: color-mix(in srgb, var(--violet) 10%, var(--panel)); }
+.svc-confirm.is-shown .svc-callout { animation: svc-in 0.45s var(--ease-out) both; }
+.svc-reveal { animation: svc-in 0.4s var(--ease-out) both; }
+.svc-stats .card { transition: transform var(--t-base) var(--ease-out); }
+.svc-stats .card:hover { transform: translateY(-2px); }
+.track-done .track-step.is-done .track-dot { background: var(--ok); border-color: var(--ok); color: var(--white); }
+.track-done .track-step.is-done::before { background: var(--ok); }
+.track-done .track-step.is-final .track-dot { border-color: var(--ok); color: var(--ok); }
+@keyframes svc-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .svc-tile, .svc-tile-icon, .svc-tile-tick, .svc-stats .card { transition: none; }
+  .svc-tile:hover, .svc-tile:hover .svc-tile-icon, .svc-stats .card:hover { transform: none; }
+  .svc-others:not([hidden]), .svc-reveal, .svc-confirm.is-shown .svc-callout { animation: none; }
+}
