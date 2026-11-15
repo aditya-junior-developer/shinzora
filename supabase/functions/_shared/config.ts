@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { geminiConfigured, primaryModel } from "./gemini.ts";
+import { fallbackConfigured, fallbackModel } from "./fallback.ts";
 
 const env = (key: string) => (Deno.env.get(key) ?? "").trim();
 
@@ -17,10 +18,10 @@ export function providerFlags() {
     available: true,
     environment: env("SITE_ENV") || "production",
     ai: {
-      configured: geminiConfigured(),
-      model: geminiConfigured() ? primaryModel() : null,
+      configured: geminiConfigured() || fallbackConfigured(),
+      model: geminiConfigured() ? primaryModel() : fallbackConfigured() ? fallbackModel() : null,
       // Names the operator the exact secret to set when AI is not configured.
-      key_env: geminiConfigured() ? null : "SHINZORA_AI_API_KEY"
+      key_env: geminiConfigured() || fallbackConfigured() ? null : "SHINZORA_AI_API_KEY"
     },
     payments: {
       upi_configured: Boolean(upiId),

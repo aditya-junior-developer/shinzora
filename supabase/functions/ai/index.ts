@@ -56,6 +56,7 @@ import {
   SUPPORT_PROMPT
 } from "../_shared/prompts.ts";
 import { providerFlags } from "../_shared/config.ts";
+import { fallbackConfigured } from "../_shared/fallback.ts";
 import { availableModels, type Capability, isUsable } from "../_shared/models.ts";
 
 const MAX_FILES = 12;
@@ -70,9 +71,9 @@ Deno.serve(async (req) => {
   const caller = await getCaller(req);
   if (!caller) return fail(401, "not_authenticated", "Sign in to use the assistant.");
 
-  if (!geminiConfigured()) {
+  if (!geminiConfigured() && !fallbackConfigured()) {
     return fail(503, "functions_unavailable", "AI generation is not configured on this deployment.", {
-      hint: "An administrator must set the GEMINI_API_KEY secret for the `ai` Edge Function, then redeploy it. Nothing is charged to your plan until it is configured."
+      hint: "An administrator must set the Gemini key (SHINZORA_AI_API_KEY) or the Groq backup key (GROQ_API_KEY) for the `ai` Edge Function, then redeploy it. Nothing is charged to your plan until it is configured."
     });
   }
 

@@ -1,25 +1,20 @@
 /* ==========================================================================
-   Shinzora — OpenAI-compatible fallback provider
+   Shinzora — Groq backup provider
    --------------------------------------------------------------------------
-   Gemini stays the primary provider. This module exists for one reason: when
-   Google refuses a request — a rejected key, an exhausted free quota, or a
-   busy model — the customer gets an answer instead of an error page.
+   Gemini stays the primary provider. Groq is used only when Gemini cannot
+   answer: quota or rate limit, timeout, outage, a busy model, or a rejected or
+   missing Gemini key. Safety blocks, empty answers and request-shape errors do
+   not fall back, because a second model would not change those results.
 
-   It speaks the Chat Completions shape, which is what every free-tier gateway
-   speaks (Groq, OpenRouter, Cerebras, NVIDIA NIM, Cloudflare's compat endpoint,
-   and Gemini's own compat endpoint). Pointing it somewhere else is two secrets:
+   Secrets (backend only, never sent to the browser):
+     GROQ_API_KEY            the Groq key. Set with the Supabase secret store.
+     AI_FALLBACK_API_KEY     optional alternative key for another compatible gateway
+     AI_FALLBACK_BASE_URL    optional, default https://api.groq.com/openai/v1
+     AI_FALLBACK_MODEL       optional, default openai/gpt-oss-120b
 
-     AI_FALLBACK_BASE_URL   e.g. https://api.groq.com/openai/v1
-     AI_FALLBACK_API_KEY    the gateway key
-     AI_FALLBACK_MODEL      e.g. openai/gpt-oss-120b
-
-   With none of them set, nothing changes: `fallbackConfigured()` is false and
-   the caller behaves exactly as before.
-
-   Deliberately NOT used for grounded search. Google's built-in google_search
-   tool is the one capability with no equivalent here, so `geminiGrounded()`
-   never falls back — it would silently return ungrounded text pretending to
-   be sourced.
+   Models are tried in order: the configured model, then openai/gpt-oss-20b.
+   Grounded search (geminiGrounded) never falls back: Groq has no equivalent of
+   Google Search, and text without sources must not be presented as research.
    ========================================================================== */
 
 export class FallbackError extends Error {
@@ -33,6 +28,14 @@ export class FallbackError extends Error {
   }
 }
 
+const DEFAULT_BASE_URL = "https://api.groq.com/openai/v1";
+const DEFAULT_MODEL = "openai/gpt-oss-120b";
+const SECOND_MODEL = "openai/gpt-oss-20b";
+
+/* Congestion, rate limits and server errors move on to the next model. A
+   refused key stops at once: every model would refuse it the same way. */
+const TRY_NEXT_MODEL = new Set([404, 408, 409, 425, 429, 500, 502, 503, 504]);
+
 const readEnv = (key: string): string => {
   try {
     // Deno is present in Edge Functions; Node is used by the test harness.
@@ -45,12 +48,15 @@ const readEnv = (key: string): string => {
   }
 };
 
-export const fallbackBaseUrl = () => readEnv("AI_FALLBACK_BASE_URL").replace(/\/+$/, "");
-export const fallbackModel = () => readEnv("AI_FALLBACK_MODEL") || "openai/gpt-oss-120b";
+export const fallbackBaseUrl = () => (readEnv("AI_FALLBACK_BASE_URL") || DEFAULT_BASE_URL).replace(/\/+$/, "");
+export const fallbackModel = () => readEnv("AI_FALLBACK_MODEL") || DEFAULT_MODEL;
 
-/** True when a fallback is fully configured. A base URL alone is not enough. */
+/** The key used for the backup: GROQ_API_KEY first, then the generic setting. */
+const fallbackApiKey = () => readEnv("GROQ_API_KEY") || readEnv("AI_FALLBACK_API_KEY");
+
+/** True when a backup key exists. The base URL and model have safe defaults. */
 export function fallbackConfigured(): boolean {
-  return Boolean(fallbackBaseUrl() && readEnv("AI_FALLBACK_API_KEY"));
+  return Boolean(fallbackApiKey());
 }
 
 export type FallbackOptions = {
@@ -61,73 +67,111 @@ export type FallbackOptions = {
   timeoutMs?: number;
 };
 
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+/* One line per event, for the function logs. Never the key, never the prompt. */
+export function logProviderEvent(event: string, fields: Record<string, unknown>) {
+  const safe = Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [
+      key,
+      typeof value === "string" ? value.slice(0, 240) : value
+    ])
+  );
+  console.warn(JSON.stringify({ event, at: new Date().toISOString(), ...safe }));
+}
 
 /**
- * One completion through the fallback gateway. Throws FallbackError on any
- * refusal, so the caller can decide whether to surface it or keep the original
- * provider error (which is usually more accurate about what went wrong).
+ * One completion from the backup, with the whole conversation. Throws
+ * FallbackError when no model answers, so the caller can keep the original
+ * provider's error, which is usually more accurate about the cause.
  */
-export async function fallbackComplete(prompt: string, options: FallbackOptions = {}): Promise<string> {
+export async function fallbackChat(messages: ChatMessage[], options: FallbackOptions = {}): Promise<string> {
   if (!fallbackConfigured()) {
-    throw new FallbackError("No fallback provider is configured.", "ai_fallback_unconfigured", 503);
+    throw new FallbackError("No backup provider is configured.", "ai_fallback_unconfigured", 503);
   }
 
-  const messages: ChatMessage[] = [];
-  if (options.system) messages.push({ role: "system", content: options.system });
-  messages.push({ role: "user", content: prompt });
+  const models = [...new Set([fallbackModel(), SECOND_MODEL])];
+  const withSystem = options.system && !messages.some((m) => m.role === "system")
+    ? [{ role: "system" as const, content: options.system }, ...messages]
+    : messages;
 
-  const body: Record<string, unknown> = {
-    model: fallbackModel(),
-    messages,
-    temperature: options.temperature ?? 0.7,
-    max_tokens: options.maxOutputTokens ?? 4096
-  };
-  if (options.json) body.response_format = { type: "json_object" };
+  let lastError: FallbackError | null = null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60000);
-  let response: Response;
-  try {
-    response = await fetch(`${fallbackBaseUrl()}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${readEnv("AI_FALLBACK_API_KEY")}`
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-  } catch (error) {
-    throw new FallbackError(
-      `The fallback provider could not be reached: ${(error as Error)?.message ?? error}`,
-      "ai_fallback_unreachable",
-      502
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+  for (const model of models) {
+    const body: Record<string, unknown> = {
+      model,
+      messages: withSystem,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxOutputTokens ?? 4096
+    };
+    if (options.json) body.response_format = { type: "json_object" };
 
-  if (!response.ok) {
-    let detail = "";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60000);
+    let response: Response;
     try {
-      detail = await response.text();
-    } catch {
-      /* body not readable — the status is still useful */
+      response = await fetch(`${fallbackBaseUrl()}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${fallbackApiKey()}`
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (error) {
+      lastError = new FallbackError(
+        `The backup provider could not be reached: ${(error as Error)?.message ?? error}`,
+        "ai_fallback_unreachable",
+        502
+      );
+      logProviderEvent("ai_provider_error", { provider: "groq", model, code: lastError.code, message: lastError.message });
+      continue;
+    } finally {
+      clearTimeout(timer);
     }
-    throw new FallbackError(
-      `The fallback provider refused the request (${response.status}): ${detail.slice(0, 300)}`,
-      response.status === 401 || response.status === 403 ? "ai_fallback_bad_key" : "ai_fallback_failed",
-      response.status === 429 ? 429 : 502
-    );
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        detail = String(await response.text());
+      } catch {
+        /* the status alone is still useful */
+      }
+      const code = response.status === 401 || response.status === 403 ? "ai_fallback_bad_key" : "ai_fallback_failed";
+      lastError = new FallbackError(
+        `The backup provider refused the request (${response.status}).`,
+        code,
+        response.status === 429 ? 429 : 502
+      );
+      logProviderEvent("ai_provider_error", {
+        provider: "groq",
+        model,
+        status: response.status,
+        code,
+        message: String(detail ?? "").slice(0, 200)
+      });
+      if (code === "ai_fallback_bad_key" || !TRY_NEXT_MODEL.has(response.status)) throw lastError;
+      continue;
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | { choices?: Array<{ message?: { content?: string } }> }
+      | null;
+    const text = payload?.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!text) {
+      lastError = new FallbackError("The backup provider returned an empty response.", "ai_fallback_empty", 502);
+      logProviderEvent("ai_provider_error", { provider: "groq", model, code: lastError.code });
+      continue;
+    }
+    return text;
   }
 
-  const payload = await response.json().catch(() => null) as
-    | { choices?: Array<{ message?: { content?: string } }> }
-    | null;
-  const text = payload?.choices?.[0]?.message?.content?.trim() ?? "";
-  if (!text) {
-    throw new FallbackError("The fallback provider returned an empty response.", "ai_fallback_empty", 502);
-  }
-  return text;
+  throw lastError ?? new FallbackError("The backup provider did not answer.", "ai_fallback_failed", 502);
+}
+
+/** Single-prompt form, kept for callers that do not have a conversation. */
+export async function fallbackComplete(prompt: string, options: FallbackOptions = {}): Promise<string> {
+  const messages: ChatMessage[] = [{ role: "user", content: prompt }];
+  return fallbackChat(messages, options);
 }

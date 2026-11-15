@@ -7,7 +7,7 @@
 
 import { resolveChain, type Capability } from "./models.ts";
 import { configuredGeminiKeys, primaryGeminiKey, type GeminiApiKey } from "./keyring.ts";
-import { fallbackComplete, fallbackConfigured } from "./fallback.ts";
+import { fallbackChat, fallbackConfigured, logProviderEvent, type ChatMessage } from "./fallback.ts";
 import { parseModelJson } from "./json-repair.ts";
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -428,7 +428,7 @@ async function requestWithKeyFailover(model: string, body: Record<string, unknow
   throw new GeminiError("No Gemini key is available for this request.", "functions_unavailable", 503);
 }
 
-type Part = { text: string };
+type Part = { text?: string; inlineData?: unknown };
 type Content = { role: "user" | "model"; parts: Part[] };
 
 export interface GeminiOptions {
@@ -477,7 +477,7 @@ export function leanBody(body: Record<string, unknown>): Record<string, unknown>
 }
 
 /** Low-level call. Throws GeminiError with a stable code for the UI. */
-export async function gemini(parts: string | Part[], options: GeminiOptions = {}): Promise<string> {
+async function geminiPrimary(parts: string | Part[], options: GeminiOptions = {}): Promise<string> {
   if (!geminiConfigured()) {
     throw new GeminiError("AI generation is not configured on this deployment.", "functions_unavailable", 503);
   }
@@ -601,25 +601,6 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
     }
   }
 
-  /* Google is out of options: a key we are not allowed to use, a quota that
-     resets at midnight, or a model that stayed busy through the whole chain.
-     If a free gateway is configured, use it rather than handing the customer an
-     error. The original Gemini error is kept if the fallback also fails, because
-     it describes the actual cause better than a second failure would. */
-  if (fallbackConfigured() && !options.noFallback) {
-    try {
-      return await fallbackComplete(typeof parts === "string" ? parts : parts.map((part) => part.text ?? "").join("\n"), {
-        system: options.system,
-        json: options.json,
-        temperature: options.temperature,
-        maxOutputTokens: Math.min(options.maxOutputTokens ?? 8192, 8192),
-        timeoutMs: options.timeoutMs ?? 120000
-      });
-    } catch {
-      /* fall through to the Gemini error below */
-    }
-  }
-
   throw (
     lastRetryable ??
     new GeminiError(
@@ -628,6 +609,90 @@ export async function gemini(parts: string | Part[], options: GeminiOptions = {}
       503
     )
   );
+}
+
+/* Errors that mean "Gemini cannot answer right now", where a backup can help.
+   Anything else is about the request or the content, and is returned as it is. */
+const FALLBACK_CODES = new Set([
+  "functions_unavailable",
+  "ai_quota_exhausted",
+  "ai_bad_key",
+  "ai_forbidden",
+  "ai_key_cooldown",
+  "ai_timeout",
+  "ai_unreachable",
+  "ai_model_busy",
+  "ai_provider_error",
+  "ai_rate_limited"
+]);
+const FALLBACK_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const NO_FALLBACK_CODES = new Set(["ai_request_rejected", "ai_blocked", "ai_empty", "ai_max_tokens"]);
+
+function fallbackWorthy(error: GeminiError): boolean {
+  if (NO_FALLBACK_CODES.has(error.code)) return false;
+  return FALLBACK_CODES.has(error.code) || FALLBACK_STATUS.has(error.status);
+}
+
+/* The conversation as chat messages, so the backup answers in context. Gemini's
+   "model" turns become "assistant" turns. */
+function conversationFor(parts: string | Part[], options: GeminiOptions): { messages: ChatMessage[]; hasImages: boolean } {
+  const messages: ChatMessage[] = [];
+  if (options.system) messages.push({ role: "system", content: options.system });
+  for (const turn of options.history ?? []) {
+    const text = (turn.parts ?? []).map((part) => part.text ?? "").filter(Boolean).join("\n");
+    if (text) messages.push({ role: turn.role === "model" ? "assistant" : "user", content: text });
+  }
+  const latest = typeof parts === "string" ? [{ text: parts }] : parts;
+  const hasImages = latest.some((part) => Boolean(part.inlineData));
+  messages.push({ role: "user", content: latest.map((part) => part.text ?? "").filter(Boolean).join("\n") });
+  return { messages, hasImages };
+}
+
+/**
+ * One completion. Gemini first; the Groq backup only for the errors above, and
+ * never for image input, which a text model cannot read. Every provider failure
+ * is logged. If the backup also fails, the Gemini error is returned, because it
+ * describes the real cause better than a second failure would.
+ */
+export async function gemini(parts: string | Part[], options: GeminiOptions = {}): Promise<string> {
+  try {
+    return await geminiPrimary(parts, options);
+  } catch (error) {
+    const failure =
+      error instanceof GeminiError ? error : new GeminiError("The AI provider could not be reached.", "ai_unreachable", 502);
+    logProviderEvent("ai_provider_error", {
+      provider: "gemini",
+      code: failure.code,
+      status: failure.status,
+      message: failure.message
+    });
+
+    if (options.noFallback || !fallbackWorthy(failure) || !fallbackConfigured()) throw failure;
+
+    const { messages, hasImages } = conversationFor(parts, options);
+    if (hasImages) {
+      logProviderEvent("ai_fallback_skipped", { reason: "image input", primary_code: failure.code });
+      throw failure;
+    }
+
+    try {
+      const text = await fallbackChat(messages, {
+        json: options.json,
+        temperature: options.temperature,
+        maxOutputTokens: Math.min(options.maxOutputTokens ?? 8192, 8192),
+        timeoutMs: options.timeoutMs ?? 120000
+      });
+      logProviderEvent("ai_fallback_used", { provider: "groq", primary_code: failure.code, turns: messages.length });
+      return text;
+    } catch (fallbackError) {
+      logProviderEvent("ai_provider_error", {
+        provider: "groq",
+        code: (fallbackError as { code?: string })?.code ?? "unknown",
+        message: (fallbackError as Error)?.message ?? String(fallbackError)
+      });
+      throw failure;
+    }
+  }
 }
 
 /** Reasons from `parseModelJson` that mean "ran out of room", not "bad syntax". */
