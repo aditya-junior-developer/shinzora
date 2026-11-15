@@ -9,6 +9,7 @@ import { validateForm, paintErrors, readForm, rules } from "../lib/validate.js";
 import { setBusy, setAlert, showError, initPasswordToggles, fieldError } from "../ui/form.js";
 import { signUp, signInWithGoogle, passwordScore, PASSWORD_LABELS } from "../modules/auth/auth-service.js";
 import { redirectIfSignedIn } from "../lib/guard.js";
+import { safeNextPath, onboardingPathWithNext } from "../lib/invite.js";
 import { loadIdentity } from "../lib/store.js";
 import { normalizeError } from "../lib/supabase.js";
 import { PLANS } from "../config/env.js";
@@ -55,7 +56,8 @@ const intentPlan = (() => {
 })();
 const finalPlan = PLANS.some((p) => p.id === intentPlan) ? intentPlan : plan;
 
-redirectIfSignedIn();
+const inviteNext = safeNextPath(param("next"), "");
+redirectIfSignedIn({ next: inviteNext });
 
 /* Password strength meter */
 passwordInput?.addEventListener("input", () => {
@@ -105,7 +107,7 @@ form?.addEventListener("submit", async (event) => {
       email: values.email,
       password: values.password,
       plan: finalPlan,
-      next: "/onboarding/"
+      next: onboardingPathWithNext(inviteNext)
     });
 
     if (result.session) {
@@ -128,7 +130,7 @@ qs("[data-google]")?.addEventListener("click", async (event) => {
   const button = event.currentTarget;
   setBusy(button, true, "Opening Google");
   try {
-    await signInWithGoogle({ next: "/onboarding/" });
+    await signInWithGoogle({ next: onboardingPathWithNext(inviteNext) });
   } catch (error) {
     setBusy(button, false);
     showError(alertBox, normalizeError(error));

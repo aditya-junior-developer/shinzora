@@ -14,6 +14,7 @@ import { validateForm, rules } from "../lib/validate.js";
 import { setBusy, setAlert, showError, fieldError } from "../ui/form.js";
 import { toast } from "../ui/toast.js";
 import { PLANS, planById } from "../config/env.js";
+import { safeNextPath } from "../lib/invite.js";
 
 hydrateIcons();
 
@@ -408,7 +409,7 @@ function bindEvents() {
   skipBtn.addEventListener("click", onSkip);
   qs("#ob-save-exit").addEventListener("click", async () => {
     await persist(true);
-    location.href = "/app/";
+    location.href = safeNextPath(new URLSearchParams(location.search).get("next"), "") || "/app/";
   });
   qs("#ob-signout").addEventListener("click", logoutEverywhere);
   qs("#review-edit").addEventListener("click", (event) => {
@@ -999,7 +1000,10 @@ async function finish() {
        wizard — the dashboard loads identity again on its own. */
     await loadIdentity({ force: true }).catch(() => undefined);
 
-    const target = draft.plan === "free" ? "/app/?welcome=1" : `/app/?view=billing&plan=${encodeURIComponent(draft.plan)}`;
+    /* Someone who arrived from a meeting invite goes back to that meeting. The
+       invite is carried in ?next= by the signup page, and only in-app paths pass. */
+    const invite = safeNextPath(new URLSearchParams(location.search).get("next"), "");
+    const target = invite || (draft.plan === "free" ? "/app/?welcome=1" : `/app/?view=billing&plan=${encodeURIComponent(draft.plan)}`);
     /* Navigation happens before any toast: a toast fired here would be destroyed
        by the page change, which is why the previous flow could look like a click
        that did nothing. */

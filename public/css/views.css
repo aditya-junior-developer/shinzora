@@ -4196,6 +4196,7 @@ html {
 /* ------------------------------------------------------------------ meetings */
 
 .meeting-start,
+.meeting-join,
 .meeting-lobby,
 .meeting-missing {
   display: flex;
@@ -4232,6 +4233,7 @@ html {
    The name field used to fall back to the browser's white default, which read
    as a broken control on the dark theme. */
 .meeting-start input[type="text"],
+.meeting-join input[type="text"],
 .meeting-lobby input[type="text"] {
   width: 100%;
   min-height: 44px;
@@ -4242,9 +4244,11 @@ html {
   color: var(--text);
   font-size: var(--fs-sm);
 }
+.meeting-join input[type="text"]::placeholder,
 .meeting-start input[type="text"]::placeholder {
   color: var(--text-4);
 }
+.meeting-join input[type="text"]:focus,
 .meeting-start input[type="text"]:focus {
   outline: none;
   border-color: var(--line-violet);
@@ -5089,4 +5093,17 @@ html {
   width: 100%;
   min-height: 44px;
   box-sizing: border-box;
+}
+
+/* Join with a code (brief item 3): the error line sits under the field. */
+.meeting-join .field-error { color: var(--danger, #f87171); font-size: var(--fs-xs); }
+
+/* The scheduling card sits on the same meetings surface as the start and join
+   cards, so it takes the same inner spacing. Without it the labels touched the
+   card edge on a phone. */
+.meeting-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
 }

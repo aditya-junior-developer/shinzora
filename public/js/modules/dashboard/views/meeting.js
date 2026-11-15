@@ -28,6 +28,7 @@ import { pageHead } from "../components.js";
 import { createCall, turnConfigured } from "../../messaging/webrtc.js";
 import { openCallSurface } from "../../messaging/call-ui.js";
 import { listCallDevices, canChooseSpeaker } from "../../messaging/call-devices.js";
+import { normaliseMeetingCode, meetingPath } from "../../../lib/invite.js";
 
 /* Devices chosen in the lobby. They apply when the call is created, and are
    kept for the rest of the page session so a rejoin does not ask again. */
@@ -216,7 +217,7 @@ function selfIdentity() {
 }
 
 function meetingLink(code) {
-  return `${location.origin}/app/?view=meeting&code=${encodeURIComponent(code)}`;
+  return `${location.origin}${meetingPath(code)}`;
 }
 
 let current = null;
@@ -307,6 +308,23 @@ async function paintStart(host) {
       </div>
     </form>
 
+    <form class="card meeting-join" id="meeting-join-form" novalidate>
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">${icon("key", { size: 16 })} Join with a code</h2>
+          <p class="card-sub">Enter the nine-character code the host sent you.</p>
+        </div>
+      </div>
+      <div class="field" id="meeting-join-field">
+        <label for="meeting-join-code">Meeting code</label>
+        <input class="input" id="meeting-join-code" name="code" type="text" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="14" placeholder="abcd-efgh2" aria-describedby="meeting-join-error" />
+        <div class="field-error" id="meeting-join-error" role="alert"></div>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-secondary" type="submit">${icon("arrow-right", { size: 14 })} Open meeting</button>
+      </div>
+    </form>
+
     ${
       mine.length
         ? `<section class="card">
@@ -331,6 +349,29 @@ async function paintStart(host) {
            </section>`
         : ""
     }`;
+
+  /* Join with a code. The format is checked here so a typo is caught before a
+     round trip; the database decides whether the meeting exists and is open. */
+  on(qs("#meeting-join-form", host), "submit", async (event) => {
+    event.preventDefault();
+    const input = qs("#meeting-join-code", host);
+    const error = qs("#meeting-join-error", host);
+    const field = qs("#meeting-join-field", host);
+    const code = normaliseMeetingCode(input?.value);
+    if (!code) {
+      /* .field.invalid is what the shared stylesheet uses to show a field error. */
+      error.textContent = "That is not a meeting code. Codes are nine characters, for example abcd-efgh2.";
+      field?.classList.add("invalid");
+      input?.setAttribute("aria-invalid", "true");
+      input?.focus();
+      return;
+    }
+    field?.classList.remove("invalid");
+    error.textContent = "";
+    input?.removeAttribute("aria-invalid");
+    history.pushState({}, "", meetingPath(code));
+    await paintLobby(host, code);
+  });
 
   let kind = "video";
   delegate(qs("#meeting-kind", host), "click", "[data-kind]", (event, button) => {

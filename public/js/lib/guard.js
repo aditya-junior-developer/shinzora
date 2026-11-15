@@ -10,6 +10,7 @@ import { sb, getSession, signOut } from "./supabase.js";
 import { loadIdentity, state, hasCompletedOnboarding, resetIdentity } from "./store.js";
 import { retrySession, classifySessionError, withDeadline, SESSION_LOOKUP_LIMIT_MS } from "./identity-retry.js";
 import { toast } from "../ui/toast.js";
+import { safeNextPath, onboardingPathWithNext } from "./invite.js";
 
 const withNext = (base, next) => {
   if (!next) return base;
@@ -144,10 +145,18 @@ export async function requireSession(opts = {}) {
 }
 
 /** Used on auth pages: bounce already-signed-in users to their workspace. */
-export async function redirectIfSignedIn() {
+export async function redirectIfSignedIn({ next = "" } = {}) {
   const session = await getSession();
   if (!session) return false;
   await loadIdentity({ force: true });
+  /* A safe `next` (an invite, for example) wins over the default workspace.
+     Without it a signed-in visitor opening a meeting link landed on the
+     dashboard and never reached the room. */
+  const requested = safeNextPath(next, "");
+  if (requested) {
+    location.replace(hasCompletedOnboarding() ? requested : onboardingPathWithNext(requested));
+    return true;
+  }
   location.replace(state.isAdmin && !hasCompletedOnboarding() ? "/admin/" : hasCompletedOnboarding() ? "/app/" : "/onboarding/");
   return true;
 }

@@ -12,6 +12,7 @@ import { signIn, signInWithGoogle } from "../modules/auth/auth-service.js";
 import { redirectIfSignedIn } from "../lib/guard.js";
 import { loadIdentity, landingPath } from "../lib/store.js";
 import { normalizeError } from "../lib/supabase.js";
+import { safeNextPath } from "../lib/invite.js";
 
 /* The submit button ships disabled so a click that lands before this module has
    bound its handler cannot perform a native form submission (which would put the
@@ -39,7 +40,7 @@ if (param("error")) setAlert(alertBox, "error", "Sign in could not complete", pa
 if (param("email") && form) form.elements.email.value = param("email");
 
 /* Already signed in? Go straight to the workspace. */
-redirectIfSignedIn();
+redirectIfSignedIn({ next: nextParam });
 
 enableSubmit();
 
@@ -61,7 +62,7 @@ form?.addEventListener("submit", async (event) => {
   try {
     await signIn({ email: values.email, password: values.password });
     await loadIdentity({ force: true });
-    const target = nextParam && nextParam.startsWith("/") ? nextParam : landingPath();
+    const target = safeNextPath(nextParam, "") || landingPath();
     location.replace(target);
   } catch (error) {
     const normalized = normalizeError(error);
@@ -86,7 +87,7 @@ qs("[data-google]")?.addEventListener("click", async (event) => {
   const button = event.currentTarget;
   setBusy(button, true, "Opening Google");
   try {
-    await signInWithGoogle({ next: nextParam || "/app/" });
+    await signInWithGoogle({ next: safeNextPath(nextParam, "/app/") });
   } catch (error) {
     setBusy(button, false);
     showError(alertBox, normalizeError(error));
