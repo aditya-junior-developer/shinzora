@@ -478,6 +478,7 @@ export default async function mountGroups(root, options = {}) {
   /** Nothing is open. The rail holds the choice; no chat is opened for the member. */
   function paintPick() {
     active = null;
+    contactGroup = null;
     view = "group";
     activeChannel = null;
     paintHead(null);
@@ -487,6 +488,83 @@ export default async function mountGroups(root, options = {}) {
         <h3 class="grp-empty-title">Pick a channel or group</h3>
         <p class="grp-empty-desc">Choose one from the list to read it. Nothing opens until you choose.</p>
       </div>`;
+  }
+
+  /* Selecting a group shows its contact number, not its chat (0063). The chat
+     opens only from the "Open chat" button. The owner or an admin can set or
+     clear the number here. */
+  let contactGroup = null;
+
+  async function openContact(id) {
+    const row = groups.find((g) => g.id === id);
+    if (!row) return;
+    stopLiveMessages();
+    active = null;
+    contactGroup = id;
+    view = "group";
+    activeChannel = null;
+    detail = null;
+    paintHead(null);
+    formEl.hidden = true;
+    messagesEl.innerHTML = `<div class="grp-contact"><p class="grp-contact-loading">Loading contact…</p></div>`;
+
+    let phone = null;
+    try {
+      phone = (await rpc("group_contact", { p_group: id })) || null;
+    } catch (error) {
+      if (contactGroup !== id) return;
+      messagesEl.innerHTML = `<div class="chat-empty-line">${esc(error.message || "The contact number could not be loaded.")}</div>`;
+      return;
+    }
+    if (contactGroup !== id) return;
+
+    const canManage = row.role === "owner" || row.role === "admin";
+    messagesEl.innerHTML = contactMarkup(row, phone, canManage);
+
+    qs("[data-open-chat]", messagesEl)?.addEventListener("click", () => open(id));
+
+    const form = qs("[data-contact-form]", messagesEl);
+    if (form) {
+      on(form, "submit", async (event) => {
+        event.preventDefault();
+        const field = qs("#grp-contact-phone", form);
+        const errorEl = qs("[data-contact-error]", form);
+        errorEl.textContent = "";
+        try {
+          await rpc("group_set_contact", { p_group: id, p_phone: field.value });
+          toast({ title: field.value.trim() ? "Contact number saved" : "Contact number removed" }, { tone: "success" });
+          await loadList();
+          if (contactGroup === id) await openContact(id);
+        } catch (error) {
+          errorEl.textContent = error.message || "The number could not be saved.";
+        }
+      });
+    }
+  }
+
+  function contactMarkup(row, phone, canManage) {
+    const number = phone
+      ? `<a class="grp-contact-number" href="tel:${esc(phone)}">${esc(phone)}</a>`
+      : `<p class="grp-contact-none">No contact number has been set for this group yet.</p>`;
+    return `<section class="grp-contact" aria-labelledby="grp-contact-title">
+        <span class="grp-empty-mark">${icon("phone", { size: 22 })}</span>
+        <h3 class="grp-empty-title" id="grp-contact-title">${esc(row.name)}</h3>
+        <p class="grp-empty-desc">Group contact number</p>
+        ${number}
+        <button class="btn btn-primary" type="button" data-open-chat>${icon("messages-square", { size: 14 })}<span>Open chat</span></button>
+        ${
+          canManage
+            ? `<form class="grp-contact-form" data-contact-form novalidate>
+                <label class="field-label" for="grp-contact-phone">Contact number</label>
+                <input class="input" id="grp-contact-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24"
+                  value="${esc(phone || "")}" placeholder="+91 98765 43210" />
+                <span class="field-hint">Digits, optionally starting with +. Members of this group see it. Leave empty to remove it.</span>
+                <div class="field-error" data-contact-error role="alert"></div>
+                <div class="card-actions"><button class="btn btn-secondary" type="submit">Save number</button></div>
+              </form>`
+            : ""
+        }
+      </section>`;
   }
 
   /** The first thing a new member sees: one sentence and one button. */
@@ -1897,7 +1975,7 @@ function insertAtCaret(field, text, start, end) {
   }
 
   /* ------------------------------------------------------------------ events */
-  delegate(listEl, "click", "[data-group]", (_event, button) => open(button.getAttribute("data-group")));
+  delegate(listEl, "click", "[data-group]", (_event, button) => openContact(button.getAttribute("data-group")));
   delegate(channelsEl, "click", "[data-channel]", (_event, button) =>
     openChannel(button.getAttribute("data-channel"))
   );

@@ -182,6 +182,8 @@ function makeWorld({
     group_get: detail,
     group_messages_list: thread,
     group_mark_read: { ok: true },
+    group_contact: "+919876543210",
+    group_set_contact: { contactPhone: "+919876543210" },
     group_mention_candidates: candidates,
     group_send: { id: "m4", createdAt: new Date().toISOString() },
     group_pinned: pinned,
@@ -216,8 +218,14 @@ async function openGroupsTab(world, { pick = true } = {}) {
   await settle();
   const first = pick ? world.root.querySelector("[data-group]") : null;
   if (first) {
+    /* Selecting a group shows its contact number first; the chat opens from the button. */
     click(world.window, first);
     await settle();
+    const openChat = world.root.querySelector("[data-open-chat]");
+    if (openChat) {
+      click(world.window, openChat);
+      await settle();
+    }
   }
 }
 
@@ -265,23 +273,39 @@ test("picking a group opens its thread", async () => {
   assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "three messages painted");
 });
 
-test("clicking a group row re-opens it", async () => {
+test("selecting a group shows its contact number, not its chat", async () => {
   const world = makeWorld();
-  await openGroupsTab(world);
+  await openGroupsTab(world, { pick: false });
 
   click(world.window, world.root.querySelector("[data-group]"));
   await settle();
 
-  assert.equal(count(world.calls, "group_get"), 2, "opened once by the first pick and once by the click");
-  assert.deepEqual(lastArgs(world.calls, "group_get"), { p_group: GROUP.id });
-  assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "the thread is still painted");
+  assert.equal(count(world.calls, "group_contact"), 1, "the group's contact number is read");
+  assert.deepEqual(lastArgs(world.calls, "group_contact"), { p_group: GROUP.id });
+  assert.equal(count(world.calls, "group_get"), 0, "the group's chat is not opened");
+  assert.equal(count(world.calls, "group_messages_list"), 0, "no thread is requested");
+  assert.equal(world.root.querySelectorAll("[data-message]").length, 0, "no message is shown");
+  assert.match(world.root.textContent, /\+919876543210/, "the number is on screen");
+  assert.ok(world.root.querySelector('a[href="tel:+919876543210"]'), "the number is a tel link");
+  assert.ok(world.root.querySelector("[data-open-chat]"), "an Open chat button is offered");
+});
+
+test("Open chat opens the thread for the selected group", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world, { pick: false });
+  click(world.window, world.root.querySelector("[data-group]"));
+  await settle();
+
+  click(world.window, world.root.querySelector("[data-open-chat]"));
+  await settle();
+
+  assert.equal(count(world.calls, "group_get"), 1, "the chat was opened by the button");
+  assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "the thread is painted");
 });
 
 test("a stored mention becomes a chip; a bare @word does not", async () => {
   const world = makeWorld();
   await openGroupsTab(world);
-  click(world.window, world.root.querySelector("[data-group]"));
-  await settle();
 
   const chips = [...world.root.querySelectorAll(".mention")];
   assert.equal(chips.length, 1, `expected exactly one mention chip, found ${chips.length}`);
@@ -297,8 +321,6 @@ test("a stored mention becomes a chip; a bare @word does not", async () => {
 test("typing @ lists this group's members and inserts the handle", async () => {
   const world = makeWorld();
   await openGroupsTab(world);
-  click(world.window, world.root.querySelector("[data-group]"));
-  await settle();
 
   const field = world.root.querySelector("#grp-body");
   assert.ok(field, "the composer exists");
@@ -322,8 +344,6 @@ test("typing @ lists this group's members and inserts the handle", async () => {
 test("sending calls group_send with what was typed", async () => {
   const world = makeWorld();
   await openGroupsTab(world);
-  click(world.window, world.root.querySelector("[data-group]"));
-  await settle();
 
   const field = world.root.querySelector("#grp-body");
   field.value = "@chirag look at this";
@@ -787,7 +807,31 @@ test("a group opened after a room promises mentions again", async () => {
   await openGroupsTab(world);
   click(world.window, world.root.querySelector('[data-channel="general"]'));
   await settle();
+  /* Selecting the group shows its number; the chat opens from the button. */
   click(world.window, world.root.querySelector("[data-group]"));
   await settle();
+  click(world.window, world.root.querySelector("[data-open-chat]"));
+  await settle();
   assert.match(world.root.querySelector("#grp-body").placeholder, /@/, "the promise comes back with a group");
+});
+
+test("the owner sets the group's contact number; a member does not see the form", async () => {
+  const owner = makeWorld({ groups: [{ ...GROUP, role: "owner" }] });
+  await openGroupsTab(owner, { pick: false });
+  click(owner.window, owner.root.querySelector("[data-group]"));
+  await settle();
+
+  const form = owner.root.querySelector("[data-contact-form]");
+  assert.ok(form, "the owner sees the number form");
+  owner.root.querySelector("#grp-contact-phone").value = "+91 98765-43210";
+  form.dispatchEvent(new owner.window.Event("submit", { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(lastArgs(owner.calls, "group_set_contact"), { p_group: GROUP.id, p_phone: "+91 98765-43210" });
+
+  const member = makeWorld({ groups: [{ ...GROUP, role: "member" }] });
+  await openGroupsTab(member, { pick: false });
+  click(member.window, member.root.querySelector("[data-group]"));
+  await settle();
+  assert.equal(member.root.querySelector("[data-contact-form]"), null, "a member does not see the form");
+  assert.ok(member.root.querySelector("a[href^=\"tel:\"]"), "a member still sees the number");
 });

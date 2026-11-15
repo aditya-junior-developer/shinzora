@@ -5045,3 +5045,48 @@ html {
     justify-content: center;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Messages: a selected group shows its contact number before its chat.
+   --------------------------------------------------------------------------- */
+.grp-contact {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--s-3, 12px);
+  padding: var(--s-6, 32px) var(--s-4, 16px);
+  text-align: center;
+  min-height: 100%;
+}
+
+.grp-contact-number {
+  font-size: var(--fs-lg, 18px);
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.grp-contact-none,
+.grp-contact-loading {
+  color: var(--text-2);
+  margin: 0;
+}
+
+.grp-contact-form {
+  width: 100%;
+  max-width: 360px;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  margin-top: var(--s-3, 12px);
+}
+
+.grp-contact-form .input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+}
