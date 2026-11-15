@@ -35,6 +35,7 @@ export const NAV = [
       { id: "subscriptions", label: "Subscriptions", icon: "crown" },
       { id: "projects", label: "Projects & deploys", icon: "panels-top-left" },
       { id: "support", label: "Support", icon: "life-buoy" },
+      { id: "themes", label: "Themes", icon: "palette" },
       { id: "contacts", label: "Contact messages", icon: "mail" }
     ]
   },
@@ -57,6 +58,7 @@ const LOADERS = {
   freelancers: () => import("./views/freelancers.js"),
   payments: () => import("./views/payments.js"),
   premium: () => import("./views/premium.js"),
+  themes: () => import("./views/themes.js"),
   services: () => import("./views/payments.js"),
   subscriptions: () => import("./views/operations.js"),
   projects: () => import("./views/operations.js"),

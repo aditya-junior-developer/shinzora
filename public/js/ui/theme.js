@@ -12,6 +12,7 @@
    ========================================================================== */
 
 import { sb, normalizeError } from "../lib/supabase.js";
+import { isSafeWallpaperUrl } from "../config/wallpaper-rules.js";
 
 export const THEMES = [
   {
@@ -105,6 +106,30 @@ export function applyTheme(id) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", META_COLOR[theme]);
   return theme;
+}
+
+/* The wallpaper sits behind the page, under positioned content, at low opacity.
+   It is a single fixed layer, so a change never re-lays out the page. */
+const WALLPAPER_LAYER = "theme-wallpaper";
+
+/** Paint a wallpaper, or remove it when the url is null or not allowed. */
+export function applyWallpaper(url) {
+  const root = document.documentElement;
+  const layer = document.getElementById(WALLPAPER_LAYER);
+  if (!isSafeWallpaperUrl(url) || !document.body) {
+    layer?.remove();
+    root.removeAttribute("data-wallpaper");
+    return false;
+  }
+  const node = layer || document.createElement("div");
+  if (!layer) {
+    node.id = WALLPAPER_LAYER;
+    node.setAttribute("aria-hidden", "true");
+    document.body.prepend(node);
+  }
+  node.style.backgroundImage = `url("${url}")`;
+  root.setAttribute("data-wallpaper", "on");
+  return true;
 }
 
 /**

@@ -146,7 +146,10 @@ export const APPLICATION_TABLES = [
   "call_responses", "meetings", "meeting_attendees",
   /* 0053: which four-hour reminders were already sent. Without it a restore
      could send the same reminder twice. */
-  "notification_reminder_log"
+  "notification_reminder_log",
+  /* 0059: theme collections and wallpapers (parents first), then each member's
+     saved wallpaper choice. */
+  "theme_collections", "theme_wallpapers", "profile_theme_choices"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

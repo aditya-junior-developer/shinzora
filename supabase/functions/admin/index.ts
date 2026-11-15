@@ -9,7 +9,7 @@
 //     service_requests | service_request_update | subscriptions
 //     subscription_update | projects | deployments | tickets | ticket_reply
 //     ticket_status | announcements | announcement_create | activity
-//     contacts | contact_update | admins
+//     contacts | contact_update | admins | premium | themes
 //
 // Payment approval is the only place a manual payment becomes 'verified', and
 // it is recorded against the approving administrator.
@@ -58,6 +58,8 @@ Deno.serve(async (req) => {
         return await paymentReview(caller.user.id, body);
       case "premium":
         return await premium(caller.user.id, body);
+      case "themes":
+        return await themes(caller.user.id, body);
       case "service_requests":
         return await serviceRequests(body);
       case "service_request_update":
@@ -595,6 +597,164 @@ async function premium(adminId: string, body: Record<string, unknown>) {
   }).then(() => undefined, () => undefined);
 
   return json({ ok: true, order: { id: orderId, status: "activated", tier: order.tier, activated_at: now } });
+}
+
+/* ------------------------------------------------------------------ themes */
+
+const THEME_TIERS = new Set(["glow", "elite"]);
+const THEME_ID = /^[a-z][a-z0-9-]{1,40}$/;
+
+/* Themes are managed by deactivating rows, never deleting them: a member's saved
+   choice and the audit history both point at these rows. */
+function themeSortOrder(value: unknown, fallback: number) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.min(9999, Math.trunc(n))) : fallback;
+}
+
+/* A database CHECK refusal is bad input, not a server fault. */
+function themeWriteFailure(error: { message?: string; code?: string }) {
+  if (error.code === "23514") return fail(400, "invalid_input", error.message || "That value was refused.");
+  return fail(500, "admin_error", error.message || "The theme could not be saved.");
+}
+
+function themeImageOk(url: string) {
+  return /^\/assets\/themes\/[a-z0-9._-]+$/.test(url) || /^https:\/\/\S+$/.test(url);
+}
+
+async function themes(adminId: string, body: Record<string, unknown>) {
+  const op = clean(body.op, 30) || "list";
+  const db = admin();
+
+  if (op === "list") {
+    const [{ data: collections, error: cError }, { data: wallpapers, error: wError }] = await Promise.all([
+      db.from("theme_collections").select("*").order("sort_order").order("name"),
+      db.from("theme_wallpapers").select("*").order("sort_order").order("title")
+    ]);
+    if (cError || wError) return fail(500, "admin_error", (cError ?? wError)!.message);
+    return json({ collections: collections ?? [], wallpapers: wallpapers ?? [], tiers: [...THEME_TIERS] });
+  }
+
+  if (op === "save_collection") {
+    const id = clean(body.id, 41).toLowerCase();
+    const name = clean(body.name, 60);
+    const description = clean(body.description, 280);
+    const tierRaw = body.requiredTier === null || body.requiredTier === "" ? null : clean(body.requiredTier, 20);
+    if (!THEME_ID.test(id)) return fail(400, "invalid_input", "A collection id must be lower case letters, digits and hyphens.");
+    if (name.length < 2) return fail(400, "invalid_input", "A collection needs a name of at least two characters.");
+    if (tierRaw !== null && !THEME_TIERS.has(tierRaw)) return fail(400, "invalid_input", "Tier must be Glow, Elite or none.");
+
+    const { data: before } = await db.from("theme_collections").select("*").eq("id", id).maybeSingle();
+    const reason = clean(body.reason, 400) || null;
+    const tierChanged = !!before && (before.required_tier ?? null) !== tierRaw;
+    const deactivating = !!before && before.active && body.active === false;
+    if ((tierChanged || deactivating) && !reason) {
+      return fail(400, "invalid_input", "A reason is required when a tier changes or a collection is deactivated.", {
+        hint: "Members who chose this collection are affected, so the reason is kept in the audit trail."
+      });
+    }
+
+    const row = {
+      id,
+      name,
+      description,
+      required_tier: tierRaw,
+      active: typeof body.active === "boolean" ? body.active : before?.active ?? true,
+      sort_order: themeSortOrder(body.sortOrder, before?.sort_order ?? 0),
+      updated_at: new Date().toISOString()
+    };
+    const { data: saved, error } = await db.from("theme_collections").upsert(row, { onConflict: "id" }).select("*").single();
+    if (error) return themeWriteFailure(error);
+
+    const { error: auditError } = await db.rpc("theme_admin_audit", {
+      p_actor: adminId,
+      p_action: before ? "theme_collection_update" : "theme_collection_create",
+      p_target_table: "theme_collections",
+      p_target_id: null,
+      p_reason: reason,
+      p_before: before ?? null,
+      p_after: saved
+    });
+    if (auditError) console.error("theme audit", auditError.message);
+    return json({ ok: true, collection: saved });
+  }
+
+  if (op === "save_wallpaper") {
+    const wallpaperId = clean(body.id, 64);
+    const collectionId = clean(body.collectionId, 41).toLowerCase();
+    const title = clean(body.title, 60);
+    const imageUrl = clean(body.imageUrl, 500);
+    if (wallpaperId && !isUuid(wallpaperId)) return fail(400, "invalid_input", "That is not a valid wallpaper id.");
+    if (!THEME_ID.test(collectionId)) return fail(400, "invalid_input", "Choose a collection for this wallpaper.");
+    if (title.length < 2) return fail(400, "invalid_input", "A wallpaper needs a title of at least two characters.");
+    if (!themeImageOk(imageUrl)) {
+      return fail(400, "invalid_input", "The image must be a Shinzora theme path or an https address.");
+    }
+
+    const { data: before } = wallpaperId
+      ? await db.from("theme_wallpapers").select("*").eq("id", wallpaperId).maybeSingle()
+      : { data: null };
+    if (wallpaperId && !before) return fail(404, "not_found", "That wallpaper does not exist.");
+
+    const row = {
+      ...(before ? { id: before.id } : {}),
+      collection_id: collectionId,
+      title,
+      image_url: imageUrl,
+      active: typeof body.active === "boolean" ? body.active : before?.active ?? true,
+      sort_order: themeSortOrder(body.sortOrder, before?.sort_order ?? 0),
+      updated_at: new Date().toISOString()
+    };
+    const { data: saved, error } = await db.from("theme_wallpapers").upsert(row).select("*").single();
+    if (error) return themeWriteFailure(error);
+
+    const { error: auditError } = await db.rpc("theme_admin_audit", {
+      p_actor: adminId,
+      p_action: before ? "theme_wallpaper_update" : "theme_wallpaper_create",
+      p_target_table: "theme_wallpapers",
+      p_target_id: saved.id,
+      p_reason: clean(body.reason, 400) || null,
+      p_before: before ?? null,
+      p_after: saved
+    });
+    if (auditError) console.error("theme audit", auditError.message);
+    return json({ ok: true, wallpaper: saved });
+  }
+
+  if (op === "set_active") {
+    const kind = clean(body.kind, 20);
+    const reason = clean(body.reason, 400) || null;
+    const active = body.active === true;
+    if (kind !== "collection" && kind !== "wallpaper") return fail(400, "invalid_input", "Kind must be collection or wallpaper.");
+    const table = kind === "collection" ? "theme_collections" : "theme_wallpapers";
+    const key = clean(body.id, 64);
+    if (kind === "wallpaper" && !isUuid(key)) return fail(400, "invalid_input", "That is not a valid wallpaper id.");
+    if (kind === "collection" && !THEME_ID.test(key)) return fail(400, "invalid_input", "That is not a valid collection id.");
+    if (!active && !reason) return fail(400, "invalid_input", "A reason is required to deactivate a theme.");
+
+    const { data: before } = await db.from(table).select("*").eq("id", key).maybeSingle();
+    if (!before) return fail(404, "not_found", "That theme item does not exist.");
+    const { data: saved, error } = await db
+      .from(table)
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq("id", key)
+      .select("*")
+      .single();
+    if (error) return fail(500, "admin_error", error.message);
+
+    const { error: auditError } = await db.rpc("theme_admin_audit", {
+      p_actor: adminId,
+      p_action: active ? "theme_activate" : "theme_deactivate",
+      p_target_table: table,
+      p_target_id: kind === "wallpaper" ? key : null,
+      p_reason: reason,
+      p_before: before,
+      p_after: saved
+    });
+    if (auditError) console.error("theme audit", auditError.message);
+    return json({ ok: true, item: saved });
+  }
+
+  return fail(400, "invalid_input", "Operation must be list, save_collection, save_wallpaper or set_active.");
 }
 
 /* --------------------------------------------------------- service requests */

@@ -28,6 +28,9 @@ import {
 } from "../../../ui/notify-reminders.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
 import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
+import { applyWallpaper } from "../../../ui/theme.js";
+import { loadThemeCatalog, chooseWallpaper, clearWallpaper } from "../../../lib/wallpaper.js";
+import { resolveWallpaper, savedChoiceUnavailable, tierLabel } from "../../../config/wallpaper-rules.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
 
 const SECTIONS = [
@@ -703,10 +706,128 @@ export default async function render(root) {
           <span>Six themes, three dark and three light. Midnight is black-purple, Nebula is blue-black, Grove is green-black; Blossom is a clean white page with pink in the rules, Daylight is warm paper with no pure white anywhere, and Porcelain is cool grey-blue. They are the same components with different tokens, every text step is checked against the surface behind it, and your choice follows the account to other devices.</span>
         </div>
       </div>
+    </div>
+    <div class="card wallpaper-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Wallpaper</div>
+          <div class="card-sub">Original artwork behind your dashboard. Premium collections come with a Glow or Elite profile.</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" id="wallpaper-clear" hidden>Use default</button>
+      </div>
+      <div class="card-body" id="wallpaper-body">
+        <div class="dim" style="font-size:var(--fs-sm)">Loading wallpapers…</div>
+      </div>
     </div>`;
   }
 
+  /* The picker. Every tile is built from the server's catalog; a locked tile has
+     no image address at all, and choosing one still goes through the database. */
+  let wallpaperCatalog = null;
+
+  async function loadWallpaperPicker() {
+    const body = qs("#wallpaper-body");
+    if (!body) return;
+    const { catalog, error } = await loadThemeCatalog();
+    if (!qs("#wallpaper-body")) return;
+    if (error || !catalog) {
+      body.innerHTML = `<div class="alert alert-info" style="font-size:var(--fs-2xs)">${icon("info", { size: 14 })}<span>Wallpapers could not be loaded just now. The default background is showing.</span></div>`;
+      return;
+    }
+    wallpaperCatalog = catalog;
+    paintWallpapers();
+  }
+
+  function paintWallpapers() {
+    const body = qs("#wallpaper-body");
+    const catalog = wallpaperCatalog;
+    if (!body || !catalog) return;
+    const chosen = resolveWallpaper(catalog, catalog.chosenWallpaperId);
+    const unavailable = savedChoiceUnavailable(catalog);
+    const clear = qs("#wallpaper-clear");
+    if (clear) clear.hidden = !catalog.chosenWallpaperId;
+
+    const notice = unavailable
+      ? `<div class="alert alert-info" style="margin-bottom:var(--s-4);font-size:var(--fs-2xs)">${icon("info", { size: 14 })}<span>Your saved wallpaper belongs to a profile that is not active on this account, so the default background is showing. Your choice is kept.</span></div>`
+      : "";
+
+    const collections = (catalog.collections || [])
+      .map((collection) => {
+        const requirement = collection.requiredTier ? `${tierLabel(collection.requiredTier)} profile` : "Free";
+        const lock = collection.locked
+          ? `<div class="wallpaper-unlock">
+               <span>${icon("lock", { size: 13 })} Part of the ${esc(tierLabel(collection.requiredTier))} profile</span>
+               <a class="btn btn-ghost btn-sm" href="/app/?view=billing">Unlock in Billing</a>
+             </div>`
+          : "";
+        const tiles = (collection.wallpapers || [])
+          .map((wallpaper) => {
+            const selected = chosen?.id === wallpaper.id;
+            if (collection.locked || !wallpaper.imageUrl) {
+              return `<div class="wallpaper-tile is-locked" aria-label="${esc(wallpaper.title)} — locked">
+                <span class="wallpaper-tile-lock" aria-hidden="true">${icon("lock", { size: 16 })}</span>
+                <span class="wallpaper-tile-name">${esc(wallpaper.title)}</span>
+              </div>`;
+            }
+            return `<button type="button" class="wallpaper-tile ${selected ? "is-selected" : ""}" data-wallpaper-choice="${esc(wallpaper.id)}" aria-pressed="${selected}" style="background-image:url('${esc(wallpaper.imageUrl)}')">
+              <span class="wallpaper-tile-name">${esc(wallpaper.title)}</span>
+              ${selected ? `<span class="wallpaper-tile-tick" aria-hidden="true">${icon("check", { size: 14 })}</span>` : ""}
+            </button>`;
+          })
+          .join("");
+        return `<section class="wallpaper-collection ${collection.locked ? "is-locked" : ""}" aria-labelledby="wc-${esc(collection.id)}">
+          <div class="wallpaper-collection-head">
+            <div>
+              <div class="card-title" id="wc-${esc(collection.id)}" style="font-size:var(--fs-sm)">${esc(collection.name)}</div>
+              <div class="card-sub">${esc(collection.description || "")}</div>
+            </div>
+            <span class="badge ${collection.locked ? "badge-warn" : "badge-ok"}">${esc(requirement)}</span>
+          </div>
+          <div class="wallpaper-grid">${tiles}</div>
+          ${lock}
+        </section>`;
+      })
+      .join("");
+
+    body.innerHTML = `${notice}${collections || '<div class="dim" style="font-size:var(--fs-sm)">No wallpapers are available yet.</div>'}`;
+    applyWallpaper(chosen?.imageUrl ?? null);
+  }
+
+  function bindWallpapers() {
+    const body = qs("#wallpaper-body");
+    if (!body) return;
+    delegate(body, "click", "[data-wallpaper-choice]", async (_event, button) => {
+      const id = button.getAttribute("data-wallpaper-choice");
+      const tile = (wallpaperCatalog?.collections || [])
+        .flatMap((collection) => collection.wallpapers || [])
+        .find((wallpaper) => wallpaper.id === id);
+      const result = await chooseWallpaper(id);
+      if (result.error) {
+        toastError(result.error);
+        await loadWallpaperPicker();
+        return;
+      }
+      if (wallpaperCatalog) wallpaperCatalog.chosenWallpaperId = id;
+      applyWallpaper(tile?.imageUrl ?? null);
+      paintWallpapers();
+      toast({ title: "Wallpaper saved" }, { tone: "success", duration: 2000 });
+    });
+    on(qs("#wallpaper-clear"), "click", async () => {
+      const result = await clearWallpaper();
+      if (result.error) {
+        toastError(result.error);
+        return;
+      }
+      if (wallpaperCatalog) wallpaperCatalog.chosenWallpaperId = null;
+      applyWallpaper(null);
+      paintWallpapers();
+      toast({ title: "Default background restored" }, { tone: "success", duration: 2000 });
+    });
+    loadWallpaperPicker();
+  }
+
   function bindAppearance() {
+    bindWallpapers();
     delegate(qs("#settings-body"), "click", "[data-theme-choice]", async (event, button) => {
       const id = button.getAttribute("data-theme-choice");
       applyTheme(id);
