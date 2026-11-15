@@ -193,6 +193,15 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
       }
     }
 
+    /* The chosen speaker applies to every remote element. Setting it again on
+       each paint is harmless and covers tiles that appeared since the choice. */
+    for (const video of stage.querySelectorAll("[data-video]")) {
+      const id = video.getAttribute("data-video");
+      if (id !== "self" && state.devices?.speakerId && typeof video.setSinkId === "function") {
+        video.setSinkId(state.devices.speakerId).catch(() => {});
+      }
+    }
+
     muteBtn.setAttribute("aria-pressed", String(state.muted));
     qs("span", muteBtn).textContent = state.muted ? "Unmute" : "Mute";
     if (cameraBtn) {
@@ -243,6 +252,23 @@ export function openCallSurface({ call, self, subtitle = "", onClose = () => {} 
       notice.className = "call-notice";
       notice.innerHTML = `${icon("loader-circle", { size: 14 })}<span>Connecting…${
         state.relay?.kind === "none" ? " Direct connection only — no relay is set up for this deployment." : ""
+      }</span>`;
+    } else if (state.deviceNotice) {
+      notice.hidden = false;
+      notice.className = "call-notice";
+      notice.setAttribute("role", "status");
+      notice.innerHTML = `${icon("mic", { size: 14 })}<span>${esc(state.deviceNotice)}</span>`;
+    } else if (state.qualityWarning && peerCount > 0) {
+      /* Said in plain words, and said what the app did about it: video is held
+         to a lower ceiling, and audio is left alone. */
+      const poor = state.qualityWarning === "poor";
+      notice.hidden = false;
+      notice.className = poor ? "call-notice is-bad" : "call-notice";
+      notice.setAttribute("role", "status");
+      notice.innerHTML = `${icon("wifi-off", { size: 14 })}<span>${
+        poor
+          ? "Your connection is weak. Video quality has been lowered to keep the call going; audio is unchanged."
+          : "Your connection is unstable. Video may freeze for a moment."
       }</span>`;
     } else if (peerCount === 0) {
       notice.hidden = false;

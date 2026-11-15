@@ -27,6 +27,178 @@ import { toast, toastError } from "../../../ui/toast.js";
 import { pageHead } from "../components.js";
 import { createCall, turnConfigured } from "../../messaging/webrtc.js";
 import { openCallSurface } from "../../messaging/call-ui.js";
+import { listCallDevices, canChooseSpeaker } from "../../messaging/call-devices.js";
+
+/* Devices chosen in the lobby. They apply when the call is created, and are
+   kept for the rest of the page session so a rejoin does not ask again. */
+let devicePrefs = { microphoneId: "", cameraId: "", speakerId: "" };
+
+const SCHEDULE_MIN_MS = 60_000;
+const SCHEDULE_MAX_MS = 366 * 24 * 60 * 60 * 1000;
+
+/* A value the datetime-local input accepts, in the user's own timezone. */
+function localInputValue(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function whenLabel(iso) {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime())
+    ? "Time not set"
+    : at.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+}
+
+async function paintSchedule(host) {
+  host.insertAdjacentHTML(
+    "beforeend",
+    `<section class="card meeting-schedule" id="meeting-schedule" aria-labelledby="schedule-title-heading">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title" id="schedule-title-heading">${icon("calendar", { size: 16 })} Schedule a meeting</h2>
+          <p class="card-sub">Book a time and share the link. You can let people in early from the room.</p>
+        </div>
+      </div>
+      <form id="schedule-form" novalidate>
+        <div class="field">
+          <label for="schedule-title">Meeting name</label>
+          <input class="input" id="schedule-title" name="title" type="text" maxlength="120" placeholder="Client kickoff" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="schedule-when">When</label>
+          <input class="input" id="schedule-when" name="when" type="datetime-local" required />
+          <span class="field-hint">Your local time. Up to a year ahead, and at least a minute from now.</span>
+        </div>
+        <div class="field">
+          <label for="schedule-kind">Type</label>
+          <select class="input" id="schedule-kind" name="kind">
+            <option value="video">Video</option>
+            <option value="voice">Voice only</option>
+          </select>
+        </div>
+        <div class="field-error" id="schedule-error" role="alert"></div>
+        <div class="card-actions">
+          <button class="btn btn-primary" type="submit">${icon("calendar-check", { size: 14 })} Book meeting</button>
+        </div>
+      </form>
+      <div class="schedule-upcoming" id="schedule-upcoming" aria-live="polite"></div>
+    </section>`
+  );
+
+  const form = qs("#schedule-form", host);
+  const when = qs("#schedule-when", host);
+  const error = qs("#schedule-error", host);
+  when.min = localInputValue(new Date(Date.now() + SCHEDULE_MIN_MS));
+
+  async function paintUpcoming() {
+    const list = qs("#schedule-upcoming", host);
+    let rows = [];
+    try {
+      rows = (await rpc("meeting_upcoming", { p_limit: 20 })) || [];
+    } catch {
+      list.innerHTML = "";
+      return;
+    }
+    if (!rows.length) {
+      list.innerHTML = `<p class="card-sub">No meetings booked yet.</p>`;
+      return;
+    }
+    list.innerHTML = `<h3 class="schedule-heading">Upcoming</h3><ul class="schedule-items">${rows
+      .map((row) => {
+        const link = `${location.origin}/app/?view=meeting&code=${row.code}`;
+        return `<li class="schedule-item">
+          <div>
+            <strong>${esc(row.title || "Meeting")}</strong>
+            <div class="card-sub">${esc(whenLabel(row.scheduledFor))} · ${row.kind === "voice" ? "Voice" : "Video"} · code <code>${esc(row.code)}</code></div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-sm" type="button" data-copy-link="${esc(link)}">${icon("copy", { size: 13 })} Copy link</button>
+            <a class="btn btn-ghost btn-sm" href="?view=meeting&code=${esc(row.code)}">Open</a>
+          </div>
+        </li>`;
+      })
+      .join("")}</ul>`;
+  }
+
+  on(form, "submit", async (event) => {
+    event.preventDefault();
+    error.textContent = "";
+    const title = String(qs("#schedule-title", host).value || "").trim();
+    const kind = qs("#schedule-kind", host).value === "voice" ? "voice" : "video";
+    const value = when.value;
+    const at = value ? new Date(value) : null;
+    const delta = at ? at.getTime() - Date.now() : NaN;
+
+    /* The same limits the database enforces. Checked here so the reason sits
+       next to the field, instead of arriving as an error toast after a round trip. */
+    if (!at || Number.isNaN(delta)) {
+      error.textContent = "Choose a date and time for the meeting.";
+      when.focus();
+      return;
+    }
+    if (delta < SCHEDULE_MIN_MS) {
+      error.textContent = "Choose a time at least a minute from now.";
+      when.focus();
+      return;
+    }
+    if (delta > SCHEDULE_MAX_MS) {
+      error.textContent = "Choose a time within the next year.";
+      when.focus();
+      return;
+    }
+
+    const submit = qs("#schedule-form button[type=submit]", host);
+    submit.disabled = true;
+    try {
+      const booked = await rpc("meeting_schedule", { p_title: title || "Meeting", p_kind: kind, p_at: at.toISOString() });
+      toast({ title: "Meeting booked", message: `${booked.title} · ${whenLabel(booked.scheduledFor)}` }, { tone: "success" });
+      form.reset();
+      when.min = localInputValue(new Date(Date.now() + SCHEDULE_MIN_MS));
+      await paintUpcoming();
+    } catch (err) {
+      error.textContent = err?.message || "The meeting could not be booked.";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  delegate(host, "click", "[data-copy-link]", async (_event, node) => {
+    try {
+      await navigator.clipboard.writeText(node.getAttribute("data-copy-link"));
+      toast({ title: "Link copied" }, { tone: "success" });
+    } catch {
+      toastError(new Error("The clipboard is blocked in this browser. Copy the code from the list instead."));
+    }
+  });
+
+  await paintUpcoming();
+}
+
+/* Fill the lobby's device pickers from what the browser can see. Labels only
+   appear once the user has allowed the microphone, so an unlabelled device
+   still gets a numbered name rather than a blank option. */
+async function wireDevices(host) {
+  const groups = await listCallDevices();
+  const fill = (name, items, placeholder) => {
+    const select = qs(`[data-device="${name}"]`, host);
+    if (!select) return;
+    select.innerHTML = [`<option value="">${esc(placeholder)}</option>`]
+      .concat(items.map((item) => `<option value="${esc(item.id)}">${esc(item.label)}</option>`))
+      .join("");
+    select.value = devicePrefs[name] || "";
+    select.addEventListener("change", () => {
+      devicePrefs = { ...devicePrefs, [name]: select.value };
+    });
+  };
+  fill("microphoneId", groups.microphones, "Default microphone");
+  fill("cameraId", groups.cameras, "Default camera");
+  const speaker = qs('[data-device="speakerId"]', host);
+  if (speaker && canChooseSpeaker() && groups.speakers.length) {
+    fill("speakerId", groups.speakers, "Default speaker");
+  } else if (speaker) {
+    speaker.closest("[data-speaker-field]")?.setAttribute("hidden", "");
+  }
+}
 
 async function rpc(name, args = {}) {
   if (!sb) throw new Error("Meetings are not available right now.");
@@ -187,6 +359,8 @@ async function paintStart(host) {
       submit.textContent = "Create meeting";
     }
   });
+
+  void paintSchedule(host);
 }
 
 /* -------------------------------------------------------------------- lobby */
@@ -243,6 +417,11 @@ async function paintLobby(host, code) {
         <p class="card-sub">The code is <code>${esc(info.code)}</code>. Anyone you send this to must be signed in to Shinzora.</p>
       </div>
 
+      <div class="meeting-devices" id="meeting-devices" aria-label="Devices for this call">
+        <label class="field"><span>Microphone</span><select class="input" data-device="microphoneId"></select></label>
+        <label class="field"><span>Camera</span><select class="input" data-device="cameraId"></select></label>
+        <label class="field" data-speaker-field><span>Speaker</span><select class="input" data-device="speakerId"></select></label>
+      </div>
       <div class="card-actions">
         <button class="btn btn-primary" type="button" data-meeting-join>
           ${icon(info.kind === "voice" ? "phone" : "video", { size: 14 })}
@@ -285,6 +464,8 @@ async function paintLobby(host, code) {
     });
   }
 
+  void wireDevices(host);
+
   on(qs("[data-meeting-join]", host), "click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -318,6 +499,9 @@ async function joinMeeting(host, code, lobby) {
     title: joined.title || lobby.title,
     self
   });
+  /* Before the call starts this only remembers the choice; the media is then
+     captured with it. */
+  await call.selectDevices({ ...devicePrefs });
 
   current = { meeting: joined, call, host: Boolean(joined.youAreHost) };
 

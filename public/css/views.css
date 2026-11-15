@@ -4449,3 +4449,24 @@ html {
   .svc-tile:hover, .svc-tile:hover .svc-tile-icon, .svc-stats .card:hover { transform: none; }
   .svc-others:not([hidden]), .svc-reveal, .svc-confirm.is-shown .svc-callout { animation: none; }
 }
+
+/* ---- Meetings: scheduling, lobby devices ---- */
+.meeting-schedule { margin-top: var(--sp-4, 16px); }
+.meeting-schedule .field-hint { display: block; margin-top: 4px; }
+.meeting-schedule .field-error:empty { display: none; }
+.schedule-heading { font-size: var(--fs-sm, 14px); margin: var(--sp-4, 16px) 0 var(--sp-2, 8px); color: var(--text-2); }
+.schedule-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.schedule-item {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line);
+  animation: svc-in .3s ease both;
+}
+.schedule-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.meeting-devices {
+  display: grid; gap: 12px; margin: var(--sp-3, 12px) 0;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.meeting-devices .field span { display: block; font-size: var(--fs-xs, 12px); margin-bottom: 4px; }
+.meeting-devices .input { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .schedule-item { animation: none; } }

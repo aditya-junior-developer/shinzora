@@ -27,6 +27,8 @@
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { env } from "../../config/env.js";
 import { releaseTopic } from "../../lib/live-channel.js";
+import { classifyQuality, videoBitrateFor, summariseStats, shouldWarn } from "./call-quality.js";
+import { captureConstraints } from "./call-devices.js";
 
 const MAX_PEERS = 6;
 
@@ -150,6 +152,13 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
        it carries their mute and camera state. */
     others: [],
     facing: "user",
+    /* P8: the worst connection quality across peers, and a warning only after
+       sustained poor or fair samples. "unknown" until the first measurement. */
+    quality: "unknown",
+    qualityWarning: null,
+    /* Chosen devices. Empty ids mean the browser's default. */
+    devices: { microphoneId: "", cameraId: "", speakerId: "" },
+    deviceNotice: null,
     relay: relayState(),
     startedAt: null,
     error: null,
@@ -164,6 +173,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
   const pendingOffers = new Map();
   let closed = false;
   let statsTimer = null;
+  let deviceListener = null;
   let levelCtx = null;
 
   /* The panel that draws the call is mounted after the call object exists, so
@@ -246,9 +256,14 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
 
     const lastError = { microphone: null, camera: null };
     try {
+      const chosen = captureConstraints({
+        microphoneId: state.devices.microphoneId,
+        cameraId: state.devices.cameraId,
+        video
+      });
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: state.facing } : false
+        audio: chosen.audio,
+        video: video ? { ...chosen.video, ...(state.devices.cameraId ? {} : { facingMode: state.facing }) } : false
       });
       return localStream;
     } catch (error) {
@@ -715,6 +730,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
           }
         }
         flushPending();
+        sampleQuality();
       }, 4000);
 
       return state;
@@ -730,6 +746,119 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
       if (state.status === "live") callPeer(userId, name).catch(() => {});
       pendingOffers.delete(userId);
     }
+  }
+
+  /* ------------------------------------------------------ quality (P8) */
+
+  const LEVEL_ORDER = { unknown: 0, good: 1, fair: 2, poor: 3 };
+  const qualityHistory = [];
+  let sampling = false;
+
+  /** Cap a video sender's bitrate to what the link can carry. Audio is never capped. */
+  async function capVideo(sender, bps) {
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+    if (params.encodings[0].maxBitrate === bps) return;
+    params.encodings[0].maxBitrate = bps;
+    await sender.setParameters(params).catch(() => {});
+  }
+
+  /**
+   * Read the connection statistics for every connected peer, rate the worst
+   * one, and lower the video ceiling when the link is weak. Only emits when the
+   * level or the warning changes, so the stage does not repaint every 4 seconds.
+   */
+  async function sampleQuality() {
+    if (sampling || closed) return;
+    sampling = true;
+    try {
+      let worst = "unknown";
+      for (const entry of state.peers.values()) {
+        const connection = entry.connection;
+        if (!connection || entry.state !== "connected" || !connection.getStats) continue;
+        const level = classifyQuality(summariseStats(await connection.getStats()));
+        if (LEVEL_ORDER[level] > LEVEL_ORDER[worst]) worst = level;
+        const video = connection.getSenders().find((sender) => sender.track?.kind === "video");
+        if (video && level !== "unknown") await capVideo(video, videoBitrateFor(level));
+      }
+      if (worst !== "unknown") {
+        qualityHistory.push(worst);
+        if (qualityHistory.length > 6) qualityHistory.shift();
+      }
+      const warning = shouldWarn(qualityHistory);
+      if (worst !== state.quality || warning !== state.qualityWarning) {
+        state.quality = worst;
+        state.qualityWarning = warning;
+        emit();
+      }
+    } catch {
+      /* statistics are a convenience; the call carries on without them */
+    } finally {
+      sampling = false;
+    }
+  }
+
+  /**
+   * Switch microphone or camera during a call without renegotiating: the new
+   * track replaces the old one on every sender, the local preview is updated,
+   * and the old track is stopped. The mute and camera-off states carry over.
+   * Before the call starts the choice is simply remembered for the next join.
+   */
+  if (navigator.mediaDevices?.addEventListener && !deviceListener) {
+    deviceListener = () => {
+      void handleDeviceChange();
+    };
+    navigator.mediaDevices.addEventListener("devicechange", deviceListener);
+  }
+
+  async function selectDevices({ microphoneId, cameraId, speakerId } = {}) {
+    if (typeof microphoneId === "string") state.devices.microphoneId = microphoneId;
+    if (typeof cameraId === "string") state.devices.cameraId = cameraId;
+    if (typeof speakerId === "string") state.devices.speakerId = speakerId;
+    if (!localStream || !navigator.mediaDevices?.getUserMedia) {
+      emit();
+      return state.devices;
+    }
+
+    if (typeof microphoneId === "string" && localStream.getAudioTracks().length) {
+      const fresh = await navigator.mediaDevices.getUserMedia({
+        audio: captureConstraints({ microphoneId }).audio,
+        video: false
+      });
+      const [track] = fresh.getAudioTracks();
+      track.enabled = !state.muted;
+      await swapTrack("audio", track);
+    }
+
+    /* While the screen is being shared, the camera track is kept but not sent,
+       so a camera change must not replace the shared screen. It takes effect when
+       sharing stops. */
+    if (typeof cameraId === "string" && state.kind === "video" && localStream.getVideoTracks().length && !state.screenSharing) {
+      const fresh = await navigator.mediaDevices.getUserMedia({
+        video: captureConstraints({ cameraId, video: true }).video,
+        audio: false
+      });
+      const [track] = fresh.getVideoTracks();
+      track.enabled = state.cameraOn;
+      await swapTrack("video", track);
+    }
+
+    /* The speaker is applied to the playing elements by the call surface, which
+       reads state.devices.speakerId on every paint. */
+    emit();
+    return state.devices;
+  }
+
+  async function swapTrack(kind, track) {
+    for (const entry of state.peers.values()) {
+      const sender = entry.connection?.getSenders().find((candidate) => candidate.track?.kind === kind);
+      if (sender) await sender.replaceTrack(track).catch(() => {});
+    }
+    for (const old of localStream.getTracks().filter((t) => t.kind === kind)) {
+      localStream.removeTrack(old);
+      old.stop();
+    }
+    localStream.addTrack(track);
   }
 
   function toggleMute() {
@@ -896,9 +1025,47 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
     }
   }
 
+  /* A microphone or camera can be unplugged mid-call. If the chosen device is
+     gone, the call moves to the system default rather than going silent, and
+     says so once. The listener is removed in cleanup(). */
+  async function handleDeviceChange() {
+    if (closed || !localStream || !navigator.mediaDevices?.enumerateDevices) return;
+    let present;
+    try {
+      present = await navigator.mediaDevices.enumerateDevices();
+    } catch {
+      return;
+    }
+    const has = (id, kind) => present.some((device) => device.kind === kind && device.deviceId === id);
+    const lost = [];
+    if (state.devices.microphoneId && !has(state.devices.microphoneId, "audioinput")) {
+      lost.push("microphone");
+      await selectDevices({ microphoneId: "" }).catch(() => {});
+    }
+    if (state.devices.cameraId && state.kind === "video" && !has(state.devices.cameraId, "videoinput")) {
+      lost.push("camera");
+      await selectDevices({ cameraId: "" }).catch(() => {});
+    }
+    if (lost.length) {
+      state.deviceNotice = `Your ${lost.join(" and ")} was disconnected. The call switched to the default.`;
+      emit();
+      /* The notice is news once; it clears itself rather than sitting in the call. */
+      setTimeout(() => {
+        if (state.deviceNotice && !closed) {
+          state.deviceNotice = null;
+          emit();
+        }
+      }, 9000);
+    }
+  }
+
   function cleanup() {
     clearInterval(statsTimer);
     statsTimer = null;
+    if (deviceListener && navigator.mediaDevices?.removeEventListener) {
+      navigator.mediaDevices.removeEventListener("devicechange", deviceListener);
+    }
+    deviceListener = null;
     clearInterval(reconnectTimer);
     reconnectTimer = null;
     restartAttempts = 0;
@@ -945,6 +1112,7 @@ export function createCall({ kind, topic, title, self, onState = () => {} }) {
     toggleCamera,
     switchCamera,
     restartIce,
+    selectDevices,
     toggleScreenShare,
     ownLevel,
     getLocalStream: () => localStream,
