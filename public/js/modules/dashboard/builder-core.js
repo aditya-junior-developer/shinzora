@@ -22,7 +22,8 @@
 import { qs, qsa, esc, on, safeSet } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { timeAgo, slugify } from "../../lib/format.js";
-import { state, plan, canCreateProject } from "../../lib/store.js";
+import { state, plan, planId, canCreateProject } from "../../lib/store.js";
+import { planById } from "../../config/env.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { api, runtimeConfig } from "../../lib/api.js";
 import { toast, toastError } from "../../ui/toast.js";
@@ -37,7 +38,8 @@ import {
 } from "./builder/stages.js";
 import { toSingleFile, singleFileDownload } from "../../lib/single-file.js";
 import { askNotificationPermission, notifyBuildResult } from "../../lib/notify.js";
-import { validateSiteDocument, validationSummary } from "../../lib/site-validate.js";
+import { validateSiteDocument, validationSummary, collectRoutes, blockingIssues } from "../../lib/site-validate.js";
+import { pageState, trimToLimit, upgradeOptions, limitWords, standardsFailure, resolveLimit } from "./builder/page-limits.js";
 import {
   packageOptions,
   resolveTarget,
@@ -73,6 +75,9 @@ export function createBuilder(type) {
   const config = TYPES[type];
   const stages = stagesFor(type);
   const isApp = type === "app";
+  /* The chips that count against the plan limit: pages for a website, screens for an app. */
+  const pagesField = isApp ? "screens" : "pages";
+  const pageNoun = isApp ? "screen" : "page";
 
   return async function render(root, ctx) {
     const runtime = await runtimeConfig();
@@ -198,6 +203,18 @@ export function createBuilder(type) {
     /* --------------------------------------------------------- entitlements */
     /* The plan decides how many platforms the app may target, and the answer
        comes from the database function, not from a list in the browser. */
+    /* The page limit the database enforces (project_plan_limits). If the lookup
+       fails the Free limit applies, never a wider one. */
+    async function loadPageLimit() {
+      try {
+        const { data, error } = await sb.rpc("project_plan_limits");
+        if (!error && data) return resolveLimit(data, planId());
+      } catch {
+        /* fall through to the Free limit */
+      }
+      return resolveLimit(null, planId());
+    }
+
     async function loadSlots() {
       if (!isApp) return;
       /* The per-format answer is the most precise one: it comes from the
@@ -224,6 +241,7 @@ export function createBuilder(type) {
       }
     }
     await loadSlots();
+    S.pageLimit = await loadPageLimit();
 
     /* ------------------------------------------------------------- existing */
     /* Opening the builder without an id is not "start again": the account
@@ -497,6 +515,64 @@ export function createBuilder(type) {
       return "";
     }
 
+    /* ----------------------------------------------------------- page limits */
+    /** A new project starts with the default pages, cut down to what the plan allows. */
+    function ensurePageDefaults() {
+      const info = S.answers.information || (S.answers.information = {});
+      if (!Array.isArray(info[pagesField])) info[pagesField] = trimToLimit(config.defaults, S.pageLimit.limit);
+    }
+
+    /** The limit, what is used, and the upgrade options, shown before the owner is stopped. */
+    function pageLimitPanel() {
+      const chosen = S.answers.information?.[pagesField] || [];
+      const st = pageState(chosen, S.pageLimit.limit);
+      const planName = planById(S.pageLimit.plan).name;
+      const options = upgradeOptions(S.pageLimit.plan);
+      const upgrade = options.length
+        ? `<div class="row gap-2 wrap" style="margin-top:8px">${options
+            .map(
+              (option) =>
+                `<a class="btn btn-secondary btn-sm" href="/app/?view=billing">${esc(option.name)} · ${
+                  option.pages == null ? `unlimited ${pageNoun}s` : limitWords(option.pages, pageNoun)
+                }</a>`
+            )
+            .join("")}</div>`
+        : "";
+      if (st.unlimited) {
+        return `<p class="field-hint">${esc(planName)} has unlimited ${pageNoun}s.</p>`;
+      }
+      if (st.over) {
+        return `<div class="alert alert-warn"><span><span class="alert-title">More ${pageNoun}s than your plan allows</span>
+          ${st.used} ${pageNoun}s are selected, and ${esc(planName)} allows ${limitWords(st.limit, pageNoun)} in a new version.
+          Your saved versions stay exactly as they are. Remove ${st.used - st.limit} to save a new version.</span></div>${upgrade}`;
+      }
+      if (st.atLimit) {
+        return `<div class="alert alert-info"><span><span class="alert-title">${esc(planName)} limit reached</span>
+          Your ${esc(planName)} plan includes ${limitWords(st.limit, pageNoun)}. Remove one to choose another, or upgrade.</span></div>${upgrade}`;
+      }
+      return `<p class="field-hint">${esc(planName)} includes ${limitWords(st.limit, pageNoun)} per ${pageNoun}. ${st.remaining} left to choose.</p>`;
+    }
+
+    /**
+     * Everything that must be fixed before a version can be saved: the page
+     * limit, and every mandatory standard. Null when the version may be saved.
+     */
+    function versionBlocker(html, validation) {
+      const problems = [];
+      const pages = collectRoutes(html || "").size;
+      if (S.pageLimit.limit != null && pages > S.pageLimit.limit) {
+        problems.push({
+          message: `This version has ${limitWords(pages, pageNoun)}, and your ${planById(S.pageLimit.plan).name} plan allows ${limitWords(S.pageLimit.limit, pageNoun)}. Remove the extra ones, or upgrade.`,
+          link: "/app/?view=billing",
+          linkLabel: "See plans"
+        });
+      }
+      for (const issue of blockingIssues(validation)) {
+        problems.push({ message: `${issue.title}: ${issue.detail}` });
+      }
+      return problems.length ? problems : null;
+    }
+
     /* ---------------------------------------------------------- stage 1 & 2 */
     function paintBrief(stage) {
       host.innerHTML = `
@@ -518,8 +594,10 @@ export function createBuilder(type) {
     }
 
     function paintInformation(stage) {
+      ensurePageDefaults();
       host.innerHTML = `
         <p class="muted" style="font-size:var(--fs-xs);line-height:1.6">${esc(stage.summary)}</p>
+        <div id="page-limit-panel">${pageLimitPanel()}</div>
         ${stage.fields.map(fieldMarkup).join("")}
         ${needsDatabase() ? databasePanel() : ""}
         <details class="wz-details">
@@ -540,6 +618,15 @@ export function createBuilder(type) {
       on(qs("#stage-next"), "click", () => {
         const problems = validateStage(stage, { ...S.answers.information, platform: S.target || S.answers.information.platform });
         if (problems.length) return showStageError(problems);
+        if (pageState(S.answers.information[pagesField] || [], S.pageLimit.limit).over) {
+          return showStageError([
+            {
+              message: `Your ${planById(S.pageLimit.plan).name} plan allows ${limitWords(S.pageLimit.limit, pageNoun)}. Remove the extra ones before building.`,
+              link: "/app/?view=billing",
+              linkLabel: "See plans"
+            }
+          ]);
+        }
         if (isApp) {
           const problemsForPackage = packageReadiness({
             target: S.target,
@@ -559,7 +646,9 @@ export function createBuilder(type) {
       const hostEl = qs("#stage-error");
       if (!hostEl) return;
       hostEl.innerHTML = `<div class="alert alert-warning"><span><span class="alert-title">Before continuing</span>
-        <ul style="margin:6px 0 0 16px">${problems.map((p) => `<li>${esc(p.message)}</li>`).join("")}</ul></span></div>`;
+        <ul style="margin:6px 0 0 16px">${problems
+          .map((p) => `<li>${esc(p.message)}${p.link ? ` <a href="${esc(p.link)}">${esc(p.linkLabel || "Open")}</a>` : ""}</li>`)
+          .join("")}</ul></span></div>`;
       hostEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
       /* Put the first unanswered control on screen instead of leaving the
          customer to hunt for it above the fold. */
@@ -584,9 +673,23 @@ export function createBuilder(type) {
       });
       qsa("[data-choice]").forEach((node) => {
         node.addEventListener("click", () => {
-          node.classList.toggle("is-active");
           const field = node.closest("[id^='chips-']").id.replace("chips-", "");
+          if (field === pagesField && !node.classList.contains("is-active")) {
+            const chosenNow = qsa(`#chips-${field} .chip.is-active`).map((chip) => chip.getAttribute("data-choice"));
+            if (pageState(chosenNow, S.pageLimit.limit).atLimit) {
+              toast(
+                {
+                  title: `${planById(S.pageLimit.plan).name} plan limit reached`,
+                  message: `It includes ${limitWords(S.pageLimit.limit, pageNoun)}. Remove one to choose another, or upgrade in Billing.`
+                },
+                { tone: "warning", duration: 6000 }
+              );
+              return;
+            }
+          }
+          node.classList.toggle("is-active");
           bucket[field] = qsa(`#chips-${field} .chip.is-active`).map((chip) => chip.getAttribute("data-choice"));
+          if (field === pagesField && qs("#page-limit-panel")) qs("#page-limit-panel").innerHTML = pageLimitPanel();
         });
       });
       qsa("[data-colour]").forEach((node) => {
@@ -1103,6 +1206,7 @@ export function createBuilder(type) {
         return "The AI service is at its current limit, so this build did not start. Nothing was taken from your allowance — try again later.";
       }
       if (code === "timeout") return "The AI service did not answer in time. Nothing was taken from your allowance.";
+      if (code === "page_limit") return "This build asks for more pages than your plan allows. Remove some, or upgrade in Billing.";
       if (code === "project_exists") return "You already have a project of this kind. Open it and update it instead of starting another.";
       if (code === "build_failed") return "The build could not finish. Your credit was returned and the pages already written are kept.";
       if (code === "build_timeout") return "The build is still running on the server. Reopen the builder and it will pick up where it stopped.";
@@ -1193,7 +1297,7 @@ export function createBuilder(type) {
     }
 
     function plannedRoutes() {
-      const pages = S.answers.information.pages || config.defaults;
+      const pages = S.answers.information[pagesField] || trimToLimit(config.defaults, S.pageLimit.limit);
       return pages.map((page) => (page.toLowerCase() === "home" ? "/" : `/${slugify(page) || page.toLowerCase()}`));
     }
 
@@ -1202,7 +1306,7 @@ export function createBuilder(type) {
         type,
         name: S.answers.information.name || "Untitled project",
         brief: instruction,
-        pages: S.answers.information.pages || config.defaults,
+        pages: S.answers.information[pagesField] || trimToLimit(config.defaults, S.pageLimit.limit),
         style: S.answers.brief.design || null,
         business: state.business || null,
         /* The single-file contract is stated to the server, and enforced again
@@ -1454,6 +1558,7 @@ export function createBuilder(type) {
       const html = S.generated?.html || S.activeVersion?.files?.["index.html"] || "";
       const validation = S.validation;
       const nextNumber = (S.versions[0]?.version_number || 0) + 1;
+      const blockers = versionBlocker(html, validation) || [];
       host.innerHTML = `
         <p class="muted" style="font-size:var(--fs-xs);line-height:1.6">
           Saving stores this as version ${nextNumber}. Every earlier version stays exactly as it is.
@@ -1464,14 +1569,15 @@ export function createBuilder(type) {
           <div class="kv"><dt>Validation</dt><dd>${validation ? esc(validationSummary(validation)) : "Not run"}</dd></div>
         </div>
         ${
-          validation && validation.counts.error
-            ? `<div class="alert alert-warning"><span><span class="alert-title">${validation.counts.error} problem(s) in this version</span>
-                 You can save it and keep editing, but the preview will show the same problems.</span></div>`
+          blockers.length
+            ? `<div class="alert alert-warn"><span><span class="alert-title">This version cannot be saved yet</span>
+                 <ul style="margin:6px 0 0 16px">${blockers.map((b) => `<li>${esc(b.message)}</li>`).join("")}</ul>
+                 Ask for a change on the preview stage, or remove the extra pages, then save again.</span></div>`
             : ""
         }
         <div class="row gap-2 wrap">
           <button class="btn btn-ghost btn-sm" id="stage-back">Back to preview</button>
-          <button class="btn btn-primary" id="save-button" ${html ? "" : "disabled"}>${icon("save", { size: 14 })}Save version ${nextNumber}</button>
+          <button class="btn btn-primary" id="save-button" ${html && !blockers.length ? "" : "disabled"}>${icon("save", { size: 14 })}Save version ${nextNumber}</button>
           <button class="btn btn-secondary btn-sm" id="download-button" ${html ? "" : "disabled"}>${icon("download", { size: 14 })}Download the app (index.html)</button>
         </div>
         ${isApp ? packageSection() : ""}
@@ -1615,7 +1721,10 @@ export function createBuilder(type) {
     async function saveVersion() {
       const generated = S.generated;
       if (!generated) return;
+      const blockers = versionBlocker(generated.html, S.validation || generated.validation);
+      if (blockers) return showStageError(blockers);
 
+      let createdProjectId = null;
       if (!S.project) {
         const limit = await canCreateProject();
         if (!limit.allowed) {
@@ -1662,6 +1771,7 @@ export function createBuilder(type) {
             .select("*")
             .single();
           if (error) throw normalizeError(error);
+          createdProjectId = data.id;
           S.project = data;
           qs("#publish-card").hidden = false;
           qs("#slug-input").value = data.slug;
@@ -1721,7 +1831,28 @@ export function createBuilder(type) {
           link: `/app/?view=${viewSlug}&id=${S.project.id}`
         });
       } catch (error) {
-        toastError(normalizeError(error));
+        const failure = standardsFailure(error);
+        if (createdProjectId) {
+          /* The project was created by this save and holds no version, because
+             the version was refused. Remove it, so the owner is not sent back to
+             an empty project, and so it does not count against the plan. */
+          await sb.from("projects").delete().eq("id", createdProjectId);
+          S.project = null;
+          history.replaceState({}, "", `/app/?view=${viewSlug}`);
+        }
+        if (failure?.kind === "page_limit") {
+          showStageError([
+            {
+              message: `This version has ${limitWords(failure.pages, pageNoun)}. Your ${planById(failure.plan).name} plan allows ${limitWords(failure.limit, pageNoun)}. Remove the extra ones, or upgrade.`,
+              link: "/app/?view=billing",
+              linkLabel: "See plans"
+            }
+          ]);
+        } else if (failure?.kind === "quality") {
+          showStageError(failure.problems.map((p) => ({ message: `${p.title}: ${p.detail}` })));
+        } else {
+          toastError(normalizeError(error));
+        }
         button.disabled = false;
         button.innerHTML = `${icon("save", { size: 14 })}Save version ${nextNumber}`;
       }
@@ -1824,6 +1955,21 @@ export function createBuilder(type) {
         toast({ title: "Save a version first" }, { tone: "warning" });
         return;
       }
+      /* Publishing is refused for a version that fails a mandatory standard. The
+         page limit is checked by the database at the moment of publishing (0051):
+         a site that is already live keeps running, but publishing a version with
+         more pages than the current plan allows is refused. */
+      const failing = blockingIssues(validateSiteDocument(S.activeVersion.files?.["index.html"] || ""));
+      if (failing.length) {
+        toast(
+          {
+            title: "This version cannot be published yet",
+            message: failing.slice(0, 3).map((issue) => issue.title).join("; ")
+          },
+          { tone: "error", duration: 8000 }
+        );
+        return;
+      }
       const slug = slugify(qs("#slug-input").value) || slugify(S.project.name);
       if (slug.length < 3) {
         toast({ title: "Address too short", message: "Use at least 3 characters." }, { tone: "warning" });
@@ -1847,6 +1993,24 @@ export function createBuilder(type) {
         toast({ title: "Published", message: `${slug}.shinzora.in is live.` }, { tone: "success" });
       } catch (error) {
         const normalized = normalizeError(error);
+        const failure = standardsFailure(error);
+        if (failure?.kind === "quality") {
+          toast(
+            { title: "This version cannot be published yet", message: failure.problems.slice(0, 3).map((p) => p.title).join("; ") },
+            { tone: "error", duration: 8000 }
+          );
+          return;
+        }
+        if (failure?.kind === "page_limit") {
+          toast(
+            {
+              title: `${planById(failure.plan).name} plan limit`,
+              message: `This version has ${limitWords(failure.pages, pageNoun)}, and your plan allows ${limitWords(failure.limit, pageNoun)}. Your live site is unchanged. Remove pages or upgrade in Billing.`
+            },
+            { tone: "error", duration: 9000 }
+          );
+          return;
+        }
         toast(
           { title: normalized.code === "conflict" ? "That address is taken" : "Could not publish", message: normalized.message },
           { tone: "error", duration: 7000 }

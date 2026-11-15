@@ -18,6 +18,41 @@
 
 const JS_TYPES = /^(|text\/javascript|application\/javascript|module|text\/ecmascript)$/i;
 
+/**
+ * The mandatory standards. A version that fails any of these cannot be saved or
+ * published: the database enforces the same list (migration 0050,
+ * sz_site_standard_problems), so the browser's answer and the server's answer
+ * cannot disagree. Warnings outside this list are advice, not a gate.
+ *
+ * `js-syntax` is only checkable here, because SQL cannot parse JavaScript. The
+ * database does not check it, so it is a known gap for a site published by a
+ * direct database write. `h1` is advice on both sides, not a gate.
+ */
+export const MANDATORY_CODES = Object.freeze([
+  "empty",
+  "doctype",
+  "lang",
+  "viewport",
+  "title",
+  "img-alt",
+  "broken-route",
+  "broken-anchor",
+  "broken-link",
+  "missing-asset",
+  "placeholder-text",
+  "js-syntax"
+]);
+
+/** Is this issue one the customer cannot save or publish past? */
+export function isMandatory(issue) {
+  return Boolean(issue) && (issue.level === "error" || MANDATORY_CODES.includes(issue.code));
+}
+
+/** The issues that block save and publish, in the order they were found. */
+export function blockingIssues(result) {
+  return (result?.issues || []).filter(isMandatory);
+}
+
 /** Collect the routes a document exposes. */
 export function collectRoutes(html) {
   const routes = new Set();
@@ -57,7 +92,7 @@ function localAssetReferences(html) {
   };
 
   for (const match of html.matchAll(/<img\b[^>]*src\s*=\s*["']([^"']*)["']/gi)) push(match[1], "img");
-  for (const match of html.matchAll(/<source\b[^>]*srcset?\s*=\s*["']([^"']*)["']/gi)) push(match[1], "source");
+  for (const match of html.matchAll(/<source\b[^>]*srcset\s*=\s*["']([^"']*)["']/gi)) push(match[1], "source");
   for (const match of html.matchAll(/<link\b[^>]*href\s*=\s*["']([^"']*)["']/gi)) {
     if (/#/.test(match[1])) continue;
     if (/\.(css|js|woff2?|ttf|ico)$/i.test(match[1])) push(match[1], "link");
@@ -103,6 +138,8 @@ function scriptErrors(html) {
  * @returns {{ issues: Array<{level:'error'|'warning'|'info', code:string, title:string, detail:string}>,
  *             counts: {error:number, warning:number, info:number}, ok: boolean,
  *             routes: string[], externalHosts: string[] }}
+ *   `ok` is the error-level verdict (kept for existing callers). Use
+ *   blockingIssues(result) for the save and publish gate.
  */
 export function validateSiteDocument(html, options = {}) {
   const doc = String(html || "");
@@ -126,6 +163,10 @@ export function validateSiteDocument(html, options = {}) {
   }
   if (!/<meta[^>]+name\s*=\s*["']viewport["']/i.test(doc)) {
     add("error", "viewport", "Not responsive", "There is no viewport meta tag, so the page will not scale on a phone.");
+  }
+  const titleMatch = doc.match(/<title[^>]*>([^<]*)<\/title>/i);
+  if (!titleMatch || !titleMatch[1].trim()) {
+    add("warning", "title", "No page title", "The document needs a non-empty <title>, which is what search results and browser tabs show.");
   }
   if (!/<h1[\s>]/i.test(doc)) {
     add("warning", "h1", "No main heading", "The page has no <h1>, which weakens both accessibility and SEO.");
@@ -193,6 +234,9 @@ export function validateSiteDocument(html, options = {}) {
     if (!/\salt\s*=/i.test(match[0])) {
       add("warning", "img-alt", "Image without alt text", "An <img> has no alt attribute, so screen readers cannot describe it.");
     }
+  }
+  if (/lorem ipsum/i.test(doc)) {
+    add("warning", "placeholder-text", "Placeholder text left in the page", "The page still contains “lorem ipsum” filler text.");
   }
   if (/<form\b/i.test(doc) && !/<label\b/i.test(doc) && !/aria-label\s*=/i.test(doc)) {
     add("warning", "form-labels", "Form without labels", "The page has a form but no <label> or aria-label, so the fields are unnamed for assistive technology.");

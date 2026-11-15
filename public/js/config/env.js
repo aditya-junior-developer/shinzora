@@ -81,11 +81,15 @@ export const PLANS = [
     priceYearly: 0,
     aiMonthlyCredits: 30,
     projects: 1,
+    /* Pages per website or app. Enforced by the database (0050, sz_page_limit);
+       `null` means no limit. */
+    pages: 1,
     domains: 0,
     seats: 1,
     removeBranding: false,
     features: [
       "1 project (website, app or store)",
+      "1 page per website or app",
       "AI assistant — 30 generations / month",
       "Shinzora subdomain publishing (with Shinzora badge)",
       "Single-page version history",
@@ -101,12 +105,13 @@ export const PLANS = [
     priceYearly: 2499000,
     aiMonthlyCredits: 800,
     projects: 15,
+    pages: 3,
     domains: 5,
     seats: 3,
     removeBranding: true,
     popular: true,
     features: [
-      "15 projects, multi-page generation",
+      "15 projects, up to 3 pages each",
       "AI assistant — 800 generations / month",
       "Store, inventory, orders and customers",
       "Custom domain connection + DNS manager",
@@ -125,11 +130,12 @@ export const PLANS = [
     priceYearly: 9999000,
     aiMonthlyCredits: 6000,
     projects: 100,
+    pages: null,
     domains: 25,
     seats: 20,
     removeBranding: true,
     features: [
-      "100 projects and unlimited pages",
+      "100 projects, unlimited pages",
       "AI assistant — 6,000 generations / month",
       "Priority AI queue and larger context",
       "Managed domain + registrar workflow",
@@ -150,6 +156,7 @@ export const PLAN_LIMITS = Object.fromEntries(
     p.id,
     {
       projects: p.projects,
+      pages: p.pages ?? null,
       domains: p.domains,
       aiMonthlyCredits: p.aiMonthlyCredits,
       removeBranding: Boolean(p.removeBranding)

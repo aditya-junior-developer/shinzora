@@ -1083,7 +1083,21 @@ ${request}`,
    instead of throwing the work away.
    ========================================================================== */
 
-const BUILD_MAX_PAGES = 3;
+/* Plan page limits for a build. This mirrors sz_page_limit in migration 0050:
+   Free 1, Pro 3, Enterprise unlimited (null). The database enforces the limit on
+   every save and publish; this function decides how many pages a build may plan.
+   An unknown or legacy plan name counts as Free. */
+function pageLimitFor(plan: unknown): number | null {
+  const key = String(plan || "free").toLowerCase();
+  if (key === "enterprise") return null;
+  if (key === "pro") return 3;
+  return 1;
+}
+
+/* Upper bound on page steps inside one build, so a single build cannot run
+   without end. The builder offers ten page types, so no normal Enterprise build
+   reaches it. It is not a plan limit. */
+const BUILD_STEP_GUARD = 12;
 const BUILD_MAX_ATTEMPTS = 3;
 const BUILD_STEPS = ["plan", "styles", "pages", "finish"] as const;
 
@@ -1176,7 +1190,7 @@ async function handleBuildStart(
 
   const name = clean(body.name, 90) || "Untitled project";
   const style = clean(body.style, 400) || "Editorial dark, restrained, premium";
-  const pages = cleanList(body.pages, 8).slice(0, BUILD_MAX_PAGES);
+  const requestedPages = cleanList(body.pages, 40);
 
   const chosen = clean(body.model, 80);
   if (chosen && !(await isUsable(chosen, "site"))) {
@@ -1186,6 +1200,22 @@ async function handleBuildStart(
   }
 
   const db = admin();
+
+  /* The plan is read from the database, never from the request. A build that
+     asks for more pages than the plan allows is refused before any work starts. */
+  const { data: subscription } = await db.from("subscriptions").select("plan").eq("user_id", caller.user.id).maybeSingle();
+  const planId = String(subscription?.plan || "free");
+  const pageLimit = pageLimitFor(planId);
+  const noun = type === "app" ? "screen" : "page";
+  if (pageLimit !== null && requestedPages.length > pageLimit) {
+    return fail(403, "page_limit", `Your ${planId} plan allows ${pageLimit} ${noun}${pageLimit === 1 ? "" : "s"} per ${type === "app" ? "app" : "website"}. This build asks for ${requestedPages.length}.`, {
+      hint: "Remove some pages, or upgrade in Billing.",
+      plan: planId,
+      limit: pageLimit,
+      pages: requestedPages.length
+    });
+  }
+  const pages = requestedPages;
 
   /* One website, one app, one store per account.
      A second build would leave the owner with two half-finished sites and no
@@ -1284,6 +1314,7 @@ async function handleBuildStart(
         brief,
         style,
         pages,
+        page_limit: pageLimit,
         model: chosen || null,
         plan: null,
         styles: null,
@@ -1313,6 +1344,14 @@ async function handleBuildStart(
 }
 
 /* ---------------------------------------------------------------- build_step */
+
+/** How many pages the plan step may keep, from the limit stored when the build started. */
+function planPageCap(meta: BuildJob): number {
+  if (meta.page_limit === null) return BUILD_STEP_GUARD;
+  /* A build started before limits were stored has no value: assume Free, the narrowest. */
+  if (typeof meta.page_limit === "number") return meta.page_limit;
+  return 1;
+}
 
 async function handleBuildStep(caller: Caller, req: Request, body: Record<string, unknown>) {
   const jobId = clean(body.jobId, 60);
@@ -1360,7 +1399,7 @@ async function handleBuildStep(caller: Caller, req: Request, body: Record<string
       if (!pages.length) throw new GeminiError("The plan came back empty.", "ai_bad_json", 502);
       meta.plan = {
         design_system: planned.design_system ?? {},
-        pages: pages.slice(0, BUILD_MAX_PAGES).map((page: any, index: number) => ({
+        pages: pages.slice(0, planPageCap(meta)).map((page: any, index: number) => ({
           name: clean(page?.name, 60) || `Page ${index + 1}`,
           file: clean(page?.file, 60) || (index === 0 ? "index.html" : `page-${index + 1}.html`),
           title: clean(page?.title, 90) || clean(page?.name, 60) || `Page ${index + 1}`,
