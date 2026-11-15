@@ -204,13 +204,21 @@ const count = (calls, name) => calls.filter((call) => call.name === name).length
 const lastArgs = (calls, name) => calls.filter((call) => call.name === name).at(-1)?.args;
 const click = (window, node) => node.dispatchEvent(new window.Event("click", { bubbles: true }));
 
-async function openGroupsTab(world) {
+/* Opens the Groups tab. By default the member then picks the first group, as
+   they would by hand, so tests that need a thread get one. Pass pick:false to
+   see the tab exactly as it opens: the list, and no chat. */
+async function openGroupsTab(world, { pick = true } = {}) {
   const view = await bundle(path.join(viewsDir, "messages.js"));
   await view.default(world.root, {});
   const tab = world.root.querySelector('[data-tab="groups"]');
   assert.ok(tab, "the Groups tab exists");
   click(world.window, tab);
   await settle();
+  const first = pick ? world.root.querySelector("[data-group]") : null;
+  if (first) {
+    click(world.window, first);
+    await settle();
+  }
 }
 
 /* ------------------------------------------------------------------- tests */
@@ -234,11 +242,24 @@ test("an empty list explains itself instead of rendering nothing", async () => {
   assert.match(world.root.textContent, /You are not in a group yet/, "the empty state is spelled out");
 });
 
-test("the first group opens by itself, so the tab is never a blank pane", async () => {
+test("opening the Groups tab shows the group entries only, and no chat opens by itself", async () => {
+  const world = makeWorld();
+  await openGroupsTab(world, { pick: false });
+
+  assert.ok(world.root.querySelectorAll("[data-group]").length > 0, "the group entries are listed");
+  assert.equal(count(world.calls, "group_get"), 0, "no group is read until the member picks one");
+  assert.equal(count(world.calls, "group_messages_list"), 0, "no thread is requested");
+  assert.equal(count(world.calls, "group_mark_read"), 0, "nothing is marked read by merely opening the tab");
+  assert.equal(world.root.querySelectorAll("[data-message]").length, 0, "no message is painted");
+  assert.equal(world.root.querySelector("#grp-compose").hidden, true, "no composer until a group is open");
+  assert.ok(world.root.querySelector(".grp-pick"), "the thread area asks the member to pick a group");
+});
+
+test("picking a group opens its thread", async () => {
   const world = makeWorld();
   await openGroupsTab(world);
 
-  assert.equal(count(world.calls, "group_get"), 1, "the first group was read without a click");
+  assert.equal(count(world.calls, "group_get"), 1, "the picked group was read");
   assert.equal(count(world.calls, "group_messages_list"), 1, "its thread was requested");
   assert.equal(count(world.calls, "group_mark_read"), 1, "and it was marked read after painting");
   assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "three messages painted");
@@ -251,7 +272,7 @@ test("clicking a group row re-opens it", async () => {
   click(world.window, world.root.querySelector("[data-group]"));
   await settle();
 
-  assert.equal(count(world.calls, "group_get"), 2, "opened once on boot and once by the click");
+  assert.equal(count(world.calls, "group_get"), 2, "opened once by the first pick and once by the click");
   assert.deepEqual(lastArgs(world.calls, "group_get"), { p_group: GROUP.id });
   assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "the thread is still painted");
 });

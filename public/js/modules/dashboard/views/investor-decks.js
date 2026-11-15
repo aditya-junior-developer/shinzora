@@ -20,7 +20,12 @@ import { pageHead, emptyState, skeletonView, chip, setupNotice } from "../compon
 import { toast, toastError } from "../../../ui/toast.js";
 import { openModal } from "../../../ui/modal.js";
 import { timeAgo } from "../../../lib/format.js";
+import { statusById } from "../../../config/request-services.js";
 import {
+  EXPERT_REQUEST_TYPE,
+  EXPERT_BRIEF_MIN,
+  EXPERT_BRIEF_MAX,
+  EXPERT_CONFIRMATION,
   DECK_SECTIONS,
   DECK_MODES,
   DECK_MAX_SLIDES,
@@ -110,6 +115,16 @@ async function paintList({ fresh = false } = {}) {
   const { data: decks, error } = await sb.from("investor_decks").select(DECK_COLUMNS).order("updated_at", { ascending: false });
   if (error) throw error;
 
+  /* Expert requests the member has sent, with the status the team sets. Read
+     under the member's own row-level security. */
+  const { data: expertRows } = await sb
+    .from("service_requests")
+    .select("id, title, status, created_at")
+    .eq("service_type", EXPERT_REQUEST_TYPE)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const expertRequests = expertRows || [];
+
   root.innerHTML = `
     ${pageHead({
       title: "Investor deck",
@@ -117,13 +132,14 @@ async function paintList({ fresh = false } = {}) {
       actions: `<button class="btn btn-primary btn-sm" type="button" data-deck-new>${icon("plus", { size: 14 })} New deck</button>`
     })}
     <div id="deck-builder" ${fresh ? "" : "hidden"}>${builderMarkup()}</div>
+    ${expertRequestsMarkup(expertRequests)}
     ${
       (decks || []).length
         ? `<div class="deck-grid">${(decks || []).map(deckCard).join("")}</div>`
         : emptyState({
             iconName: "layers",
             title: "No decks yet",
-            desc: "Start with an AI draft (free), or write every slide yourself. You can share a deck once it has at least three slides.",
+            desc: "Start with an AI draft (5 credits), or send your brief to our experts and we deliver the finished deck to your email. You can share a deck once it has at least three slides.",
             action: `<button class="btn btn-primary btn-sm" type="button" data-deck-new>${icon("plus", { size: 14 })} Start a deck</button>`
           })
     }
@@ -151,6 +167,7 @@ function builderMarkup() {
       </div>
       <div class="deck-modes" role="radiogroup" aria-label="How to start">
         ${Object.values(DECK_MODES)
+          .filter((mode) => mode.creatable)
           .map(
             (mode, i) => `<label class="deck-mode ${i === 0 ? "is-selected" : ""}">
               <input type="radio" name="deck-mode" value="${mode.id}" ${i === 0 ? "checked" : ""} />
@@ -170,7 +187,7 @@ function builderMarkup() {
         <span class="field-hint">Nothing else is read. The draft uses only what you tick.</span>
       </fieldset>
       <div class="field" id="deck-brief-field">
-        <label class="field-label" for="deck-brief">What is this deck for? <span class="field-hint">(optional)</span></label>
+        <label class="field-label" for="deck-brief">What is this deck for? <span class="field-hint" id="deck-brief-hint">(optional)</span></label>
         <textarea class="input" id="deck-brief" rows="3" maxlength="600" placeholder="A seed round to open a second roastery in Gurugram."></textarea>
       </div>
       <div class="field-error" id="deck-error" role="alert"></div>
@@ -196,11 +213,14 @@ function bindBuilder() {
     const mode = form.querySelector("input[name=deck-mode]:checked")?.value || "ai";
     qsa(".deck-mode", form).forEach((label) => label.classList.toggle("is-selected", label.querySelector("input").checked));
     const isAi = mode === "ai";
-    qs("#deck-sections", form).hidden = !isAi;
-    qs("#deck-brief-field", form).hidden = !isAi;
+    /* Both kinds read the parts of the business the owner ticks and the brief.
+       An expert brief is required; an AI brief is optional. */
+    qs("#deck-sections", form).hidden = false;
+    qs("#deck-brief-field", form).hidden = false;
+    qs("#deck-brief-hint", form).textContent = isAi ? "(optional)" : `(required, at least ${EXPERT_BRIEF_MIN} characters)`;
     qs("#deck-create", form).innerHTML = isAi
       ? `${icon("wand-sparkles", { size: 14 })} Draft with AI · ${DECK_AI_CREDITS} credits`
-      : `${icon("file-pen-line", { size: 14 })} Start writing`;
+      : `${icon("users", { size: 14 })} Send to our experts`;
   };
   qsa("input[name=deck-mode]", form).forEach((input) => on(input, "change", syncMode));
   syncMode();
@@ -220,6 +240,32 @@ function bindBuilder() {
       return;
     }
     const submit = qs("#deck-create", form);
+    if (mode === "expert") {
+      const brief = String(qs("#deck-brief", form).value || "").trim();
+      if (brief.length < EXPERT_BRIEF_MIN) {
+        error.textContent = `Describe what the deck should say, at least ${EXPERT_BRIEF_MIN} characters.`;
+        qs("#deck-brief", form).focus();
+        return;
+      }
+      if (brief.length > EXPERT_BRIEF_MAX) {
+        error.textContent = `Keep the brief to ${EXPERT_BRIEF_MAX} characters.`;
+        return;
+      }
+      submit.disabled = true;
+      submit.setAttribute("aria-busy", "true");
+      try {
+        await submitExpertRequest({ title, sections, brief });
+        form.reset();
+        toast({ title: "Request sent", message: EXPERT_CONFIRMATION }, { tone: "success" });
+        await paintList({ fresh: false });
+      } catch (err) {
+        const normalized = normalizeError(err);
+        error.textContent = normalized.message || "The request could not be sent. Please try again.";
+        submit.disabled = false;
+        submit.removeAttribute("aria-busy");
+      }
+      return;
+    }
     submit.disabled = true;
     try {
       if (mode === "ai") {
@@ -252,6 +298,56 @@ function bindBuilder() {
       submit.disabled = false;
     }
   });
+}
+
+/* ------------------------------------------------- written by experts */
+
+/** Sends the brief to the team. The row is what admins see and act on. */
+async function submitExpertRequest({ title, sections, brief }) {
+  const email = state.user?.email || state.session?.user?.email || "";
+  if (!email) throw new Error("Your registered email is needed to deliver the deck. Check your account details and try again.");
+  const name = String(state.profile?.full_name || state.profile?.business_name || email).slice(0, 120);
+  const parts = sections.length ? sections.join(", ") : "none";
+
+  const { data, error } = await sb
+    .from("service_requests")
+    .insert({
+      owner_id: state.user.id,
+      service_type: EXPERT_REQUEST_TYPE,
+      title: `Investor deck: ${title}`.slice(0, 120),
+      details: brief,
+      custom_description: `Deck title: ${title}\nParts of the business to use: ${parts}\n\n${brief}`,
+      budget_inr: null,
+      contact_name: name,
+      contact_email: email,
+      contact_phone: null,
+      status: "submitted"
+    })
+    .select("id")
+    .single();
+  if (error) throw normalizeError(error);
+  return data;
+}
+
+function expertRequestsMarkup(rows) {
+  if (!rows.length) return "";
+  return `<section class="card deck-requests" aria-labelledby="deck-requests-title">
+    <h2 class="card-title" id="deck-requests-title">${icon("users", { size: 16 })} Written by experts</h2>
+    <ul class="deck-request-list">
+      ${rows
+        .map((row) => {
+          const status = statusById(row.status) || { label: row.status || "Submitted", tone: "info" };
+          return `<li class="deck-request">
+            <div class="deck-request-body">
+              <strong>${esc(row.title || "Investor deck")}</strong>
+              <span class="field-hint">Requested ${esc(timeAgo(row.created_at))}. The finished file goes to your registered email.</span>
+            </div>
+            ${chip(status.label, { tone: status.tone })}
+          </li>`;
+        })
+        .join("")}
+    </ul>
+  </section>`;
 }
 
 /* ------------------------------------------------------------------ editor */

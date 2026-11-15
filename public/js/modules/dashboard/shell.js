@@ -21,6 +21,7 @@ import { initNotifications, presentNotification } from "../../ui/notify.js";
 import { mountNotificationOnboarding } from "../../ui/notify-reminders.js";
 import { registerIncomingCalls } from "../messaging/incoming-call.js";
 import { openLiveChannel, closeLiveChannel } from "../../lib/live-channel.js";
+import { subscribePremiumLive, unsubscribePremiumLive } from "../../lib/premium-live.js";
 
 export const NAV = [
   {
@@ -55,7 +56,8 @@ export const NAV = [
     items: [
       { id: "marketplace", label: "Marketplace", icon: "package" },
       { id: "community", label: "Community", icon: "messages-square" },
-      { id: "marketing", label: "Request for Extra Service", icon: "megaphone" },
+      { id: "requests", label: "Extra Services", icon: "sparkles" },
+      { id: "marketing", label: "Ad campaigns", icon: "megaphone" },
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
       { id: "meeting", label: "Meetings", icon: "video" },
@@ -633,6 +635,7 @@ function bindNotificationDrawer() {
 /** Stop every long-lived subscription this shell owns. */
 export function stopBackgroundWork() {
   closeLiveChannel(NOTIFICATION_KEY);
+  unsubscribePremiumLive();
   realtimeChannel = null;
 }
 
@@ -645,6 +648,8 @@ export function subscribeNotifications() {
   initNotifications({ onChange: () => refreshNotificationBadge() }).catch(() => {});
   /* The permission card waits eight seconds and asks only when the browser has never been asked. */
   mountNotificationOnboarding();
+  /* Plan, payment and premium changes arrive without a reload (premium-live.js). */
+  subscribePremiumLive(uid());
   /* Rings can arrive on any page, so the answer handler is registered with the
      notification layer here rather than inside the messages view. */
   registerIncomingCalls();

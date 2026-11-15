@@ -104,14 +104,16 @@ orders = await q(
   [pendingPay]
 );
 check("a verified premium:glow payment opens one order", orders.length === 1, JSON.stringify(orders));
-check("the order is for glow and awaits activation", orders[0]?.tier === "glow" && orders[0]?.status === "awaiting_activation");
+check("the order is for glow and is activated in the same step as verification", orders[0]?.tier === "glow" && orders[0]?.status === "activated");
+const glowNow = await q(`select tier, granted_order_id from public.profile_entitlements where user_id = $1`, [ids.alice]);
+check("the glow profile is live as soon as the payment is verified", glowNow[0]?.tier === "glow", JSON.stringify(glowNow));
 check("the order is due within 24 hours", orders[0]?.window_s === 86400, String(orders[0]?.window_s));
 
 const notes = await q(
-  `select count(*)::int as n from public.notifications where user_id = $1 and title = 'Premium payment received'`,
+  `select count(*)::int as n from public.notifications where user_id = $1 and title = 'Glow profile is live'`,
   [ids.alice]
 );
-check("the member is told the payment was received", notes[0].n === 1);
+check("the member is told the glow profile is live", notes[0].n === 1);
 
 await db.query(`update public.payments set note = 'touched' where id = $1`, [pendingPay]);
 await db.query(`update public.payments set status = 'verified' where id = $1`, [pendingPay]);
@@ -120,8 +122,28 @@ check("re-saving a verified payment does not create a second order", orders[0].n
 
 const elitePay = await makePayment(ids.alice, "premium:elite", "pending");
 await db.query(`update public.payments set status = 'verified' where id = $1`, [elitePay]);
-const eliteOrders = await q(`select tier from public.premium_orders where payment_id = $1`, [elitePay]);
+const eliteOrders = await q(`select tier, status from public.premium_orders where payment_id = $1`, [elitePay]);
 check("a second premium purchase opens its own order", eliteOrders[0]?.tier === "elite");
+const eliteNow = await q(`select tier from public.profile_entitlements where user_id = $1`, [ids.alice]);
+check("the elite purchase upgrades the live profile at once", eliteNow[0]?.tier === "elite");
+
+/* A lower tier bought later never replaces a higher one. */
+const lowerPay = await makePayment(ids.alice, "premium:glow", "pending");
+await db.query(`update public.payments set status = 'verified' where id = $1`, [lowerPay]);
+const lowerOrder = await q(`select status from public.premium_orders where payment_id = $1`, [lowerPay]);
+const kept = await q(`select tier from public.profile_entitlements where user_id = $1`, [ids.alice]);
+check("a glow purchase is recorded as activated", lowerOrder[0]?.status === "activated", JSON.stringify(lowerOrder));
+check("a glow purchase never downgrades an elite profile", kept[0]?.tier === "elite", JSON.stringify(kept));
+const keptNote = await q(
+  `select count(*)::int as n from public.notifications where user_id = $1 and title = 'Premium payment confirmed'`,
+  [ids.alice]
+);
+check("the member is told the lower purchase is confirmed", keptNote[0].n === 1);
+
+const realtime = await q(
+  `select count(*)::int as n from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'profile_entitlements'`
+);
+check("entitlement changes are published for live dashboards", realtime[0].n === 1);
 
 const subPay = await makePayment(ids.bob, "subscription:pro", "pending");
 await db.query(`update public.payments set status = 'verified' where id = $1`, [subPay]);
@@ -134,11 +156,14 @@ const badOrders = await q(`select count(*)::int as n from public.premium_orders 
 check("an unknown premium tier opens no order", badOrders[0].n === 0);
 
 console.log("entitlements and access");
-await db.query(
-  `insert into public.profile_entitlements (user_id, tier, granted_order_id)
-   values ($1, 'elite', (select id from public.premium_orders where payment_id = $2))`,
-  [ids.alice, elitePay]
+/* The elite entitlement was granted by the verification itself (0060); it is
+   not inserted by hand here. */
+const grantedBy = await q(
+  `select granted_order_id = (select id from public.premium_orders where payment_id = $1) as same
+     from public.profile_entitlements where user_id = $2`,
+  [elitePay, ids.alice]
 );
+check("the live entitlement points at the order that was verified", grantedBy[0]?.same === true);
 
 await asUser(ids.alice);
 const own = await q(`select tier from public.profile_entitlements where user_id = $1`, [ids.alice]);

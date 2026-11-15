@@ -44,10 +44,42 @@ export const INVESTOR_VIEWS = ["investor", "notifications", "settings"];
 /** Views only a business owner may open. */
 export const OWNER_ONLY_VIEWS = ["investor-decks"];
 
+/* How a deck starts. `creatable` decides what the builder offers today:
+   - ai      an AI draft from the parts of the business the owner ticks (5 credits)
+   - expert  "Written by Experts": the request goes to the Shinzora team, who
+             deliver the finished file to the member's registered email. No price
+             is shown: a quote follows the team's review of the brief.
+   - manual  decks written by the owner before experts were offered. Still open,
+             edited and exported; no longer offered for new decks. */
 export const DECK_MODES = {
-  ai: { id: "ai", label: "AI draft", price: "Free", desc: "The AI drafts slides from the parts of your business you choose. You review and edit before anything is shared." },
-  manual: { id: "manual", label: "Write it yourself", price: `Rs ${DECK_PDF_RUPEES} PDF`, desc: "You write every slide. Exporting the PDF costs Rs 20 per export, paid once." }
+  ai: {
+    id: "ai",
+    label: "AI draft",
+    price: `${DECK_AI_CREDITS} credits`,
+    desc: "The AI drafts slides from the parts of your business you choose. You review and edit before anything is shared.",
+    creatable: true
+  },
+  expert: {
+    id: "expert",
+    label: "Written by Experts",
+    price: "Quote after review",
+    desc: "A specialist writes the complete deck from your brief. Our team delivers the finished file to your registered email, and you can follow its status below.",
+    creatable: true
+  },
+  manual: {
+    id: "manual",
+    label: "Written by you",
+    price: `Rs ${DECK_PDF_RUPEES} PDF export`,
+    desc: "Decks you wrote slide by slide. Exporting the PDF costs Rs 20 per export, paid once.",
+    creatable: false
+  }
 };
+
+export const EXPERT_REQUEST_TYPE = "investor_deck_expert";
+export const EXPERT_BRIEF_MIN = 10;
+export const EXPERT_BRIEF_MAX = 600;
+export const EXPERT_CONFIRMATION =
+  "Thank you. Our team has your request for a written investor deck. The finished file will be sent to your registered email. You can follow its status on this page.";
 
 export const SHARE_NOTE =
   "Only the slides you choose to share are visible to the investor. They never see your live data, your other decks, or your account.";

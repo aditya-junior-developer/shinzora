@@ -462,7 +462,17 @@ test("Community renders the same hub every signed-in account gets, and sends tex
   assert.ok(root.querySelector(".chat-pane-thread"), "the middle column is a thread");
   assert.ok(root.querySelector("#grp-info-col"), "the details column is present");
 
-  assert.equal(count(calls, "community_messages_list"), 1, "the open room loads its messages");
+  /* Opening the page shows the channel list only: no room is opened for the
+     member, so no room's messages are loaded. */
+  assert.equal(count(calls, "community_messages_list"), 0, "no room's messages load until a channel is picked");
+  assert.ok(root.querySelector(".grp-pick"), "the thread area asks the member to pick a channel");
+  assert.equal(root.querySelector("#grp-compose").hidden, true, "no composer until a channel is open");
+
+  /* Clicking a channel shows its content only. */
+  click(window, [...root.querySelectorAll("[data-channel]")].find((b) => b.dataset.channel === "general"));
+  await settleHub();
+
+  assert.equal(count(calls, "community_messages_list"), 1, "the picked room loads its messages");
   assert.deepEqual(lastArgs(calls, "community_messages_list"), { p_channel: "general", p_limit: 80 });
   assert.match(root.querySelector(".chat-thread-title").textContent, /#General/, "the open room is named");
   assert.match(root.textContent, /Hello everyone/, "messages render");
@@ -495,11 +505,13 @@ test("switching rooms in the hub reloads that room's messages", async () => {
   click(window, wins);
   await settleHub();
 
+  /* Only the channel the member picked loads. Nothing else was opened first. */
+  assert.equal(count(calls, "community_messages_list"), 1, "only the picked room loads");
+  assert.deepEqual(lastArgs(calls, "community_messages_list"), { p_channel: "wins", p_limit: 80 });
+  click(window, [...root.querySelectorAll("[data-channel]")].find((b) => b.dataset.channel === "general"));
+  await settleHub();
   assert.equal(count(calls, "community_messages_list"), 2, "a second load for the new room");
-  assert.deepEqual(lastArgs(calls, "community_messages_list"), {
-    p_channel: "wins",
-    p_limit: 80
-  });
+  assert.deepEqual(lastArgs(calls, "community_messages_list"), { p_channel: "general", p_limit: 80 });
 });
 
 test("a signed-out visitor keeps the read-only room page", async () => {
@@ -595,7 +607,7 @@ test("a one-year profile is written in the singular", async () => {
 });
 
 test("consecutive messages from one person group under a single author line", async () => {
-  const { root } = makeWorld();
+  const { window, root } = makeWorld();
   const now = Date.now();
   globalThis.__rpc = (name) => {
     if (name === "community_messages_list") {
@@ -610,6 +622,8 @@ test("consecutive messages from one person group under a single author line", as
   };
   const view = await bundle(path.join(viewsDir, "community.js"));
   await view.default(root);
+  await settleHub();
+  click(window, [...root.querySelectorAll("[data-channel]")].find((b) => b.dataset.channel === "general"));
   await settleHub();
 
   assert.equal(root.querySelectorAll("[data-message]").length, 3, "all three messages render");

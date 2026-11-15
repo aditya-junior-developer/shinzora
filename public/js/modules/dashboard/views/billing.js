@@ -20,6 +20,7 @@ import { api, runtimeConfig } from "../../../lib/api.js";
 import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
 import { DECK_PDF_RUPEES } from "../../../config/investor-deck.js";
 import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
+import { PREMIUM_EVENT } from "../../../lib/premium-live.js";
 import { payments as fetchPayments, subscription } from "../data.js";
 import { pageHead, setupNotice, skeletonView, statusBadge, emptyState, statCard } from "../components.js";
 import { openModal, formDialog } from "../../../ui/modal.js";
@@ -49,7 +50,24 @@ let premiumOrders = [];
 let current = null;
 let runtime = null;
 
+/* One live listener per open page. It repaints from the database when a plan,
+   payment or profile changes, and removes itself once the page has gone. */
+let onPremiumChange = null;
+function followPremiumChanges(root, repaint) {
+  if (onPremiumChange) document.removeEventListener(PREMIUM_EVENT, onPremiumChange);
+  onPremiumChange = () => {
+    if (!root.isConnected) {
+      document.removeEventListener(PREMIUM_EVENT, onPremiumChange);
+      onPremiumChange = null;
+      return;
+    }
+    repaint();
+  };
+  document.addEventListener(PREMIUM_EVENT, onPremiumChange);
+}
+
 export default async function render(root) {
+  followPremiumChanges(root, () => render(root));
   root.innerHTML = skeletonView(3);
 
   runtime = await runtimeConfig();

@@ -4937,3 +4937,111 @@ html {
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Investor deck: "Written by Experts" request list, and a builder that fits
+   a phone. Buttons stack full width and stay inside the screen; nothing is
+   pushed under the Android navigation bar.
+   --------------------------------------------------------------------------- */
+.deck-requests {
+  margin-bottom: var(--s-4);
+}
+
+.deck-request-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.deck-request {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.deck-request:first-child {
+  border-top: 0;
+}
+
+.deck-request-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .deck-builder {
+    padding: var(--s-4);
+  }
+
+  .deck-builder .card-actions {
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .deck-builder .card-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .deck-request {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Zoom and Room: the scheduling form on a phone. Labels sit above their
+   fields, the date-time and type controls fill the card and keep a 44px touch
+   target, and nothing runs past the card edge.
+   --------------------------------------------------------------------------- */
+.meeting-schedule .field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.meeting-schedule .field > label {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.meeting-schedule .field > .input,
+.meeting-schedule input[type="datetime-local"],
+.meeting-schedule select.input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.meeting-schedule input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.meeting-schedule .card-actions .btn {
+  min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  .meeting-schedule .card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .meeting-schedule .card-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

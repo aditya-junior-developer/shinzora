@@ -12,6 +12,7 @@ import { api, runtimeConfig } from "../../../lib/api.js";
 import { state, loadIdentity, plan, aiCredits } from "../../../lib/store.js";
 import { BUSINESS_CATEGORIES, PREMIUM_ACCENTS } from "../../../config/env.js";
 import { activeTier, ringAttributes } from "../../../lib/premium.js";
+import { PREMIUM_EVENT } from "../../../lib/premium-live.js";
 import { updateProfile, updateBusiness, logActivity } from "../data.js";
 import { pageHead, setupNotice, skeletonView, statusBadge } from "../components.js";
 import { confirmDialog } from "../../../ui/modal.js";
@@ -62,6 +63,9 @@ const businessSocials = () => {
 
 let section = "profile";
 
+/* Repaints this page when a plan or profile changes (premium-live.js). */
+let onPremiumChange = null;
+
 export default async function render(root) {
   root.innerHTML = skeletonView(3);
   const runtime = await runtimeConfig();
@@ -91,6 +95,20 @@ export default async function render(root) {
   });
 
   paint();
+
+  if (onPremiumChange) document.removeEventListener(PREMIUM_EVENT, onPremiumChange);
+  onPremiumChange = () => {
+    if (!root.isConnected) {
+      document.removeEventListener(PREMIUM_EVENT, onPremiumChange);
+      onPremiumChange = null;
+      return;
+    }
+    paint();
+    /* A new profile unlocks wallpapers the catalog marked locked, so reload it
+       from the server rather than repaint the old answer. No-op off that section. */
+    loadWallpaperPicker();
+  };
+  document.addEventListener(PREMIUM_EVENT, onPremiumChange);
 
   function paint() {
     const body = qs("#settings-body");

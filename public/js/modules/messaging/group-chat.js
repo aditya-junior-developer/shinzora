@@ -475,6 +475,20 @@ export default async function mountGroups(root, options = {}) {
   }
 
   /* ----------------------------------------------------------------- thread */
+  /** Nothing is open. The rail holds the choice; no chat is opened for the member. */
+  function paintPick() {
+    active = null;
+    view = "group";
+    activeChannel = null;
+    paintHead(null);
+    formEl.hidden = true;
+    messagesEl.innerHTML = `<div class="grp-empty grp-pick">
+        <span class="grp-empty-mark">${icon("messages-square", { size: 22 })}</span>
+        <h3 class="grp-empty-title">Pick a channel or group</h3>
+        <p class="grp-empty-desc">Choose one from the list to read it. Nothing opens until you choose.</p>
+      </div>`;
+  }
+
   /** The first thing a new member sees: one sentence and one button. */
   function paintEmptyGroups() {
     messagesEl.innerHTML = `<div class="grp-empty">
@@ -1726,7 +1740,7 @@ function insertAtCaret(field, text, start, end) {
             formEl.hidden = true;
             messagesEl.innerHTML = `<div class="chat-empty-line">No group open.</div>`;
             await loadList();
-            if (groups.length) await open(groups[0].id);
+            if (groups.length) paintPick();
           } catch (error) {
             toastError(error);
           }
@@ -2057,7 +2071,7 @@ function insertAtCaret(field, text, start, end) {
       active = null;
       infoCol.innerHTML = `<div class="hub-info-empty">You left that group.</div>`;
       await loadList();
-      if (groups.length) await open(groups[0].id);
+      if (groups.length) paintPick();
       else {
         paintHead(null);
         paintEmptyGroups();
@@ -2129,16 +2143,18 @@ function insertAtCaret(field, text, start, end) {
       await openChannel(wantedChannel.slug);
       return { open, openChannel, refresh: loadList };
     }
-    /* Community asks for a room first: that page is about the public rooms, and
-       landing a visitor on their most recent group instead would be a different
-       page. */
-    if (options.preferChannel && channels.length) {
-      await openChannel(channels[0].slug);
+    /* Opening a page shows its list only. A chat opens when the member picks
+       one, or when a link names one (a notification or a shared group link).
+       Community used to open its first channel here, and Messages its first
+       group, so every thread showed before anybody asked for it. */
+    if (options.preferChannel) {
+      if (channels.length) paintPick();
+      else paintHead(null);
       return { open, openChannel, refresh: loadList };
     }
     const wanted = options.groupId && groups.find((group) => group.id === options.groupId);
     if (wanted) await open(wanted.id, options.messageId || null);
-    else if (groups.length) await open(groups[0].id, options.messageId || null);
+    else if (groups.length) paintPick();
     else {
       paintHead(null);
       paintEmptyGroups();
