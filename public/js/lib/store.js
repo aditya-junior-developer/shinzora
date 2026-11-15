@@ -59,6 +59,7 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
     state.business = null;
     state.subscription = null;
     state.onboarding = null;
+    state.entitlement = null;
     state.isAdmin = false;
     state.unreadNotifications = 0;
     state.loadedAt = Date.now();
@@ -75,6 +76,9 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
     profile: () => sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
     business: () => sb.from("businesses").select("*").eq("owner_id", userId).order("created_at", { ascending: true }).limit(1).maybeSingle(),
     subscription: () => sb.from("subscriptions").select("*").eq("user_id", userId).maybeSingle(),
+    /* Premium tier, readable by its owner only (RLS, 0054). Written by the admin
+       function after activation; the browser never sets it. */
+    entitlement: () => sb.from("profile_entitlements").select("tier, accent").eq("user_id", userId).maybeSingle(),
     onboarding: () => sb.from("onboarding_progress").select("*").eq("user_id", userId).maybeSingle(),
     admin: () => sb.rpc("is_admin"),
     notifications: () => sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null)
@@ -122,6 +126,7 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
   state.business = one(result.business?.data);
   state.subscription = one(result.subscription?.data);
   state.onboarding = one(result.onboarding?.data);
+  state.entitlement = one(result.entitlement?.data);
   state.isAdmin = result.admin?.data === true;
   state.unreadNotifications = result.notifications?.count || 0;
   state.loadedAt = Date.now();

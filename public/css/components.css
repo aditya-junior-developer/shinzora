@@ -2295,3 +2295,26 @@ body.ip-open {
 .alerts-prompt-text strong { font-size: var(--fs-xs); color: var(--text); font-weight: 650; }
 .alerts-prompt-text span { font-size: var(--fs-2xs); color: var(--text-3); }
 .alerts-prompt .btn { flex: none; }
+
+/* ---------------------------------------------------------------------------
+   Premium profile ring (P6). The attributes are set from the database tier
+   (data-tier, data-accent); nothing here is decided in the browser.
+   --------------------------------------------------------------------------- */
+.avatar[data-tier] {
+  --premium-ring: var(--violet);
+  box-shadow: 0 0 0 2px var(--surface, #111), 0 0 0 4px var(--premium-ring), 0 0 16px 2px color-mix(in srgb, var(--premium-ring) 40%, transparent);
+}
+.avatar[data-tier="elite"][data-accent="rose"] { --premium-ring: #f43f5e; }
+.avatar[data-tier="elite"][data-accent="amber"] { --premium-ring: #f59e0b; }
+.avatar[data-tier="elite"][data-accent="teal"] { --premium-ring: #14b8a6; }
+.avatar[data-tier="elite"][data-accent="sky"] { --premium-ring: #0ea5e9; }
+.avatar[data-tier="elite"][data-accent="violet"] { --premium-ring: #8b5cf6; }
+.premium-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-2xs); padding: 2px 8px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--violet) 60%, transparent);
+  color: var(--lavender); background: color-mix(in srgb, var(--violet) 14%, transparent);
+}
+.premium-badge[data-tier="elite"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, transparent); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.premium-tier-card { border: 1px solid var(--border, #2a2a33); border-radius: var(--r-md, 12px); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); }
+.premium-tier-card .plan-price { font-size: var(--fs-xl, 1.5rem); }

@@ -49,6 +49,7 @@ export const adminApi = {
   customers: (params) => call("customers", params),
   customer: (userId) => call("customer", { userId }),
   payments: (params) => call("payments", params),
+  premium: (params) => call("premium", params),
   paymentReview: (params) => call("payment_review", params),
   serviceRequests: (params) => call("service_requests", params),
   serviceRequestUpdate: (params) => call("service_request_update", params),

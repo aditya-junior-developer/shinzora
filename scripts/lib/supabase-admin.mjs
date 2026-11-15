@@ -120,7 +120,7 @@ export const APPLICATION_TABLES = [
   "projects", "project_versions", "deployments", "store_products", "inventory_movements",
   "store_orders", "store_order_items", "store_customers", "campaigns",
   "support_tickets", "support_replies", "service_requests", "service_request_notes",
-  "domains", "domain_orders", "payments", "payment_webhook_events",
+  "domains", "domain_orders", "payments", "payment_webhook_events", "premium_orders", "profile_entitlements",
   "notifications", "customer_activity", "ai_conversations", "ai_messages", "ai_usage_log",
   "admin_announcements", "contact_messages", "admin_users", "admin_audit", "migration_notes",
   "migration_archive", "integrations", "integration_tokens",

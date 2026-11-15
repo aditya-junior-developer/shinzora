@@ -150,6 +150,47 @@ export const PLANS = [
 
 export const planById = (id) => PLANS.find((p) => p.id === id) || PLANS[0];
 
+/* Premium profiles (P6). One-time purchases, not subscriptions.
+   PROPOSED prices, subject to business review. The payment gateway holds the
+   amounts that are actually charged (PREMIUM_PRICES in
+   supabase/functions/payments/index.ts); tests/premium-config.test.mjs fails if
+   these drift apart. Only features that exist are listed here. */
+export const PREMIUM_TIERS = Object.freeze([
+  {
+    id: "glow",
+    name: "Glow",
+    priceRupees: 99,
+    tagline: "A glowing ring and badge on your profile photo.",
+    features: [
+      "Glowing ring around your profile photo",
+      "Glow badge on your profile",
+      "Activated by our team within 24 hours of verified payment"
+    ]
+  },
+  {
+    id: "elite",
+    name: "Elite",
+    priceRupees: 199,
+    tagline: "Everything in Glow, plus your own accent colour.",
+    features: [
+      "Everything in Glow",
+      "Elite badge on your profile",
+      "Choose one accent colour for your profile ring",
+      "Activated by our team within 24 hours of verified payment"
+    ]
+  }
+]);
+
+/* The accent palette. The database (set_premium_accent, 0054) and the admin
+   function hold the same five values; the test checks that. */
+export const PREMIUM_ACCENTS = Object.freeze([
+  { id: "violet", label: "Violet" },
+  { id: "rose", label: "Rose" },
+  { id: "amber", label: "Amber" },
+  { id: "teal", label: "Teal" },
+  { id: "sky", label: "Sky" }
+]);
+
 /** Server-enforced limits, mirrored for display before the API responds. */
 export const PLAN_LIMITS = Object.fromEntries(
   PLANS.map((p) => [

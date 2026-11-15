@@ -10,7 +10,8 @@ import { date, timeAgo } from "../../../lib/format.js";
 import { sb, normalizeError, uploadPublic } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
 import { state, loadIdentity, plan, aiCredits } from "../../../lib/store.js";
-import { BUSINESS_CATEGORIES } from "../../../config/env.js";
+import { BUSINESS_CATEGORIES, PREMIUM_ACCENTS } from "../../../config/env.js";
+import { activeTier, ringAttributes } from "../../../lib/premium.js";
 import { updateProfile, updateBusiness, logActivity } from "../data.js";
 import { pageHead, setupNotice, skeletonView, statusBadge } from "../components.js";
 import { confirmDialog } from "../../../ui/modal.js";
@@ -172,10 +173,65 @@ export default async function render(root) {
           </div>
         </form>
       </div>
+    </div>
+    ${premiumCard()}`;
+  }
+
+  /* Premium profile (P6). What a member sees here is read from the database.
+     The accent control is shown only to Elite members; the database refuses the
+     write for anyone else, so hiding the control is not what protects it. */
+  function premiumCard() {
+    const tier = activeTier(state.entitlement);
+    const ring = ringAttributes(state.entitlement);
+    const accent = ring.accent;
+    return `
+    <div class="card" style="margin-top:var(--s-4)" id="premium-settings">
+      <div class="card-head">
+        <div><div class="card-title">Premium profile</div>
+          <div class="card-sub">A ring around your photo and a badge. One-time purchases, set up in Billing.</div></div>
+        ${tier ? `<span class="premium-badge" data-tier="${esc(tier)}">${tier === "elite" ? "Elite" : "Glow"} active</span>` : `<span class="badge badge-neutral">Free</span>`}
+      </div>
+      <div class="card-body stack gap-3">
+        ${
+          tier === "elite"
+            ? `<div class="field">
+                <label class="field-label" for="premium-accent">Accent colour</label>
+                <select class="select" id="premium-accent">
+                  <option value="" ${accent ? "" : "selected"}>Default</option>
+                  ${PREMIUM_ACCENTS.map((a) => `<option value="${a.id}" ${accent === a.id ? "selected" : ""}>${esc(a.label)}</option>`).join("")}
+                </select>
+                <div class="field-hint">Shown as the ring around your profile photo.</div>
+              </div>
+              <div class="row gap-2"><button class="btn btn-secondary btn-sm" type="button" id="save-accent">Save accent</button></div>`
+            : `<p class="muted" style="font-size:var(--fs-sm);margin:0">${
+                tier === "glow"
+                  ? "Accent colours are part of the Elite profile."
+                  : "Premium profiles add a glowing ring and a badge to your photo."
+              } <a href="/app/?view=billing">See plans in Billing</a>.</p>`
+        }
+      </div>
     </div>`;
   }
 
   function bindProfile() {
+    const accentButton = qs("#save-accent");
+    if (accentButton) {
+      accentButton.addEventListener("click", async () => {
+        const value = qs("#premium-accent")?.value || null;
+        accentButton.disabled = true;
+        try {
+          const { error } = await sb.rpc("set_premium_accent", { p_accent: value });
+          if (error) throw normalizeError(error);
+          await loadIdentity({ force: true });
+          toast({ title: "Accent saved" }, { tone: "success" });
+        } catch (error) {
+          toastError(normalizeError(error));
+        } finally {
+          accentButton.disabled = false;
+        }
+      });
+    }
+
     qs("#profile-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;

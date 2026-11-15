@@ -17,7 +17,8 @@ import { money, date, dateTime, timeAgo, statusLabel } from "../../../lib/format
 import { state, plan as currentPlan, aiCredits } from "../../../lib/store.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
-import { PLANS, planById } from "../../../config/env.js";
+import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
+import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
 import { payments as fetchPayments, subscription } from "../data.js";
 import { pageHead, setupNotice, skeletonView, statusBadge, emptyState, statCard } from "../components.js";
 import { openModal, formDialog } from "../../../ui/modal.js";
@@ -43,6 +44,7 @@ const SERVICES = [
 ];
 
 let paymentRows = [];
+let premiumOrders = [];
 let current = null;
 let runtime = null;
 
@@ -51,9 +53,14 @@ export default async function render(root) {
 
   runtime = await runtimeConfig();
   try {
-    const [paymentsRes, subRes] = await Promise.all([fetchPayments(60), subscription()]);
+    const [paymentsRes, subRes, premiumRes] = await Promise.all([
+      fetchPayments(60),
+      subscription(),
+      sb.from("premium_orders").select("id, tier, status, due_by, created_at").order("created_at", { ascending: false }).limit(10)
+    ]);
     paymentRows = paymentsRes.data;
     current = subRes;
+    premiumOrders = premiumRes?.data || [];
   } catch (error) {
     root.innerHTML = `${pageHead({ title: "Billing" })}${setupNotice(error, "Billing")}`;
     return;
@@ -122,6 +129,38 @@ export default async function render(root) {
                 </div>`
               ).join("")}
             </div>
+          </div>
+        </div>
+
+        <div class="card" id="premium-card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Premium profile</div>
+              <div class="card-sub">One-time purchases. Not a subscription. Activated within 24 hours of verified payment.</div>
+            </div>
+            ${activeTier(state.entitlement) ? `<span class="premium-badge" data-tier="${esc(activeTier(state.entitlement))}">${esc(activeTier(state.entitlement) === "elite" ? "Elite" : "Glow")} active</span>` : `<span class="badge badge-neutral">Free</span>`}
+          </div>
+          <div class="card-body stack gap-3">
+            <p class="muted" style="font-size:var(--fs-sm);margin:0">${esc(statusLine(state.entitlement, premiumOrders))}</p>
+            ${
+              buyableTiers(state.entitlement).length
+                ? `<div class="grid-2">${buyableTiers(state.entitlement)
+                    .map(
+                      (tier) => `<div class="premium-tier-card">
+                        <div class="row between"><strong>${esc(tier.name)}</strong><span class="mono">₹${tier.priceRupees}</span></div>
+                        <div class="dim" style="font-size:var(--fs-xs)">${esc(tier.tagline)}</div>
+                        <ul class="plan-features">${tier.features.map((f) => `<li>${icon("check", { size: 13 })}<span>${esc(f)}</span></li>`).join("")}</ul>
+                        <button class="btn btn-primary btn-sm btn-block" data-premium="${esc(tier.id)}">Buy ${esc(tier.name)} · ₹${tier.priceRupees}</button>
+                      </div>`
+                    )
+                    .join("")}</div>`
+                : `<div class="alert alert-ok"><span>You hold the highest premium profile.</span></div>`
+            }
+            ${
+              pendingOrders(premiumOrders).length
+                ? `<p class="dim" style="font-size:var(--fs-xs);margin:0">Waiting for activation: ${pendingOrders(premiumOrders).map((o) => esc(o.tier)).join(", ")}</p>`
+                : ""
+            }
           </div>
         </div>
 
@@ -238,6 +277,16 @@ export default async function render(root) {
         amount: target.priceMonthly,
         plan: target.id
       });
+      return;
+    }
+
+    const premiumBuy = event.target.closest("[data-premium]");
+    if (premiumBuy) {
+      const tier = PREMIUM_TIERS.find((t) => t.id === premiumBuy.getAttribute("data-premium"));
+      if (!tier) return;
+      /* The amount shown is paise, as elsewhere in billing. The gateway charges
+         its own price for `premium:<tier>` and refuses a tier already held. */
+      startPayment({ purpose: `premium:${tier.id}`, label: `${tier.name} profile`, amount: tier.priceRupees * 100 });
       return;
     }
 
@@ -605,5 +654,9 @@ function prettyPurpose(purpose = "") {
     return SERVICES.find((service) => service.id === id)?.label || "Service";
   }
   if (text.startsWith("domain:")) return `Domain ${text.split(":")[1]}`;
+  if (text.startsWith("premium:")) {
+    const tier = PREMIUM_TIERS.find((t) => t.id === text.split(":")[1]);
+    return tier ? `${tier.name} profile` : "Premium profile";
+  }
   return text || "Payment";
 }

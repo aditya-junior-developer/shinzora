@@ -26,6 +26,14 @@ const PLAN_PRICES: Record<string, number> = {
   enterprise: 999900
 };
 
+/* Premium profiles (P6). One-time purchases. Proposed prices, subject to
+   business review. Mirrored for display in public/js/config/env.js; a test
+   fails if the two drift apart. */
+const PREMIUM_PRICES: Record<string, { amount: number; label: string; rank: number }> = {
+  glow: { amount: 9900, label: "Glow profile", rank: 1 },
+  elite: { amount: 19900, label: "Elite profile", rank: 2 }
+};
+
 const SERVICE_PRICES: Record<string, { amount: number; label: string }> = {
   website_setup: { amount: 499900, label: "Managed website setup" },
   brand_kit: { amount: 249900, label: "Brand kit and copywriting" },
@@ -122,6 +130,23 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
 
   const resolved = await resolveAmount(userId, purpose);
   if (!resolved) return fail(400, "invalid_input", "That payment purpose is not recognised.");
+
+  /* A premium tier the member already holds (or a higher one) is refused on the
+     server. The browser hides the button too, but that is not the check. */
+  if (purpose.startsWith("premium:")) {
+    const wanted = PREMIUM_PRICES[purpose.split(":")[1]];
+    const { data: held } = await admin()
+      .from("profile_entitlements")
+      .select("tier")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const heldRank = held ? (PREMIUM_PRICES[held.tier]?.rank ?? 0) : 0;
+    if (heldRank >= wanted.rank) {
+      return fail(409, "already_entitled", "You already have this profile or a higher one.", {
+        hint: "Premium profiles are one-time purchases. Pick a tier above your current one."
+      });
+    }
+  }
   if (!resolved.amount || resolved.amount < 100) {
     return fail(400, "amount_unavailable", "The price for this item has to be set before a payment can be created.", {
       hint: "Domain prices come from the registrar at checkout. Create a service request instead."
@@ -195,6 +220,13 @@ async function resolveAmount(userId: string, purpose: string): Promise<{ amount:
     const plan = purpose.split(":")[1];
     if (!PLAN_PRICES[plan]) return null;
     return { amount: PLAN_PRICES[plan], label: `${plan === "pro" ? "Pro" : "Enterprise"} plan`, plan };
+  }
+
+  if (purpose.startsWith("premium:")) {
+    const tier = purpose.split(":")[1];
+    const entry = PREMIUM_PRICES[tier];
+    if (!entry) return null;
+    return { amount: entry.amount, label: entry.label };
   }
 
   if (purpose.startsWith("service:")) {

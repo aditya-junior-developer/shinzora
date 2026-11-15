@@ -24,6 +24,7 @@ export const NAV = [
       { id: "customers", label: "Customers", icon: "users" },
       { id: "freelancers", label: "Freelancers", icon: "briefcase" },
       { id: "payments", label: "Payments", icon: "receipt" },
+      { id: "premium", label: "Premium profiles", icon: "crown" },
       { id: "services", label: "Service requests", icon: "briefcase" },
       { id: "marketing", label: "Marketing requests", icon: "megaphone" }
     ]
@@ -55,6 +56,7 @@ const LOADERS = {
   customers: () => import("./views/customers.js"),
   freelancers: () => import("./views/freelancers.js"),
   payments: () => import("./views/payments.js"),
+  premium: () => import("./views/premium.js"),
   services: () => import("./views/payments.js"),
   subscriptions: () => import("./views/operations.js"),
   projects: () => import("./views/operations.js"),

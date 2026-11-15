@@ -15,6 +15,7 @@ import { markAllNotificationsRead, markNotificationRead, notifications as fetchN
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
 import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
+import { ringAttributes } from "../../lib/premium.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 import { initNotifications, presentNotification } from "../../ui/notify.js";
 import { mountNotificationOnboarding } from "../../ui/notify-reminders.js";
@@ -249,6 +250,13 @@ export function paintIdentity() {
       avatarUrl: state.profile?.avatar_url,
       alt: "Your profile photo"
     });
+    /* The premium ring (P6). The attributes only paint a ring; the tier itself
+       comes from the database through loadIdentity(). */
+    const ring = ringAttributes(state.entitlement);
+    if (ring.tier) accAvatar.setAttribute("data-tier", ring.tier);
+    else accAvatar.removeAttribute("data-tier");
+    if (ring.accent) accAvatar.setAttribute("data-accent", ring.accent);
+    else accAvatar.removeAttribute("data-accent");
   }
   if (accEmail) accEmail.textContent = state.user?.email || "";
   if (adminLink) adminLink.hidden = !state.isAdmin;

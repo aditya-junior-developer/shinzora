@@ -148,6 +148,8 @@ export function titleCase(value = "") {
 export function statusLabel(status = "") {
   const map = {
     awaiting_verification: "Awaiting verification",
+    awaiting_activation: "Awaiting activation",
+    activated: "Activated",
     awaiting_payment: "Awaiting payment",
     pending: "Pending",
     in_review: "In review",

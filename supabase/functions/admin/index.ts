@@ -56,6 +56,8 @@ Deno.serve(async (req) => {
         return await payments(body);
       case "payment_review":
         return await paymentReview(caller.user.id, body);
+      case "premium":
+        return await premium(caller.user.id, body);
       case "service_requests":
         return await serviceRequests(body);
       case "service_request_update":
@@ -426,6 +428,173 @@ async function applyPaymentEffect(payment: Record<string, any>) {
       .update({ status: "paid", payment_id: payment.id, updated_at: new Date().toISOString() })
       .eq("id", orderId);
   }
+}
+
+/* ------------------------------------------------------- premium profiles */
+/* P6. A premium order exists only for a verified payment (database trigger,
+   0054). An administrator activates it here, within 24 hours of verification.
+   Activation writes the entitlement with the service role; the browser cannot. */
+const PREMIUM_RANK: Record<string, number> = { glow: 1, elite: 2 };
+const PREMIUM_ACCENTS = ["violet", "rose", "amber", "teal", "sky"];
+
+async function premium(adminId: string, body: Record<string, unknown>) {
+  const op = clean(body.op, 20) || "list";
+  const db = admin();
+
+  if (op === "list") {
+    const status = clean(body.status, 30) || "awaiting_activation";
+    let query = db
+      .from("premium_orders")
+      .select("id, owner_id, payment_id, tier, status, due_by, activated_at, admin_note, created_at")
+      .order("due_by", { ascending: true })
+      .limit(200);
+    if (status !== "all") query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) return fail(500, "admin_error", error.message);
+
+    const rows = data ?? [];
+    const ownerIds = [...new Set(rows.map((row) => row.owner_id))];
+    const paymentIds = [...new Set(rows.map((row) => row.payment_id))];
+    const [{ data: people }, { data: payments }, { data: entitlements }] = await Promise.all([
+      ownerIds.length
+        ? db.from("profiles").select("id, full_name, email").in("id", ownerIds)
+        : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+      paymentIds.length
+        ? db.from("payments").select("id, reference, amount, label, verified_at, status").in("id", paymentIds)
+        : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+      ownerIds.length
+        ? db.from("profile_entitlements").select("user_id, tier, accent").in("user_id", ownerIds)
+        : Promise.resolve({ data: [] as Record<string, unknown>[] })
+    ]);
+
+    const personById = new Map((people ?? []).map((row: any) => [row.id, row]));
+    const paymentById = new Map((payments ?? []).map((row: any) => [row.id, row]));
+    const tierById = new Map((entitlements ?? []).map((row: any) => [row.user_id, row.tier]));
+    const now = Date.now();
+
+    return json({
+      now: new Date(now).toISOString(),
+      orders: rows.map((row: any) => {
+        const person = personById.get(row.owner_id) as any;
+        const payment = paymentById.get(row.payment_id) as any;
+        return {
+          ...row,
+          customer: person?.full_name || person?.email || "Member",
+          email: person?.email ?? null,
+          payment: payment ?? null,
+          currentTier: tierById.get(row.owner_id) ?? null,
+          overdue: row.status === "awaiting_activation" && new Date(row.due_by).getTime() < now
+        };
+      })
+    });
+  }
+
+  const orderId = clean(body.orderId, 64);
+  if (!isUuid(orderId)) return fail(400, "invalid_input", "An order id is required.");
+
+  const { data: order } = await db.from("premium_orders").select("*").eq("id", orderId).maybeSingle();
+  if (!order) return fail(404, "not_found", "That premium order does not exist.");
+  if (order.status !== "awaiting_activation") {
+    return fail(409, "not_awaiting", `This order is already ${order.status}.`);
+  }
+
+  if (op === "cancel") {
+    const note = clean(body.note, 500);
+    if (!note) return fail(400, "invalid_input", "A reason is required to cancel an order.", {
+      hint: "Refunds are handled outside this panel. Record the reason here."
+    });
+    const { data: updated, error } = await db
+      .from("premium_orders")
+      .update({ status: "cancelled", admin_note: note, updated_at: new Date().toISOString() })
+      .eq("id", orderId)
+      .eq("status", "awaiting_activation")
+      .select("*")
+      .single();
+    if (error) return fail(500, "admin_error", error.message);
+
+    await db.from("notifications").insert({
+      user_id: order.owner_id,
+      title: "Premium request cancelled",
+      body: `Your ${String(order.tier).replace(/^./, (c: string) => c.toUpperCase())} profile request was cancelled. ${note}`,
+      type: "payment",
+      link: "/app/?view=billing"
+    }).then(() => undefined, () => undefined);
+    await db.from("customer_activity").insert({
+      user_id: order.owner_id,
+      action: "premium_order_cancelled",
+      entity_type: "premium_order",
+      entity_id: orderId,
+      meta: { admin_id: adminId, tier: order.tier, note }
+    }).then(() => undefined, () => undefined);
+    return json({ ok: true, order: updated });
+  }
+
+  if (op !== "activate") return fail(400, "invalid_input", "Operation must be list, activate or cancel.");
+
+  /* Only a verified payment can be activated. The trigger is what created the
+     order, but the payment is re-read here so a stale order cannot be used. */
+  const { data: payment } = await db.from("payments").select("id, status, owner_id").eq("id", order.payment_id).maybeSingle();
+  if (!payment || payment.status !== "verified" || payment.owner_id !== order.owner_id) {
+    return fail(409, "payment_not_verified", "The payment for this order is not verified, so the profile cannot be activated.");
+  }
+
+  const { data: current } = await db
+    .from("profile_entitlements")
+    .select("tier, accent")
+    .eq("user_id", order.owner_id)
+    .maybeSingle();
+  if (current && (PREMIUM_RANK[current.tier] ?? 0) > (PREMIUM_RANK[order.tier] ?? 0)) {
+    return fail(409, "would_downgrade", `This member already has the ${current.tier} profile. Activating ${order.tier} would be a downgrade.`, {
+      hint: "Cancel this order and refund it outside the panel, or activate a higher tier."
+    });
+  }
+
+  /* Claim the order first, so two administrators cannot activate it twice. */
+  const now = new Date().toISOString();
+  const { data: claimed, error: claimError } = await db
+    .from("premium_orders")
+    .update({ status: "activated", activated_at: now, activated_by: adminId, updated_at: now })
+    .eq("id", orderId)
+    .eq("status", "awaiting_activation")
+    .select("id")
+    .maybeSingle();
+  if (claimError) return fail(500, "admin_error", claimError.message);
+  if (!claimed) return fail(409, "not_awaiting", "This order was just handled by another administrator.");
+
+  const keepAccent = order.tier === "elite" && current?.tier === "elite" ? current.accent ?? null : null;
+  const { error: grantError } = await db.from("profile_entitlements").upsert(
+    {
+      user_id: order.owner_id,
+      tier: order.tier,
+      accent: keepAccent,
+      granted_order_id: orderId,
+      granted_at: now,
+      updated_at: now
+    },
+    { onConflict: "user_id" }
+  );
+  if (grantError) {
+    await db.from("premium_orders").update({ status: "awaiting_activation", activated_at: null, activated_by: null, updated_at: new Date().toISOString() }).eq("id", orderId);
+    return fail(500, "admin_error", grantError.message);
+  }
+
+  const tierName = String(order.tier).replace(/^./, (c: string) => c.toUpperCase());
+  await db.from("notifications").insert({
+    user_id: order.owner_id,
+    title: `${tierName} profile is live`,
+    body: `Your ${tierName} profile is active. Thank you for supporting Shinzora.`,
+    type: "payment",
+    link: "/app/?view=settings"
+  }).then(() => undefined, () => undefined);
+  await db.from("customer_activity").insert({
+    user_id: order.owner_id,
+    action: "premium_activated",
+    entity_type: "premium_order",
+    entity_id: orderId,
+    meta: { admin_id: adminId, tier: order.tier }
+  }).then(() => undefined, () => undefined);
+
+  return json({ ok: true, order: { id: orderId, status: "activated", tier: order.tier, activated_at: now } });
 }
 
 /* --------------------------------------------------------- service requests */
