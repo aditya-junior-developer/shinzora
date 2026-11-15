@@ -51,6 +51,21 @@ export async function getCaller(req: Request): Promise<Caller | null> {
   }
 }
 
+/**
+ * The account type recorded on the caller's profile: owner, agent or investor.
+ * Null when there is no profile. Read with the service client, so a function
+ * can refuse an action by role without trusting the browser to say who it is.
+ */
+export async function accountTypeOf(userId: string): Promise<string | null> {
+  const { data, error } = await admin()
+    .from("profiles")
+    .select("account_type")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) return null;
+  return (data?.account_type as string | undefined) ?? null;
+}
+
 /** Caller-scoped client: every query runs with the user's own JWT and RLS. */
 export function scoped(caller: Caller): SupabaseClient {
   return createClient(SUPABASE_URL, ANON_KEY || caller.token, {

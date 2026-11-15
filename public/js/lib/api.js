@@ -226,6 +226,12 @@ export const api = {
     status: (payload) => invoke("payments", "status", payload),
     razorpayOrder: (payload) => invoke("payments", "razorpay_order", payload)
   },
+  /* Investor decks (P9). An export answers with a PDF, which invoke() returns as
+     a Blob; a manual deck without a paid export answers 402 payment_required. */
+  deck: {
+    generate: (payload) => invoke("deck", "generate", payload, { timeout: 90000 }),
+    export: (payload) => invoke("deck", "export", payload, { timeout: 60000 })
+  },
   integrations: {
     status: () => invoke("integrations", "status"),
     githubConnect: (payload) => invoke("integrations", "github_connect", payload),

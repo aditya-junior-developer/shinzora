@@ -73,3 +73,6 @@ verify_jwt = true
 
 [functions.payments]
 verify_jwt = true
+
+[functions.deck]
+verify_jwt = true

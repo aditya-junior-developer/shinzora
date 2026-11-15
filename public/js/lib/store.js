@@ -207,7 +207,7 @@ export function applyShellIdentity() {
   state.profile = {
     id: remembered.userId || null,
     full_name: remembered.fullName || "",
-    account_type: remembered.accountType === "agent" ? "agent" : "owner",
+    account_type: ["agent", "investor"].includes(remembered.accountType) ? remembered.accountType : "owner",
     __provisional: true
   };
   return true;

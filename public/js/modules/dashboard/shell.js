@@ -59,7 +59,8 @@ export const NAV = [
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
       { id: "meeting", label: "Meetings", icon: "video" },
-      { id: "analytics", label: "Analytics", icon: "chart-line" }
+      { id: "analytics", label: "Analytics", icon: "chart-line" },
+      { id: "investor-decks", label: "Investor deck", icon: "layers" }
     ]
   },
   {
@@ -106,8 +107,28 @@ export const AGENT_NAV = [
   }
 ];
 
+/* An investor's sidebar holds only what an investor may open. There is no
+   billing (an investor buys nothing) and no business, store or AI tools. */
+export const INVESTOR_NAV = [
+  {
+    label: "Investor",
+    items: [{ id: "investor", label: "Shared with you", icon: "briefcase" }]
+  },
+  {
+    label: "Account",
+    items: [
+      { id: "notifications", label: "Notifications", icon: "bell" },
+      { id: "settings", label: "Settings", icon: "settings" }
+    ]
+  }
+];
+
 /** Which navigation a signed-in account should see. */
-export const navFor = () => (state.profile?.account_type === "agent" ? AGENT_NAV : NAV);
+export const navFor = () => {
+  const type = state.profile?.account_type;
+  if (type === "investor") return INVESTOR_NAV;
+  return type === "agent" ? AGENT_NAV : NAV;
+};
 
 /* One key for this page's notification channel — see lib/live-channel.js. */
 const NOTIFICATION_KEY = "notifications";

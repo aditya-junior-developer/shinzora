@@ -603,9 +603,10 @@ function renderStep(target) {
   backBtn.style.visibility = step === 1 ? "hidden" : "visible";
   const optional = step === 3 || step === 4;
   skipBtn.classList.toggle("hidden", !optional);
+  const investorDone = draft.account.type === "investor" && step === 1;
   nextBtn.innerHTML =
-    step === TOTAL_STEPS
-      ? 'Finish setup <i data-icon="check" data-size="15" data-stroke="2.4"></i>'
+    step === TOTAL_STEPS || investorDone
+      ? `${investorDone ? "Create investor account" : "Finish setup"} <i data-icon="check" data-size="15" data-stroke="2.4"></i>`
       : 'Continue <i data-icon="arrow-right" data-size="15"></i>';
   hydrateIcons(nextBtn);
 
@@ -702,6 +703,13 @@ function paintFields(errors) {
 
 async function onNext() {
   if (submitting) return;
+  /* An investor account has one step: the handle. Everything else about a
+     business is skipped, so Continue on step 1 is the final action. */
+  if (draft.account.type === "investor" && step === 1) {
+    if (!validateStep()) return;
+    await finish();
+    return;
+  }
   if (step < TOTAL_STEPS) {
     if (!validateStep()) return;
     renderStep(step + 1);
@@ -778,6 +786,43 @@ async function finish() {
         { onConflict: "id" }
       );
     if (profileError) throw normalizeError(profileError);
+
+    /* An investor account: the handle is the only thing it needs. investor_join
+       refuses an account that already runs a business, so the role can never be
+       attached to a business owner's workspace. The database then checks the role
+       really landed before we say so. */
+    if (draft.account.type === "investor") {
+      const { error: joinError } = await sb.rpc("investor_join", {
+        p_username: (draft.account.username || "").trim().toLowerCase()
+      });
+      if (joinError) throw normalizeError(joinError);
+
+      const { error: investorProgressError } = await upsertProgress({
+        user_id: userId,
+        current_step: 1,
+        data: draft,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      if (investorProgressError) throw normalizeError(investorProgressError);
+
+      const { data: savedInvestor, error: savedInvestorError } = await sb
+        .from("profiles")
+        .select("account_type")
+        .eq("id", userId)
+        .maybeSingle();
+      if (savedInvestorError) throw normalizeError(savedInvestorError);
+      if (savedInvestor?.account_type !== "investor") {
+        throw new AppError("Your investor account was not saved.", {
+          code: "verify_failed",
+          hint: "Nothing was lost. Press Create investor account again."
+        });
+      }
+
+      await loadIdentity({ force: true }).catch(() => undefined);
+      location.assign("/app/?view=investor&welcome=1");
+      return;
+    }
 
     // 2a. An agent saves a public profile instead of a business.
     let businessId = null;

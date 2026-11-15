@@ -10,6 +10,7 @@ import { normalizeError } from "../../lib/supabase.js";
 import { state, loadIdentity, hasCompletedOnboarding } from "../../lib/store.js";
 import { qs } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
+import { INVESTOR_VIEWS, OWNER_ONLY_VIEWS } from "../../config/investor-deck.js";
 
 const LOADERS = {
   overview: () => import("./views/overview.js"),
@@ -37,7 +38,9 @@ const LOADERS = {
   analytics: () => import("./views/analytics.js"),
   notifications: () => import("./views/notifications.js"),
   billing: () => import("./views/billing.js"),
-  settings: () => import("./views/settings.js")
+  settings: () => import("./views/settings.js"),
+  "investor-decks": () => import("./views/investor-decks.js"),
+  investor: () => import("./views/investor.js")
 };
 
 export const DEFAULT_VIEW = "overview";
@@ -45,7 +48,20 @@ export const DEFAULT_VIEW = "overview";
 /* An agent account has no business to overview, so its front door is the
    freelancer dashboard. Explicit ?view= always wins. */
 export function landingView() {
+  if (state.profile?.account_type === "investor") return "investor";
   return state.profile?.account_type === "agent" ? "freelancer" : DEFAULT_VIEW;
+}
+
+/* Who may open which view. The browser hides what is not allowed; the database
+   and the Edge Functions refuse the data either way. Before the profile loads
+   there is nothing to check against, so the view opens and the server decides. */
+export function allowedView(view) {
+  const type = state.profile?.account_type;
+  if (!type) return true;
+  if (type === "investor") return INVESTOR_VIEWS.includes(view);
+  if (view === "investor") return false;
+  if (OWNER_ONLY_VIEWS.includes(view)) return type === "owner";
+  return true;
 }
 
 export const viewIds = () => Object.keys(LOADERS);
@@ -60,9 +76,10 @@ function parseParams() {
 }
 
 /** Render a view into the root element. */
-export async function render(view, params, ctx) {
+export async function render(requested, params, ctx) {
   const root = qs("#view-root");
   if (!root) return;
+  const view = allowedView(requested) ? requested : landingView();
   const myToken = ++token;
   current = view;
 

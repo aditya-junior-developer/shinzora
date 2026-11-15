@@ -149,15 +149,22 @@ export default async function render(root) {
             <div class="field-hint" id="username-note">People find and connect with you by this handle. Lowercase letters, numbers, dots and underscores.</div>
             <div class="field-error"></div>
           </div>
-          <div class="field" data-field="account_type">
-            <label class="field-label" for="account_type">How you use Shinzora</label>
-            <select class="input" id="account_type" name="account_type">
-              <option value="owner" ${profile.account_type !== "agent" ? "selected" : ""}>I run a business</option>
-              <option value="agent" ${profile.account_type === "agent" ? "selected" : ""}>I work as an agent</option>
-            </select>
-            <div class="field-hint">This decides which half of the marketplace the dashboard opens on. You can switch at any time.</div>
-            <div class="field-error"></div>
-          </div>
+          ${
+            profile.account_type === "investor"
+              ? `<div class="field" data-field="account_type">
+                  <span class="field-label">How you use Shinzora</span>
+                  <div class="field-hint">You joined as an investor. This account cannot change role, because an investor holds no business and no owner or agent permissions.</div>
+                </div>`
+              : `<div class="field" data-field="account_type">
+                  <label class="field-label" for="account_type">How you use Shinzora</label>
+                  <select class="input" id="account_type" name="account_type">
+                    <option value="owner" ${profile.account_type !== "agent" ? "selected" : ""}>I run a business</option>
+                    <option value="agent" ${profile.account_type === "agent" ? "selected" : ""}>I work as an agent</option>
+                  </select>
+                  <div class="field-hint">This decides which half of the marketplace the dashboard opens on. You can switch at any time.</div>
+                  <div class="field-error"></div>
+                </div>`
+          }
           <div class="field" data-field="phone">
             <label class="field-label" for="phone">Phone</label>
             <input class="input" id="phone" name="phone" value="${esc(profile.phone || "")}" placeholder="+91" autocomplete="tel" />
@@ -259,7 +266,7 @@ export default async function render(root) {
           const { error } = await sb.rpc("set_username", { p_username: wantedHandle });
           if (error) throw normalizeError(error);
         }
-        if (form.account_type.value !== (state.profile?.account_type || "owner")) {
+        if (form.account_type && form.account_type.value !== (state.profile?.account_type || "owner")) {
           const { error } = await sb.rpc("set_account_type", { p_type: form.account_type.value });
           if (error) throw normalizeError(error);
         }

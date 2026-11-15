@@ -18,6 +18,7 @@ import { state, plan as currentPlan, aiCredits } from "../../../lib/store.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
 import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
+import { DECK_PDF_RUPEES } from "../../../config/investor-deck.js";
 import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
 import { payments as fetchPayments, subscription } from "../data.js";
 import { pageHead, setupNotice, skeletonView, statusBadge, emptyState, statCard } from "../components.js";
@@ -266,8 +267,25 @@ export default async function render(root) {
       </div>
     </div>`;
 
+  /* Investor deck PDF (P9). Owners only: the server refuses it for any other
+     account, and the card is hidden for them too. Price is Rs 20 per export. */
+  if (state.profile?.account_type !== "agent" && state.profile?.account_type !== "investor") {
+    root.insertAdjacentHTML("afterbegin", deckExportCard());
+  }
+  /* Arrived from a deck that needs an export: open the same payment straight away. */
+  const buyParam = new URLSearchParams(globalThis.location?.search || "").get("buy");
+  if (buyParam === "deck_pdf" && state.profile?.account_type === "owner") {
+    startPayment({ purpose: "deck_pdf", label: "Investor deck PDF export", amount: DECK_PDF_RUPEES * 100 });
+  }
+
   /* -------------------------------------------------------------- actions */
   on(root, "click", async (event) => {
+    const deckBuy = event.target.closest("[data-deck-pdf]");
+    if (deckBuy) {
+      startPayment({ purpose: "deck_pdf", label: "Investor deck PDF export", amount: DECK_PDF_RUPEES * 100 });
+      return;
+    }
+
     const upgrade = event.target.closest("[data-upgrade]");
     if (upgrade) {
       const target = planById(upgrade.getAttribute("data-upgrade"));
@@ -637,6 +655,16 @@ export default async function render(root) {
   }
 
   void qsa;
+}
+
+function deckExportCard() {
+  return `<section class="card card-pad deck-export-card" aria-labelledby="deck-export-title">
+    <div>
+      <h2 class="card-title" id="deck-export-title">${icon("layers", { size: 15 })} Investor deck PDF</h2>
+      <p class="field-hint">Each PDF export of a manual investor deck costs Rs ${DECK_PDF_RUPEES}, paid once per export. AI-drafted decks export free.</p>
+    </div>
+    <button class="btn btn-secondary btn-sm" type="button" data-deck-pdf>Buy one export · Rs ${DECK_PDF_RUPEES}</button>
+  </section>`;
 }
 
 function planIdIsPro(purpose = "") {

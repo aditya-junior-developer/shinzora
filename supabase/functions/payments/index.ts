@@ -18,7 +18,7 @@
 // ============================================================================
 
 import { clean, fail, json, preflight, readBody } from "../_shared/http.ts";
-import { admin, getCaller } from "../_shared/auth.ts";
+import { accountTypeOf, admin, getCaller } from "../_shared/auth.ts";
 
 /** Prices in paise (minor units). ₹2,499 = 249900. */
 const PLAN_PRICES: Record<string, number> = {
@@ -33,6 +33,10 @@ const PREMIUM_PRICES: Record<string, { amount: number; label: string; rank: numb
   glow: { amount: 9900, label: "Glow profile", rank: 1 },
   elite: { amount: 19900, label: "Elite profile", rank: 2 }
 };
+
+/* Investor deck PDF export (P9). Rs 20 per export of a manual deck. Mirrored in
+   public/js/config/investor-deck.js; a test fails if the two drift apart. */
+const DECK_PDF_PRICE = { amount: 2000, label: "Investor deck PDF export" };
 
 const SERVICE_PRICES: Record<string, { amount: number; label: string }> = {
   website_setup: { amount: 499900, label: "Managed website setup" },
@@ -131,6 +135,17 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   const resolved = await resolveAmount(userId, purpose);
   if (!resolved) return fail(400, "invalid_input", "That payment purpose is not recognised.");
 
+  /* Investors hold no payments at all. A deck export belongs to a business
+     owner. Checked here because the browser hides these buttons only as a
+     courtesy. */
+  const accountType = await accountTypeOf(userId);
+  if (accountType === "investor") {
+    return fail(403, "not_for_this_account", "Investor accounts do not buy anything on Shinzora.");
+  }
+  if (purpose === "deck_pdf" && accountType !== "owner") {
+    return fail(403, "owner_only", "Only business owners can buy an investor deck export.");
+  }
+
   /* A premium tier the member already holds (or a higher one) is refused on the
      server. The browser hides the button too, but that is not the check. */
   if (purpose.startsWith("premium:")) {
@@ -227,6 +242,10 @@ async function resolveAmount(userId: string, purpose: string): Promise<{ amount:
     const entry = PREMIUM_PRICES[tier];
     if (!entry) return null;
     return { amount: entry.amount, label: entry.label };
+  }
+
+  if (purpose === "deck_pdf") {
+    return { amount: DECK_PDF_PRICE.amount, label: DECK_PDF_PRICE.label };
   }
 
   if (purpose.startsWith("service:")) {

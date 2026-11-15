@@ -34,7 +34,7 @@
 // ============================================================================
 
 import { clean, cleanList, fail, json, preflight, readBody } from "../_shared/http.ts";
-import { admin, Caller, getCaller, scoped } from "../_shared/auth.ts";
+import { accountTypeOf, admin, Caller, getCaller, scoped } from "../_shared/auth.ts";
 import {
   defaultModel,
   estimateTokens,
@@ -70,6 +70,11 @@ Deno.serve(async (req) => {
 
   const caller = await getCaller(req);
   if (!caller) return fail(401, "not_authenticated", "Sign in to use the assistant.");
+  /* An investor account has no business to build. Refused here, not only by
+     hiding the menu, so a direct call gets the same answer. */
+  if ((await accountTypeOf(caller.user.id)) === "investor") {
+    return fail(403, "not_for_this_account", "Investor accounts cannot use the AI tools. They read the decks founders share with them.");
+  }
 
   if (!geminiConfigured() && !fallbackConfigured()) {
     return fail(503, "functions_unavailable", "AI generation is not configured on this deployment.", {
