@@ -25,6 +25,8 @@ import { buildDeckPdf, normaliseSlides, MAX_SLIDES } from "../_shared/deck-pdf.j
 
 const SECTIONS = ["business", "inventory", "sales"];
 const DECK_PDF_AMOUNT_PAISE = 2000;
+/* Owner's rule: an AI pitch deck costs 5 credits. Mirrored in config/investor-deck.js. */
+const DECK_AI_CREDITS = 5;
 
 type Slide = { title: string; bullets: string[] };
 
@@ -128,7 +130,7 @@ async function generate(caller: Caller, body: Record<string, unknown>) {
     p_user: caller.user.id,
     p_mode: "deck",
     p_model: "deck-draft",
-    p_credits: 1
+    p_credits: DECK_AI_CREDITS
   });
   if (quotaError) console.error("consume_ai_credit failed", quotaError.message);
   if (quota && (quota as { ok?: boolean }).ok === false) {

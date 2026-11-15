@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
     /* No output, no charge. The credit is spent before the provider is called,
        so a provider outage, a rate limit or a bad key used to cost the customer
        a generation they never received. */
-    if (charged) await refundCredit(caller.user.id, mode);
+    if (charged) await refundCredit(caller.user.id, mode, creditCostFor(mode));
     return handleError(error, caller, mode);
   }
 });
@@ -199,7 +199,7 @@ function handleError(error: unknown, caller: Caller, mode: string) {
  * counter lives on the subscription row; the service role may write it, and the
  * failure itself is already recorded in ai_usage_log by handleError().
  */
-async function refundCredit(userId: string, mode: string): Promise<void> {
+async function refundCredit(userId: string, mode: string, cost = 1): Promise<void> {
   try {
     const db = admin();
     const { data } = await db
@@ -209,9 +209,10 @@ async function refundCredit(userId: string, mode: string): Promise<void> {
       .maybeSingle();
     const used = Number(data?.ai_credits_used ?? 0);
     if (!Number.isFinite(used) || used <= 0) return;
+    const back = Math.min(used, cost);
     const { error } = await db
       .from("subscriptions")
-      .update({ ai_credits_used: used - 1 })
+      .update({ ai_credits_used: used - back })
       .eq("user_id", userId);
     if (error) {
       console.error("ai credit refund failed", error.message);
@@ -229,13 +230,19 @@ async function refundCredit(userId: string, mode: string): Promise<void> {
   }
 }
 
-/** Consume one credit. Returns {ok:false,...} when the plan is exhausted. */
+/* Credits per generation, set by the owner: creating a website costs 6, changing
+   one costs 3, and every other AI response costs 1. An investor deck draft costs
+   5 and is charged by the deck function. Enforced here, on the server. */
+const CREDIT_COST: Record<string, number> = { build_start: 6, revise: 3 };
+export const creditCostFor = (mode: string): number => CREDIT_COST[mode] ?? 1;
+
+/** Consume the credits for one generation. Returns {ok:false,...} when the plan is exhausted. */
 async function ensureQuota(userId: string, mode: string): Promise<Record<string, unknown> | null> {
   const { data, error } = await admin().rpc("consume_ai_credit", {
     p_user: userId,
     p_mode: mode,
     p_model: defaultModel(),
-    p_credits: 1
+    p_credits: creditCostFor(mode)
   });
   if (error) {
     // A missing function is a deployment problem, not a quota problem: let the

@@ -28,6 +28,7 @@ import {
   DECK_MAX_BULLETS,
   DECK_MAX_BULLET_CHARS,
   DECK_PDF_RUPEES,
+  DECK_AI_CREDITS,
   SHARE_NOTE
 } from "../../../config/investor-deck.js";
 
@@ -174,7 +175,7 @@ function builderMarkup() {
       </div>
       <div class="field-error" id="deck-error" role="alert"></div>
       <div class="card-actions">
-        <button class="btn btn-primary" type="submit" id="deck-create">${icon("wand-sparkles", { size: 14 })} Draft with AI</button>
+        <button class="btn btn-primary" type="submit" id="deck-create">${icon("wand-sparkles", { size: 14 })} Draft with AI · ${DECK_AI_CREDITS} credits</button>
         <button class="btn btn-ghost" type="button" data-deck-cancel>Cancel</button>
       </div>
     </form>`;
@@ -198,7 +199,7 @@ function bindBuilder() {
     qs("#deck-sections", form).hidden = !isAi;
     qs("#deck-brief-field", form).hidden = !isAi;
     qs("#deck-create", form).innerHTML = isAi
-      ? `${icon("wand-sparkles", { size: 14 })} Draft with AI`
+      ? `${icon("wand-sparkles", { size: 14 })} Draft with AI · ${DECK_AI_CREDITS} credits`
       : `${icon("file-pen-line", { size: 14 })} Start writing`;
   };
   qsa("input[name=deck-mode]", form).forEach((input) => on(input, "change", syncMode));

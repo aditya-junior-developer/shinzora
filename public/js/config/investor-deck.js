@@ -26,6 +26,9 @@ export const DECK_SECTIONS = [
 
 export const DECK_SECTION_IDS = DECK_SECTIONS.map((section) => section.id);
 
+/** AI pitch-deck draft cost in credits. Mirrors DECK_AI_CREDITS in deck/index.ts. */
+export const DECK_AI_CREDITS = 5;
+
 /** A manual deck's PDF export. Mirrors DECK_PDF_PRICE in payments/index.ts. */
 export const DECK_PDF_RUPEES = 20;
 

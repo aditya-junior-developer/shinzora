@@ -43,6 +43,18 @@ check("deck PDF price: browser Rs 20 equals server 2000 paise", () => {
   assert.equal(Number(deckFn.match(/DECK_PDF_AMOUNT_PAISE = (\d+)/)?.[1]), paise);
 });
 
+check("AI deck draft cost: browser 5 credits equals server 5", () => {
+  assert.equal(num(config, "DECK_AI_CREDITS"), 5);
+  assert.equal(Number(deckFn.match(/DECK_AI_CREDITS = (\d+)/)?.[1]), 5);
+  assert.match(deckFn, /p_credits: DECK_AI_CREDITS/);
+});
+
+check("website credit costs are enforced on the server: create 6, modify 3, other 1", () => {
+  assert.match(ai, /CREDIT_COST: Record<string, number> = \{ build_start: 6, revise: 3 \}/);
+  assert.match(ai, /p_credits: creditCostFor\(mode\)/);
+  assert.match(ai, /refundCredit\(caller\.user\.id, mode, creditCostFor\(mode\)\)/);
+});
+
 check("slide and bullet limits match the PDF writer", () => {
   assert.equal(num(config, "DECK_MAX_SLIDES"), num(deckPdf, "MAX_SLIDES"));
   assert.equal(num(config, "DECK_MAX_BULLETS"), num(deckPdf, "MAX_BULLETS"));
