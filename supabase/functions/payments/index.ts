@@ -38,6 +38,10 @@ const PREMIUM_PRICES: Record<string, { amount: number; label: string; rank: numb
    public/js/config/investor-deck.js; a test fails if the two drift apart. */
 const DECK_PDF_PRICE = { amount: 2000, label: "Investor deck PDF export" };
 
+/* Written by Experts: a fixed ₹30 (3000 paise), paid before the brief is sent.
+   Mirrors DECK_EXPERT_RUPEES in public/js/config/investor-deck.js. */
+const DECK_EXPERT_PRICE = { amount: 3000, label: "Written by Experts investor deck" };
+
 const SERVICE_PRICES: Record<string, { amount: number; label: string }> = {
   website_setup: { amount: 499900, label: "Managed website setup" },
   brand_kit: { amount: 249900, label: "Brand kit and copywriting" },
@@ -145,6 +149,9 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   if (purpose === "deck_pdf" && accountType !== "owner") {
     return fail(403, "owner_only", "Only business owners can buy an investor deck export.");
   }
+  if (purpose === "deck_expert" && accountType !== "owner") {
+    return fail(403, "owner_only", "Only business owners can order a written investor deck.");
+  }
 
   /* A premium tier the member already holds (or a higher one) is refused on the
      server. The browser hides the button too, but that is not the check. */
@@ -246,6 +253,10 @@ async function resolveAmount(userId: string, purpose: string): Promise<{ amount:
 
   if (purpose === "deck_pdf") {
     return { amount: DECK_PDF_PRICE.amount, label: DECK_PDF_PRICE.label };
+  }
+
+  if (purpose === "deck_expert") {
+    return { amount: DECK_EXPERT_PRICE.amount, label: DECK_EXPERT_PRICE.label };
   }
 
   if (purpose.startsWith("service:")) {

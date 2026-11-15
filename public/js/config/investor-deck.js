@@ -32,6 +32,9 @@ export const DECK_AI_CREDITS = 5;
 /** A manual deck's PDF export. Mirrors DECK_PDF_PRICE in payments/index.ts. */
 export const DECK_PDF_RUPEES = 20;
 
+/** Written by Experts: a fixed price, paid before the brief is sent. Mirrors DECK_EXPERT_PRICE in supabase/functions/payments/index.ts. */
+export const DECK_EXPERT_RUPEES = 30;
+
 /** Matches the database check and the PDF writer. */
 export const DECK_MAX_SLIDES = 12;
 export const DECK_MIN_READY_SLIDES = 3;
@@ -47,8 +50,8 @@ export const OWNER_ONLY_VIEWS = ["investor-decks"];
 /* How a deck starts. `creatable` decides what the builder offers today:
    - ai      an AI draft from the parts of the business the owner ticks (5 credits)
    - expert  "Written by Experts": the request goes to the Shinzora team, who
-             deliver the finished file to the member's registered email. No price
-             is shown: a quote follows the team's review of the brief.
+             deliver the finished file to the member's registered email. A fixed
+             Rs 30, paid before the brief is sent.
    - manual  decks written by the owner before experts were offered. Still open,
              edited and exported; no longer offered for new decks. */
 export const DECK_MODES = {
@@ -62,8 +65,8 @@ export const DECK_MODES = {
   expert: {
     id: "expert",
     label: "Written by Experts",
-    price: "Quote after review",
-    desc: "A specialist writes the complete deck from your brief. Our team delivers the finished file to your registered email, and you can follow its status below.",
+    price: `Rs ${DECK_EXPERT_RUPEES} fixed`,
+    desc: "A specialist writes the complete deck from your brief. You pay Rs 30 to send the brief. Our team delivers the finished file to your registered email, and you can follow its status below.",
     creatable: true
   },
   manual: {

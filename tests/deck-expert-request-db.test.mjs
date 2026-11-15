@@ -46,6 +46,7 @@ await db.exec(`
   grant usage on schema public to authenticated;
   grant select, insert, update, delete on public.service_requests to authenticated;
   grant select, insert, update, delete on public.investor_decks to authenticated;
+  grant select on public.payments to authenticated;
 `);
 
 const deckId = (await q(
@@ -135,6 +136,62 @@ check(
 await asSystem();
 const adminSees = await q(`select count(*)::int as n from public.service_requests where service_type = 'investor_deck_expert'`);
 check("the admin desk sees the request", adminSees[0].n === 1);
+
+/* ---- the ₹30 payment (0064) -------------------------------------------- */
+console.log("expert deck payment");
+await asSystem();
+const payment = async (owner, purpose, status = "pending") =>
+  (await q(
+    `insert into public.payments (owner_id, purpose, label, amount, status)
+     values ($1, $2, 'test', 3000, $3) returning id`,
+    [owner, purpose, status]
+  ))[0].id;
+const expertPaid = await payment(ids.alice, "deck_expert");
+const bobExpert = await payment(ids.bob, "deck_expert");
+const alicePdf = await payment(ids.alice, "deck_pdf");
+const aliceCancelled = await payment(ids.alice, "deck_expert", "cancelled");
+const withPayment = (owner, pay, extra = {}) => ({ ...expertRow(owner, deckId), payment_id: pay, ...extra });
+const insertWithPayment = (row) =>
+  db.query(
+    `insert into public.service_requests
+       (owner_id, service_type, title, details, custom_description, budget_inr, contact_name, contact_email, contact_phone, status, deck_id, payment_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
+    [row.owner_id, row.service_type, row.title, row.details, row.custom_description, row.budget_inr, row.contact_name, row.contact_email, row.contact_phone, row.status, row.deck_id, row.payment_id]
+  );
+
+await asUser(ids.alice);
+let paidRequest = null;
+try {
+  paidRequest = (await insertWithPayment(withPayment(ids.alice, expertPaid))).rows[0];
+} catch (error) {
+  console.log(error.message);
+}
+check("a member can send a brief against their own open ₹30 deck_expert payment", Boolean(paidRequest?.id));
+
+check(
+  "the brief cannot be sent against someone else's payment",
+  await refused(() => insertWithPayment(withPayment(ids.alice, bobExpert)))
+);
+check(
+  "the brief cannot be sent against a different purpose (deck PDF export)",
+  await refused(() => insertWithPayment(withPayment(ids.alice, alicePdf)))
+);
+check(
+  "the brief cannot be sent against a cancelled payment",
+  await refused(() => insertWithPayment(withPayment(ids.alice, aliceCancelled)))
+);
+check(
+  "a payment can only be attached to an investor_deck_expert request",
+  await refused(() => insertWithPayment(withPayment(ids.alice, expertPaid, { service_type: "business_cards", budget_inr: 5000, title: "Cards" })))
+);
+check(
+  "a brief with no payment is still allowed, as before",
+  await refused(() => insertWithPayment({ ...expertRow(ids.alice, deckId), payment_id: null })) === false
+);
+
+await asSystem();
+const linked = await q(`select payment_id from public.service_requests where id = $1`, [paidRequest?.id]);
+check("the stored request points at the payment", linked[0]?.payment_id === expertPaid);
 
 await db.close?.();
 console.log(`\n${pass} passed, ${fail} failed`);

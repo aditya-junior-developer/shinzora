@@ -55,6 +55,7 @@ await db.query(`insert into public.admin_users (user_id, email, role) values ($1
 await db.exec(`
   grant usage on schema public to authenticated;
   grant select, insert, update, delete on public.service_requests to authenticated;
+  grant select on public.payments to authenticated;
   grant select on public.notifications to authenticated;
 `);
 

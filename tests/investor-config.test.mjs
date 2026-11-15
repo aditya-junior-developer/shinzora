@@ -43,6 +43,15 @@ check("deck PDF price: browser Rs 20 equals server 2000 paise", () => {
   assert.equal(Number(deckFn.match(/DECK_PDF_AMOUNT_PAISE = (\d+)/)?.[1]), paise);
 });
 
+check("Written by Experts: browser Rs 30 equals server 3000 paise, and no quote wording remains", () => {
+  const rupees = num(config, "DECK_EXPERT_RUPEES");
+  const paise = Number(payments.match(/DECK_EXPERT_PRICE = \{ amount: (\d+)/)?.[1]);
+  assert.equal(rupees, 30);
+  assert.equal(paise, rupees * 100);
+  assert.match(config, /price: `Rs \$\{DECK_EXPERT_RUPEES\} fixed`/);
+  assert.doesNotMatch(config, /Quote after review/);
+});
+
 check("AI deck draft cost: browser 5 credits equals server 5", () => {
   assert.equal(num(config, "DECK_AI_CREDITS"), 5);
   assert.equal(Number(deckFn.match(/DECK_AI_CREDITS = (\d+)/)?.[1]), 5);

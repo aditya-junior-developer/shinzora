@@ -18,6 +18,7 @@ import { state } from "../../../lib/store.js";
 import { api } from "../../../lib/api.js";
 import { pageHead, emptyState, skeletonView, chip, setupNotice } from "../components.js";
 import { toast, toastError } from "../../../ui/toast.js";
+import { openPaymentDialog } from "../payment-dialog.js";
 import { openModal } from "../../../ui/modal.js";
 import { timeAgo } from "../../../lib/format.js";
 import { statusById } from "../../../config/request-services.js";
@@ -25,7 +26,6 @@ import {
   EXPERT_REQUEST_TYPE,
   EXPERT_BRIEF_MIN,
   EXPERT_BRIEF_MAX,
-  EXPERT_CONFIRMATION,
   DECK_SECTIONS,
   DECK_MODES,
   DECK_MAX_SLIDES,
@@ -34,6 +34,7 @@ import {
   DECK_MAX_BULLET_CHARS,
   DECK_PDF_RUPEES,
   DECK_AI_CREDITS,
+  DECK_EXPERT_RUPEES,
   SHARE_NOTE
 } from "../../../config/investor-deck.js";
 
@@ -220,7 +221,7 @@ function bindBuilder() {
     qs("#deck-brief-hint", form).textContent = isAi ? "(optional)" : `(required, at least ${EXPERT_BRIEF_MIN} characters)`;
     qs("#deck-create", form).innerHTML = isAi
       ? `${icon("wand-sparkles", { size: 14 })} Draft with AI · ${DECK_AI_CREDITS} credits`
-      : `${icon("users", { size: 14 })} Send to our experts`;
+      : `${icon("users", { size: 14 })} Pay Rs ${DECK_EXPERT_RUPEES} and send brief`;
   };
   qsa("input[name=deck-mode]", form).forEach((input) => on(input, "change", syncMode));
   syncMode();
@@ -254,14 +255,25 @@ function bindBuilder() {
       submit.disabled = true;
       submit.setAttribute("aria-busy", "true");
       try {
-        await submitExpertRequest({ title, sections, brief });
+        /* Pay first (the server fixes the amount), then save the brief against
+           that payment. The team only starts once the payment is verified. */
+        const { payment, upi } = await submitExpertRequest({ title, sections, brief });
         form.reset();
-        toast({ title: "Request sent", message: EXPERT_CONFIRMATION }, { tone: "success" });
+        toast({ title: "Brief saved", message: `Complete the Rs ${DECK_EXPERT_RUPEES} payment. The team starts once it is verified.` }, { tone: "success" });
+        openPaymentDialog({
+          payment,
+          upi,
+          label: "Written by Experts investor deck",
+          amount: DECK_EXPERT_RUPEES * 100,
+          onDone: () => paintList({ fresh: false })
+        });
         await paintList({ fresh: false });
       } catch (err) {
         const normalized = normalizeError(err);
-        error.textContent = normalized.message || "The request could not be sent. Please try again.";
+        error.textContent = normalized.message || "The brief could not be saved. Please try again.";
         submit.disabled = false;
+        submit.removeAttribute("aria-busy");
+      } finally {
         submit.removeAttribute("aria-busy");
       }
       return;
@@ -302,17 +314,31 @@ function bindBuilder() {
 
 /* ------------------------------------------------- written by experts */
 
-/** Sends the brief to the team. The row is what admins see and act on. */
+/**
+ * Written by Experts: a ₹30 payment, then the brief. The payment is created on
+ * the server (the amount is set there, never by the browser), and the brief row
+ * is stored against it. The row is what admins see; the payment is what they
+ * verify before the team starts.
+ */
 async function submitExpertRequest({ title, sections, brief }) {
   const email = state.user?.email || state.session?.user?.email || "";
   if (!email) throw new Error("Your registered email is needed to deliver the deck. Check your account details and try again.");
   const name = String(state.profile?.full_name || state.profile?.business_name || email).slice(0, 120);
   const parts = sections.length ? sections.join(", ") : "none";
 
+  const created = await api.payments.create({
+    purpose: "deck_expert",
+    label: "Written by Experts investor deck",
+    amount: DECK_EXPERT_RUPEES * 100
+  });
+  const payment = created?.payment;
+  if (!payment?.id) throw new Error("The payment could not be started. Please try again.");
+
   const { data, error } = await sb
     .from("service_requests")
     .insert({
       owner_id: state.user.id,
+      payment_id: payment.id,
       service_type: EXPERT_REQUEST_TYPE,
       title: `Investor deck: ${title}`.slice(0, 120),
       details: brief,
@@ -326,7 +352,7 @@ async function submitExpertRequest({ title, sections, brief }) {
     .select("id")
     .single();
   if (error) throw normalizeError(error);
-  return data;
+  return { request: data, payment, upi: created?.upi || null };
 }
 
 function expertRequestsMarkup(rows) {
