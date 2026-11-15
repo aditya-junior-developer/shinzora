@@ -13,8 +13,12 @@
 import { PLANS, PLAN_LIMITS } from "../../../config/env.js";
 
 /** Plan id → page limit. `null` means unlimited. Unknown plans count as Free. */
+/* Legacy plan names in the database map to the app's plans (migration 0052). */
+const LEGACY_PLAN = { starter: "free", growth: "pro", scale: "enterprise" };
+
 export function pageLimitFor(planId) {
-  const key = String(planId || "free").toLowerCase();
+  const raw = String(planId || "free").toLowerCase();
+  const key = LEGACY_PLAN[raw] || raw;
   if (Object.prototype.hasOwnProperty.call(PLAN_LIMITS, key)) {
     return PLAN_LIMITS[key].pages ?? null;
   }

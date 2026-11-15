@@ -34,14 +34,17 @@ console.log("plan limits");
 check("free allows 1 page", pageLimitFor("free") === 1);
 check("pro allows 3 pages", pageLimitFor("pro") === 3);
 check("enterprise is unlimited", pageLimitFor("enterprise") === null);
-check("an unknown plan counts as free", pageLimitFor("starter") === 1 && pageLimitFor(undefined) === 1);
+check("an unknown plan counts as free", pageLimitFor("nonsense") === 1 && pageLimitFor(undefined) === 1);
+check("starter is Free (1 page)", pageLimitFor("starter") === 1);
+check("growth is Pro (3 pages)", pageLimitFor("growth") === 3);
+check("scale is Enterprise (unlimited)", pageLimitFor("scale") === null);
 check("plan names are case-insensitive", pageLimitFor("PRO") === 3);
 
 console.log("server-reported limit");
 check("uses the server's answer when it has one", resolveLimit({ plan: "pro", page_limit: 3 }, "free").limit === 3);
 check("server says unlimited", resolveLimit({ plan: "enterprise", page_limit: null }, "enterprise").limit === null);
 check("a failed lookup falls back to free, never wider", resolveLimit(null, "free").limit === 1);
-check("a failed lookup for an unknown plan is still free", resolveLimit(null, "growth").limit === 1);
+check("a failed lookup for a legacy growth plan is Pro, not free", resolveLimit(null, "growth").limit === 3);
 check("reports whether the server answered", resolveLimit({ page_limit: 1, plan: "free" }, "free").fromServer === true);
 
 console.log("page state");
@@ -112,6 +115,7 @@ check("a build over the limit is refused before any work starts", /requestedPage
 check("the old fixed cap is gone", !/BUILD_MAX_PAGES/.test(aiSource));
 const mig51 = read("supabase/migrations/0051_publish_page_limit.sql");
 check("0051 publish guard checks the owner's page limit", /sz_page_limit\(v_plan\)/.test(mig51) && /code', 'page_limit'/.test(mig51));
+check("0052 maps starter, growth and scale in sz_page_limit", /when 'growth'\s+then 3/.test(read("supabase/migrations/0052_plan_names_page_limits.sql")) && /when 'scale'\s+then null/.test(read("supabase/migrations/0052_plan_names_page_limits.sql")));
 check("0051 keeps the early return for unchanged published sites", /old\.published_version_id is not distinct from new\.published_version_id/.test(mig51));
 const builder = read("public/js/modules/dashboard/builder-core.js");
 check("the builder sends the chosen pages, not a fixed list", /S\.answers\.information\[pagesField\]/.test(builder));

@@ -1089,8 +1089,8 @@ ${request}`,
    An unknown or legacy plan name counts as Free. */
 function pageLimitFor(plan: unknown): number | null {
   const key = String(plan || "free").toLowerCase();
-  if (key === "enterprise") return null;
-  if (key === "pro") return 3;
+  if (key === "enterprise" || key === "scale") return null;
+  if (key === "pro" || key === "growth") return 3;
   return 1;
 }
 
