@@ -11,13 +11,22 @@ import { sb, normalizeError } from "../../../lib/supabase.js";
 import { state } from "../../../lib/store.js";
 import { products as fetchProducts } from "../data.js";
 import { pageHead, setupNotice, emptyState, skeletonView, statusBadge } from "../components.js";
-import { formDialog, confirmDialog } from "../../../ui/modal.js";
+import { formDialog, confirmDialog, openModal } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
 import { parseCsv, toCsv, downloadCsv } from "../../../lib/csv.js";
 
 let rows = [];
 let search = "";
 let lowOnly = false;
+
+/* Each product sets its own low-stock level. Products saved before the column
+   existed fall back to 5, the level the app used before thresholds. */
+const lowAt = (row) => Math.max(0, Number(row.low_stock_threshold ?? 5));
+const isLow = (row) => Number(row.stock) <= lowAt(row);
+const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTOS = 8;
+const websiteUrl = (slug) => `${location.origin}/shop/?p=${encodeURIComponent(slug)}`;
 
 export default async function render(root) {
   root.innerHTML = skeletonView(4);
@@ -33,7 +42,7 @@ export default async function render(root) {
   root.innerHTML = `
     ${pageHead({
       title: "Inventory",
-      desc: "Products, prices and stock. Low-stock items are flagged the moment the level drops to five or fewer.",
+      desc: "Products, prices and stock. Each product raises its own low-stock alert at the level you set.",
       actions: `<button class="btn btn-secondary btn-sm" id="import-products">${icon("upload", { size: 14 })}Import CSV</button>
                 <button class="btn btn-secondary btn-sm" id="export-products">${icon("download", { size: 14 })}Export CSV</button>
                 <button class="btn btn-primary btn-sm" id="add-product">${icon("plus", { size: 14 })}Add product</button>
@@ -86,6 +95,42 @@ export default async function render(root) {
     if (row) productDialog(row);
   });
 
+  /* Push to website: the database checks the quality rules and writes the flag,
+     so this only reports what the database actually did. */
+  delegate(qs("#product-table"), "click", "[data-website]", async (_event, node) => {
+    const row = rows.find((item) => item.id === node.getAttribute("data-website"));
+    if (!row) return;
+    const publish = !row.website_published;
+    node.disabled = true;
+    try {
+      const { data, error } = await sb.rpc("product_set_website", { p_product: row.id, p_publish: publish });
+      if (error) throw error;
+      row.website_published = publish;
+      if (data?.slug) row.website_slug = data.slug;
+      paintTable();
+      toast(
+        publish
+          ? { title: "Live on your website", message: websiteUrl(row.website_slug) }
+          : { title: "Taken off your website", message: "The public page for this product now shows as not found." },
+        { tone: "success", duration: 7000 }
+      );
+    } catch (error) {
+      /* 22023 is the publish quality gate; its message names what is missing. */
+      if (error?.code === "22023") {
+        toast({ title: "Not published", message: error.message }, { tone: "warning", duration: 7000 });
+      } else {
+        toastError(normalizeError(error));
+      }
+    } finally {
+      node.disabled = false;
+    }
+  });
+
+  delegate(qs("#product-table"), "click", "[data-photos]", (_event, node) => {
+    const row = rows.find((item) => item.id === node.getAttribute("data-photos"));
+    if (row) photosDialog(row);
+  });
+
   delegate(qs("#product-table"), "click", "[data-stock]", async (_event, node) => {
     const row = rows.find((item) => item.id === node.getAttribute("data-stock"));
     if (!row) return;
@@ -131,42 +176,56 @@ export default async function render(root) {
   });
 
   /* ---------------------------------------------------------------- alerts */
+  /* One open alert per product and state, enforced by the database. "Resolve"
+     closes an alert; it reopens only after the product recovers and drops again. */
   async function paintAlerts() {
     const box = qs("#stock-alerts");
     if (!box) return;
     try {
       const { data, error } = await sb
         .from("product_alerts")
-        .select("id, product_name, stock, threshold, state, created_at")
-        .is("seen_at", null)
+        .select("id, product_id, product_name, stock, threshold, state, created_at")
+        .is("resolved_at", null)
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(50);
       if (error) throw normalizeError(error);
       if (!data?.length) {
         box.innerHTML = "";
+        box.onclick = null;
         return;
       }
-      box.innerHTML = `<div class="alert alert-warn" style="align-items:flex-start">
-        ${icon("triangle-alert", { size: 15 })}
-        <div style="flex:1">
-          <strong>${data.length} ${data.length === 1 ? "product needs" : "products need"} restocking</strong>
-          <div style="margin-top:4px;font-size:var(--fs-2xs)">
-            ${data
-              .slice(0, 6)
-              .map((row) => `${esc(row.product_name || "A product")} — ${row.state === "out" ? "out of stock" : `${row.stock} left`}`)
-              .join(" · ")}
-          </div>
+      box.innerHTML = `<div class="alert alert-warn" style="align-items:flex-start;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center;width:100%">
+          ${icon("triangle-alert", { size: 15 })}
+          <strong style="flex:1">${data.length} ${data.length === 1 ? "product needs" : "products need"} restocking</strong>
+          ${data.length > 1 ? `<button class="btn btn-ghost btn-sm" type="button" data-resolve-all>Resolve all</button>` : ""}
         </div>
-        <button class="btn btn-ghost btn-sm" type="button" id="alerts-ack">Mark seen</button>
+        ${data
+          .map(
+            (row) => `<div style="display:flex;gap:8px;align-items:center;width:100%;font-size:var(--fs-2xs)">
+              <span style="flex:1">${esc(row.product_name || "A product")} — ${
+                row.state === "out" ? "out of stock" : `${row.stock} left (alert at ${row.threshold})`
+              }</span>
+              <button class="btn btn-ghost btn-sm" type="button" data-resolve="${esc(row.id)}">Resolve</button>
+            </div>`
+          )
+          .join("")}
       </div>`;
-      on(qs("#alerts-ack"), "click", async () => {
+
+      /* One handler on the container, replaced on each repaint, so clicks never
+         run twice. */
+      box.onclick = async (event) => {
+        const one = event.target.closest?.("[data-resolve]")?.getAttribute("data-resolve");
+        const all = event.target.closest?.("[data-resolve-all]");
+        if (!one && !all) return;
         try {
-          await sb.rpc("product_alerts_ack", { p_ids: null });
-          box.innerHTML = "";
-        } catch (error) {
-          toastError(normalizeError(error));
+          const { error: resolveError } = await sb.rpc("product_alert_resolve", { p_ids: one ? [one] : null });
+          if (resolveError) throw normalizeError(resolveError);
+          void paintAlerts();
+        } catch (failure) {
+          toastError(normalizeError(failure));
         }
-      });
+      };
     } catch {
       /* An alert list that cannot load must not take the catalogue down with it. */
       box.innerHTML = "";
@@ -220,7 +279,7 @@ export default async function render(root) {
   function paintStats() {
     const total = rows.length;
     const value = rows.reduce((sum, row) => sum + Number(row.price || 0) * Number(row.stock || 0), 0);
-    const low = rows.filter((row) => Number(row.stock) <= 5).length;
+    const low = rows.filter(isLow).length;
     const active = rows.filter((row) => row.status !== "archived").length;
     safeSet("#inventory-stats", `
       ${stat("Products", String(total), "boxes")}
@@ -239,7 +298,7 @@ export default async function render(root) {
   function paintTable() {
     const visible = rows.filter((row) => {
       const matches = !search || `${row.name} ${row.sku || ""}`.toLowerCase().includes(search);
-      const stockMatch = !lowOnly || Number(row.stock) <= 5;
+      const stockMatch = !lowOnly || isLow(row);
       return matches && stockMatch;
     });
     qs("#product-count").textContent = `${visible.length} of ${rows.length} products`;
@@ -257,13 +316,18 @@ export default async function render(root) {
                 <td class="mono dim" data-label="SKU">${esc(row.sku || "—")}</td>
                 <td data-label="Price">${esc(money(row.price, row.currency || "INR"))}</td>
                 <td data-label="Stock">
-                  <span class="badge ${Number(row.stock) <= 0 ? "badge-danger" : Number(row.stock) <= 5 ? "badge-warn" : "badge-ok"}">
+                  <span class="badge ${Number(row.stock) <= 0 ? "badge-danger" : isLow(row) ? "badge-warn" : "badge-ok"}">
                     ${Number(row.stock) <= 0 ? "Out of stock" : `${row.stock} in stock`}
                   </span>
                 </td>
                 <td data-label="Status">${statusBadge(row.status || "active")}</td>
                 <td class="dim" data-label="Updated">${esc(timeAgo(row.updated_at || row.created_at))}</td>
                 <td class="cell-actions">
+                  ${row.website_published && row.website_slug
+                    ? `<a class="badge badge-ok" href="${esc(websiteUrl(row.website_slug))}" target="_blank" rel="noopener" style="margin-right:6px">On website</a>`
+                    : ""}
+                  <button class="btn btn-ghost btn-sm" data-website="${esc(row.id)}">${row.website_published ? "Unpublish" : "Push to website"}</button>
+                  <button class="btn btn-ghost btn-sm" data-photos="${esc(row.id)}">Photos${row.image_urls?.length ? ` (${row.image_urls.length})` : ""}</button>
                   <button class="btn btn-ghost btn-sm" data-stock="${esc(row.id)}">Stock</button>
                   <button class="btn btn-ghost btn-sm" data-edit="${esc(row.id)}">Edit</button>
                   <button class="btn btn-ghost btn-sm btn-icon" data-delete="${esc(row.id)}" aria-label="Delete">${icon("trash-2", { size: 13 })}</button>
@@ -282,6 +346,101 @@ export default async function render(root) {
         }));
 
     qs("#empty-add")?.addEventListener("click", () => productDialog());
+  }
+
+  /* Photos: uploaded to the owner's folder in brand-assets (public read, owner
+     write, per 0003). The product's image list is updated only after the upload
+     succeeds. The first photo is the cover. */
+  function photosDialog(row) {
+    const photos = [...(row.image_urls || [])];
+    openModal({
+      title: `Photos — ${row.name}`,
+      desc: `JPG, PNG or WebP, up to 5 MB each, ${MAX_PHOTOS} at most. The first photo is the cover on your website.`,
+      body: `<div class="stack gap-4">
+        <div id="photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
+        <div id="photo-empty" class="dim" style="font-size:var(--fs-xs)">No photos yet.</div>
+        <input class="input" type="file" id="photo-file" accept="image/png,image/jpeg,image/webp" />
+        <div class="field-hint" id="photo-status"></div>
+      </div>`,
+      footer: `<button class="btn btn-primary" data-modal-close>Done</button>`,
+      onMount: (root) => {
+        const grid = qs("#photo-grid", root);
+        const empty = qs("#photo-empty", root);
+        const status = qs("#photo-status", root);
+        const paint = () => {
+          empty.hidden = photos.length > 0;
+          grid.innerHTML = photos
+            .map(
+              (url, index) => `<div style="position:relative">
+                <img src="${esc(url)}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px" />
+                ${index === 0 ? `<span class="badge badge-ok" style="position:absolute;left:4px;top:4px">Cover</span>` : ""}
+                <button class="btn btn-ghost btn-sm" type="button" data-remove="${index}" style="position:absolute;right:4px;bottom:4px">Remove</button>
+              </div>`
+            )
+            .join("");
+        };
+        const save = async () => {
+          const { error } = await sb.from("store_products").update({ image_urls: photos, updated_at: new Date().toISOString() }).eq("id", row.id);
+          if (error) throw normalizeError(error);
+          row.image_urls = [...photos];
+          paintTable();
+        };
+        paint();
+
+        grid.addEventListener("click", async (event) => {
+          const index = Number(event.target.closest?.("[data-remove]")?.getAttribute("data-remove"));
+          if (!Number.isInteger(index)) return;
+          photos.splice(index, 1);
+          paint();
+          try {
+            await save();
+            status.textContent = "Photo removed.";
+          } catch (error) {
+            toastError(normalizeError(error));
+          }
+        });
+
+        qs("#photo-file", root).addEventListener("change", async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          if (!PHOTO_TYPES.includes(file.type)) {
+            status.textContent = "That file type is not supported. Use JPG, PNG or WebP.";
+            return;
+          }
+          if (file.size > PHOTO_MAX_BYTES) {
+            status.textContent = "That photo is larger than 5 MB.";
+            return;
+          }
+          if (photos.length >= MAX_PHOTOS) {
+            status.textContent = `A product can have ${MAX_PHOTOS} photos. Remove one first.`;
+            return;
+          }
+          status.textContent = "Uploading…";
+          const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
+          const path = `${state.user.id}/products/${row.id}/${Date.now()}-${safe}`;
+          try {
+            const { error: uploadError } = await sb.storage.from("brand-assets").upload(path, file, {
+              contentType: file.type,
+              upsert: false
+            });
+            if (uploadError) throw normalizeError(uploadError);
+            const { data: pub } = sb.storage.from("brand-assets").getPublicUrl(path);
+            photos.push(pub.publicUrl);
+            paint();
+            await save();
+            status.textContent = "Photo added.";
+          } catch (error) {
+            /* Put the list back to what the database holds. */
+            photos.length = 0;
+            photos.push(...(row.image_urls || []));
+            paint();
+            status.textContent = "";
+            toastError(normalizeError(error));
+          }
+        });
+      }
+    });
   }
 
   async function productDialog(existing = null) {
@@ -307,6 +466,14 @@ export default async function render(root) {
         },
         { name: "stock", label: "Stock on hand", type: "number", value: existing?.stock ?? 0, required: true },
         {
+          name: "low_stock_threshold",
+          label: "Low-stock alert at",
+          type: "number",
+          value: existing?.low_stock_threshold ?? 5,
+          required: true,
+          hint: "You are alerted when stock reaches this number or below. Out-of-stock alerts always fire at zero."
+        },
+        {
           name: "status",
           label: "Status",
           type: "select",
@@ -322,6 +489,12 @@ export default async function render(root) {
       submitLabel: existing ? "Save changes" : "Create product"
     });
     if (!values) return;
+    const threshold = Math.round(Number(values.low_stock_threshold));
+    if (!Number.isFinite(threshold) || threshold < 1) {
+      toast({ title: "Low-stock level", message: "Enter a whole number of 1 or more." }, { tone: "warning" });
+      return;
+    }
+    values.low_stock_threshold = threshold;
 
     try {
       if (existing) {
@@ -351,6 +524,10 @@ export default async function render(root) {
       paintTable();
       toast({ title: existing ? "Product updated" : "Product created" }, { tone: "success" });
     } catch (error) {
+      if (error?.code === "23505") {
+        toast({ title: "SKU already used", message: "Another product in your catalogue has this SKU. Use a different one, or leave it blank." }, { tone: "warning" });
+        return;
+      }
       toastError(normalizeError(error));
     }
   }

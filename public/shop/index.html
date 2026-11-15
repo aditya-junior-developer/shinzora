@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Product · Shinzora</title>
+  <meta name="description" content="A product published from a Shinzora store." />
+  <meta name="robots" content="index, follow" />
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
+  <script src="/js/config/runtime.js" defer></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #08060d; color: #f5f3ff;
+      font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+    .shop-card { display: grid; gap: 28px; grid-template-columns: 1fr; }
+    @media (min-width: 760px) { .shop-card { grid-template-columns: 1.1fr 1fr; align-items: start; } }
+    .gallery img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 16px; background: #141026; display: block; }
+    .thumbs { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .thumbs button { width: 64px; height: 64px; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: #141026; cursor: pointer; }
+    .thumbs button[aria-current="true"] { border-color: #a855f7; }
+    .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    h1 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; }
+    .price { font-size: 22px; font-weight: 600; color: #e9d5ff; margin: 0 0 12px; }
+    .stock { display: inline-block; font-size: 13px; padding: 4px 10px; border-radius: 999px; margin-bottom: 16px; }
+    .stock.in { background: rgba(34,197,94,.14); color: #86efac; }
+    .stock.out { background: rgba(248,113,113,.14); color: #fca5a5; }
+    .desc { white-space: pre-wrap; color: rgba(245,243,255,.82); margin: 0; }
+    .state { text-align: center; padding: 80px 16px; color: rgba(245,243,255,.7); }
+    .brand { font-size: 12px; color: rgba(245,243,255,.5); margin-top: 40px; }
+    .brand a { color: #c4b5fd; text-decoration: none; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <p id="state" class="state">Loading…</p>
+    <article id="product" class="shop-card" hidden>
+      <div class="gallery">
+        <img id="hero" alt="" />
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+      <div>
+        <h1 id="name"></h1>
+        <p class="price" id="price"></p>
+        <span class="stock" id="stock"></span>
+        <p class="desc" id="desc"></p>
+      </div>
+    </article>
+    <p class="brand">Sold through <a href="/">Shinzora</a></p>
+  </main>
+
+  <script type="module">
+    /* Reads only the public_store_products view, which the database limits to
+       products the owner has published and set Active. Nothing here writes. */
+    import { env } from "/js/config/env.js";
+
+    const $ = (id) => document.getElementById(id);
+    const show = (message) => {
+      $("state").textContent = message;
+      $("state").hidden = false;
+      $("product").hidden = true;
+    };
+
+    const slug = new URLSearchParams(location.search).get("p")?.trim().toLowerCase() || "";
+    if (!/^[a-z0-9-]{1,120}$/.test(slug)) {
+      show("This product is not published, or the address is wrong.");
+    } else if (!env.supabaseUrl || !env.supabaseKey) {
+      show("This store is not connected yet.");
+    } else {
+      load(slug);
+    }
+
+    async function load(value) {
+      try {
+        const url = `${env.supabaseUrl}/rest/v1/public_store_products?slug=eq.${encodeURIComponent(value)}&select=slug,name,description,price,currency,in_stock,image_urls&limit=1`;
+        const response = await fetch(url, {
+          headers: { apikey: env.supabaseKey, authorization: `Bearer ${env.supabaseKey}`, accept: "application/json" }
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const rows = await response.json();
+        const item = Array.isArray(rows) ? rows[0] : null;
+        if (!item) return show("This product is not published, or the address is wrong.");
+        render(item);
+      } catch {
+        show("The product could not be loaded. Try again in a moment.");
+      }
+    }
+
+    function render(item) {
+      const photos = Array.isArray(item.image_urls) ? item.image_urls.filter((url) => /^https:\/\//.test(url)) : [];
+      document.title = `${item.name} · Shinzora`;
+      $("name").textContent = item.name || "Product";
+      $("price").textContent = new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: item.currency || "INR"
+      }).format(Number(item.price || 0) / 100);
+      $("stock").textContent = item.in_stock ? "In stock" : "Out of stock";
+      $("stock").className = `stock ${item.in_stock ? "in" : "out"}`;
+      $("desc").textContent = item.description || "";
+
+      const hero = $("hero");
+      hero.alt = item.name || "";
+      hero.src = photos[0] || "";
+      hero.hidden = !photos.length;
+
+      const thumbs = $("thumbs");
+      thumbs.textContent = "";
+      if (photos.length > 1) {
+        photos.forEach((url, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.setAttribute("aria-current", index === 0 ? "true" : "false");
+          const img = document.createElement("img");
+          img.src = url;
+          img.alt = "";
+          img.loading = "lazy";
+          button.appendChild(img);
+          button.addEventListener("click", () => {
+            hero.src = url;
+            thumbs.querySelectorAll("button").forEach((node) => node.setAttribute("aria-current", String(node === button)));
+          });
+          thumbs.appendChild(button);
+        });
+      }
+
+      $("state").hidden = true;
+      $("product").hidden = false;
+    }
+  </script>
+</body>
+</html>

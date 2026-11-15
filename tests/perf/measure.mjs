@@ -76,7 +76,30 @@ const PAGES = [
   { id: "app-overview", url: "/app/", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title" },
   { id: "app-messages", url: "/app/?view=messages", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title" },
   { id: "app-builder", url: "/app/?view=website-builder", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
-  { id: "app-billing", url: "/app/?view=billing", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title" }
+  { id: "app-billing", url: "/app/?view=billing", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title" },
+  { id: "signup", url: "/auth/signup/", signedIn: false, interact: null, ready: "form, input" },
+  { id: "app-assistant", url: "/app/?view=assistant", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-app-maker", url: "/app/?view=app-builder", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-inventory", url: "/app/?view=inventory", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-orders", url: "/app/?view=orders", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-customers", url: "/app/?view=customers", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-store", url: "/app/?view=store", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-marketing", url: "/app/?view=marketing", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-support", url: "/app/?view=support", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-meeting", url: "/app/?view=meeting", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-requests", url: "/app/?view=requests", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-notifications", url: "/app/?view=notifications", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-analytics", url: "/app/?view=analytics", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-settings", url: "/app/?view=settings", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-projects", url: "/app/?view=projects", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-marketplace", url: "/app/?view=marketplace", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-team", url: "/app/?view=team", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-domains", url: "/app/?view=domains", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-freelancer", url: "/app/?view=freelancer", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-find-team", url: "/app/?view=find-team", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-community", url: "/app/?view=community", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-portfolio", url: "/app/?view=portfolio", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" },
+  { id: "app-invitations", url: "/app/?view=invitations", signedIn: true, interact: "#sidebar-nav [data-nav]", ready: ".page-title, h1, h2" }
 ].filter((page) => !ONLY || ONLY.split(",").includes(page.id));
 
 /* ------------------------------------------------------- the page probe */

@@ -37,7 +37,8 @@ export default async function render(root) {
   const paid = orderRows.filter((row) => ["paid", "processing", "shipped", "delivered", "fulfilled"].includes(row.status));
   const revenue = paid.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
   const activeProducts = productRows.filter((row) => (row.status || "active") === "active");
-  const lowStock = productRows.filter((row) => Number(row.stock) <= 5);
+  /* Each product sets its own low-stock level; 5 is the fallback for older rows. */
+  const lowStock = productRows.filter((row) => Number(row.stock) <= Number(row.low_stock_threshold ?? 5));
 
   const checklist = [
     { label: "Storefront project created", done: Boolean(projectRows.some((p) => p.type === "store")), href: "/app/?view=website-builder" },
@@ -141,7 +142,7 @@ export default async function render(root) {
                           <div style="font-size:var(--fs-sm);color:var(--text)">${esc(row.name)}</div>
                           <div class="dim" style="font-size:var(--fs-2xs)">${esc(row.sku || "no SKU")} · ${esc(money(row.price, row.currency || "INR"))}</div>
                         </div>
-                        <span class="badge ${Number(row.stock) <= 0 ? "badge-danger" : Number(row.stock) <= 5 ? "badge-warn" : "badge-ok"}">${row.stock} left</span>
+                        <span class="badge ${Number(row.stock) <= 0 ? "badge-danger" : Number(row.stock) <= Number(row.low_stock_threshold ?? 5) ? "badge-warn" : "badge-ok"}">${row.stock} left</span>
                       </div>`
                     )
                     .join("")}</div>`
