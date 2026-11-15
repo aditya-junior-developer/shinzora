@@ -143,7 +143,10 @@ export const APPLICATION_TABLES = [
   "community_groups", "community_group_members", "community_mentions",
   "group_polls", "group_poll_votes",
   "notification_preferences", "push_subscriptions", "call_invites",
-  "call_responses", "meetings", "meeting_attendees"
+  "call_responses", "meetings", "meeting_attendees",
+  /* 0053: which four-hour reminders were already sent. Without it a restore
+     could send the same reminder twice. */
+  "notification_reminder_log"
 ];
 
 /* Restoring these writes provider credentials back into the database, so the

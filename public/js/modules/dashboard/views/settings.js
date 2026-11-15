@@ -20,6 +20,11 @@ import {
   bindNotificationSettings,
   loadPrefs
 } from "../../../ui/notify.js";
+import {
+  loadReminderSettings,
+  reminderSettingsMarkup,
+  bindReminderSettings
+} from "../../../ui/notify-reminders.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
 import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
@@ -837,10 +842,19 @@ export default async function render(root) {
       } catch {
         groups = [];
       }
-      slot.innerHTML = notificationSettingsMarkup(groups);
+      /* Reminders and categories are stored with the account too. If they cannot
+         be read, the group card still works and the reminder card says so. */
+      let reminders = null;
+      try {
+        reminders = await loadReminderSettings();
+      } catch {
+        reminders = null;
+      }
+      slot.innerHTML = notificationSettingsMarkup(groups) + reminderSettingsMarkup(reminders);
       bindNotificationSettings(slot, {
         refresh: () => hydrateNotificationSettings().catch(() => {})
       });
+      bindReminderSettings(slot);
     } catch (error) {
       slot.innerHTML = `<div class="card"><div class="card-body"><p class="muted" style="font-size:var(--fs-xs)">
         ${esc(normalizeError(error).message || "Group notification settings could not be loaded.")}

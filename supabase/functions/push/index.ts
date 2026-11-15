@@ -52,6 +52,18 @@ type NotificationRow = {
   meta: Record<string, unknown> | null;
 };
 
+type PrefRow = {
+  group_messages: boolean;
+  group_mentions: boolean;
+  push_enabled: boolean;
+  reminders_enabled: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_start: number;
+  quiet_end: number;
+  timezone: string;
+  categories: Record<string, boolean> | null;
+};
+
 type SubscriptionRow = {
   id: string;
   endpoint: string;
@@ -102,9 +114,11 @@ Deno.serve(async (req) => {
   /* ---------------------------------------------------------------- prefs */
   const { data: prefs } = await db
     .from("notification_preferences")
-    .select("group_messages,group_mentions,push_enabled")
+    .select(
+      "group_messages,group_mentions,push_enabled,reminders_enabled,quiet_hours_enabled,quiet_start,quiet_end,timezone,categories"
+    )
     .eq("user_id", row.user_id)
-    .maybeSingle<{ group_messages: boolean; group_mentions: boolean; push_enabled: boolean }>();
+    .maybeSingle<PrefRow>();
 
   if (prefs && prefs.push_enabled === false) {
     return json({ ok: true, sent: 0, skipped: "push_disabled" });
@@ -114,6 +128,30 @@ Deno.serve(async (req) => {
   const groupId = typeof meta.groupId === "string" ? meta.groupId : null;
   const kind = typeof meta.kind === "string" ? meta.kind : "";
   const isMention = kind === "mention" || kind === "everyone";
+
+  /* A category the member has switched off is not pushed. The in-app notice is
+     stored either way, so nothing is lost; only the closed-tab alert is held back. */
+  if (prefs?.categories && row.type && prefs.categories[row.type] === false) {
+    return json({ ok: true, sent: 0, skipped: "category_off" });
+  }
+
+  /* Reminders are an opt-out. They are checked again here, not only in the
+     database that queued them, so a reminder queued before the member changed
+     their mind is still not pushed. */
+  if (kind === "reminder") {
+    if (prefs && prefs.reminders_enabled === false) {
+      return json({ ok: true, sent: 0, skipped: "reminders_off" });
+    }
+    if (prefs?.quiet_hours_enabled) {
+      const { data: quiet } = await db.rpc("sz_in_quiet_hours", {
+        p_tz: prefs.timezone || "UTC",
+        p_start: prefs.quiet_start ?? 22,
+        p_end: prefs.quiet_end ?? 8,
+        p_at: new Date().toISOString()
+      });
+      if (quiet === true) return json({ ok: true, sent: 0, skipped: "quiet_hours" });
+    }
+  }
 
   if (groupId) {
     if (isMention && prefs && prefs.group_mentions === false) {

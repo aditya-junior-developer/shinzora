@@ -17,6 +17,7 @@ import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 import { initNotifications, presentNotification } from "../../ui/notify.js";
+import { mountNotificationOnboarding } from "../../ui/notify-reminders.js";
 import { registerIncomingCalls } from "../messaging/incoming-call.js";
 import { openLiveChannel, closeLiveChannel } from "../../lib/live-channel.js";
 
@@ -613,6 +614,8 @@ export function subscribeNotifications() {
      subscription. Nothing here asks for browser permission — that only happens
      when somebody presses "Turn on" in settings. */
   initNotifications({ onChange: () => refreshNotificationBadge() }).catch(() => {});
+  /* The permission card waits eight seconds and asks only when the browser has never been asked. */
+  mountNotificationOnboarding();
   /* Rings can arrive on any page, so the answer handler is registered with the
      notification layer here rather than inside the messages view. */
   registerIncomingCalls();
