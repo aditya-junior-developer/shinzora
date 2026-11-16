@@ -107,8 +107,8 @@ for (const [file, label] of SURFACES) {
 
 test("components.avatar takes a photo URL", () => {
   const source = read("public/js/modules/dashboard/components.js");
-  assert.match(source, /export function avatar\(name, email, size = "", avatarUrl = null, fit = "cover"\)/);
-  assert.match(source, /avatarMarkup\(\{ name, email, avatarUrl, size, fit \}\)/);
+  assert.match(source, /export function avatar\(name, email, size = "", avatarUrl = null, fit = "cover", userId = ""\)/);
+  assert.match(source, /avatarMarkup\(\{ name, email, avatarUrl, size, fit, userId \}\)/);
 });
 
 test("the shared renderer is one module, not a copy per screen", () => {

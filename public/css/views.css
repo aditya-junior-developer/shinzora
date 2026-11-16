@@ -4811,6 +4811,21 @@ html {
   opacity: 0.28;
 }
 
+/* A wallpaper has to be seen. The dashboard shell, main column and sidebar
+   were opaque, so the layer was painted under them and never showed (brief 3).
+   While a wallpaper is on, those surfaces step back: the shell and main column
+   are clear, the sidebar and cards are translucent, and the layer is stronger. */
+:root[data-wallpaper="on"] #theme-wallpaper { opacity: 0.6; }
+:root[data-wallpaper="on"] .app-shell,
+:root[data-wallpaper="on"] .app-main { background: transparent; }
+:root[data-wallpaper="on"] .app-sidebar {
+  background: color-mix(in srgb, var(--void) 70%, transparent);
+  backdrop-filter: blur(10px);
+}
+:root[data-wallpaper="on"] .card {
+  background: color-mix(in srgb, var(--panel) 62%, transparent);
+}
+
 .wallpaper-collection {
   display: grid;
   gap: var(--s-3);
@@ -5392,3 +5407,16 @@ html {
 
 /* Admin: the ring payment ledger, shown under the premium orders. */
 .ring-ledger-cell { font-size: var(--fs-xs); }
+
+/* Groups, Channels and Messages are separate (brief 8). A rail section that
+   belongs to the other surface is hidden with the attribute; the rule below
+   keeps the section's own display from overriding it. */
+.hub-rail-section[hidden] { display: none !important; }
+
+/* Card titles that open with an icon keep it on the same line as the words. */
+.card-title > svg,
+.card-title > .icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 2px;
+}

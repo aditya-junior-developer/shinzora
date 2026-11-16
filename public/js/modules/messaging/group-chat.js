@@ -155,22 +155,18 @@ export default async function mountGroups(root, options = {}) {
   /* Community is the same hub with only its public rooms in the rail: groups
      live under Messages, and a second copy of them here was two places to look
      for the same thing. */
-  const withGroups = options.groups !== false;
+  /* Groups, Channels and Messages are three separate places. Messages mounts the
+     hub with groups only; Community mounts it with channels only (groups: false).
+     The section that does not belong is hidden, never removed, so the same
+     event wiring serves both. */
+  const withChannels = options.groups === false;
+  const withGroups = !withChannels;
   const wrap = document.createElement("div");
-  wrap.className = `chat group-chat hub${withGroups ? "" : " hub-channels-only"}`;
-  wrap.dataset.seg = withGroups ? "groups" : "channels";
+  wrap.className = `chat group-chat hub${withChannels ? " hub-channels-only" : ""}`;
+  wrap.dataset.seg = withChannels ? "channels" : "groups";
   wrap.innerHTML = `
     <aside class="chat-pane chat-pane-list hub-rail">
-      ${
-        withGroups
-          ? `<div class="hub-rail-seg" role="tablist" aria-label="Groups or channels">
-        <button class="hub-rail-seg-btn is-active" type="button" role="tab" id="grp-seg-groups" data-seg="groups" aria-selected="true">${icon("users", { size: 14 })}<span>Groups</span></button>
-        <button class="hub-rail-seg-btn" type="button" role="tab" id="grp-seg-channels" data-seg="channels" aria-selected="false">${icon("message-square", { size: 14 })}<span>Channels</span></button>
-      </div>`
-          : ""
-      }
-
-      <div class="hub-rail-section hub-rail-channels" data-rail="channels">
+      <div class="hub-rail-section hub-rail-channels" data-rail="channels"${withChannels ? "" : " hidden"}>
         <div class="hub-rail-head">
           <div class="chat-pane-title">${icon("message-square", { size: 15 })}<span>Channels</span></div>
         </div>
@@ -203,8 +199,12 @@ export default async function mountGroups(root, options = {}) {
         <div class="grp-head-lead">
           <span class="grp-head-avatar" id="grp-avatar" hidden></span>
           <div class="dm-head-identity">
-            <div class="chat-thread-title">Groups</div>
-            <div class="chat-thread-sub">Pick a group, or start one. Only members can read what is posted here.</div>
+            <div class="chat-thread-title">${withChannels ? "Channels" : "Groups"}</div>
+            <div class="chat-thread-sub">${
+              withChannels
+                ? "Pick a channel to read it. Channels are public rooms for everyone."
+                : "Pick a group, or start one. Only members can read what is posted here."
+            }</div>
           </div>
         </div>
         <div class="pane-head-actions">
@@ -247,7 +247,7 @@ export default async function mountGroups(root, options = {}) {
       </div>
 
       <div class="chat-messages" id="grp-messages">
-        <div class="chat-empty-line">No group open.</div>
+        <div class="chat-empty-line">${withChannels ? "No channel open." : "No group open."}</div>
       </div>
 
       <form class="chat-compose hub-compose" id="grp-compose" hidden>
@@ -506,93 +506,15 @@ export default async function mountGroups(root, options = {}) {
   /** Nothing is open. The rail holds the choice; no chat is opened for the member. */
   function paintPick() {
     active = null;
-    contactGroup = null;
     view = "group";
     activeChannel = null;
     paintHead(null);
     formEl.hidden = true;
     messagesEl.innerHTML = `<div class="grp-empty grp-pick">
         <span class="grp-empty-mark">${icon("messages-square", { size: 22 })}</span>
-        <h3 class="grp-empty-title">Pick a channel or group</h3>
+        <h3 class="grp-empty-title">${withChannels ? "Pick a channel" : "Pick a group"}</h3>
         <p class="grp-empty-desc">Choose one from the list to read it. Nothing opens until you choose.</p>
       </div>`;
-  }
-
-  /* Selecting a group shows its contact number, not its chat (0063). The chat
-     opens only from the "Open chat" button. The owner or an admin can set or
-     clear the number here. */
-  let contactGroup = null;
-
-  async function openContact(id) {
-    const row = groups.find((g) => g.id === id);
-    if (!row) return;
-    stopLiveMessages();
-    active = null;
-    contactGroup = id;
-    view = "group";
-    activeChannel = null;
-    detail = null;
-    paintHead(null);
-    formEl.hidden = true;
-    messagesEl.innerHTML = `<div class="grp-contact"><p class="grp-contact-loading">Loading contact…</p></div>`;
-
-    let phone = null;
-    try {
-      phone = (await rpc("group_contact", { p_group: id })) || null;
-    } catch (error) {
-      if (contactGroup !== id) return;
-      messagesEl.innerHTML = `<div class="chat-empty-line">${esc(error.message || "The contact number could not be loaded.")}</div>`;
-      return;
-    }
-    if (contactGroup !== id) return;
-
-    const canManage = row.role === "owner" || row.role === "admin";
-    messagesEl.innerHTML = contactMarkup(row, phone, canManage);
-
-    qs("[data-open-chat]", messagesEl)?.addEventListener("click", () => open(id));
-
-    const form = qs("[data-contact-form]", messagesEl);
-    if (form) {
-      on(form, "submit", async (event) => {
-        event.preventDefault();
-        const field = qs("#grp-contact-phone", form);
-        const errorEl = qs("[data-contact-error]", form);
-        errorEl.textContent = "";
-        try {
-          await rpc("group_set_contact", { p_group: id, p_phone: field.value });
-          toast({ title: field.value.trim() ? "Contact number saved" : "Contact number removed" }, { tone: "success" });
-          await loadList();
-          if (contactGroup === id) await openContact(id);
-        } catch (error) {
-          errorEl.textContent = error.message || "The number could not be saved.";
-        }
-      });
-    }
-  }
-
-  function contactMarkup(row, phone, canManage) {
-    const number = phone
-      ? `<a class="grp-contact-number" href="tel:${esc(phone)}">${esc(phone)}</a>`
-      : `<p class="grp-contact-none">No contact number has been set for this group yet.</p>`;
-    return `<section class="grp-contact" aria-labelledby="grp-contact-title">
-        <span class="grp-empty-mark">${icon("phone", { size: 22 })}</span>
-        <h3 class="grp-empty-title" id="grp-contact-title">${esc(row.name)}</h3>
-        <p class="grp-empty-desc">Group contact number</p>
-        ${number}
-        <button class="btn btn-primary" type="button" data-open-chat>${icon("messages-square", { size: 14 })}<span>Open chat</span></button>
-        ${
-          canManage
-            ? `<form class="grp-contact-form" data-contact-form novalidate>
-                <label class="field-label" for="grp-contact-phone">Contact number</label>
-                <input class="input" id="grp-contact-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24"
-                  value="${esc(phone || "")}" placeholder="+91 98765 43210" />
-                <span class="field-hint">Digits, optionally starting with +. Members of this group see it. Leave empty to remove it.</span>
-                <div class="field-error" data-contact-error role="alert"></div>
-                <div class="card-actions"><button class="btn btn-secondary" type="submit">Save number</button></div>
-              </form>`
-            : ""
-        }
-      </section>`;
   }
 
   /** The first thing a new member sees: one sentence and one button. */
@@ -618,8 +540,11 @@ export default async function mountGroups(root, options = {}) {
     const sub = qs(".chat-thread-sub", headEl);
     if (!group) {
       qs(".grp-head-avatar", wrap).hidden = true;
-      if (title) title.textContent = "Groups";
-      if (sub) sub.textContent = "Pick a group, or start one. Only members can read what is posted here.";
+      if (title) title.textContent = withChannels ? "Channels" : "Groups";
+      if (sub)
+        sub.textContent = withChannels
+          ? "Pick a channel to read it. Channels are public rooms for everyone."
+          : "Pick a group, or start one. Only members can read what is posted here.";
       infoBtn.hidden = true;
       qs("#grp-call", wrap).hidden = true;
       qs("#grp-call-voice", wrap).hidden = true;
@@ -1846,7 +1771,7 @@ function insertAtCaret(field, text, start, end) {
             detail = null;
             paintHead(null);
             formEl.hidden = true;
-            messagesEl.innerHTML = `<div class="chat-empty-line">No group open.</div>`;
+            messagesEl.innerHTML = `<div class="chat-empty-line">${withChannels ? "No channel open." : "No group open."}</div>`;
             await loadList();
             if (groups.length) paintPick();
           } catch (error) {
@@ -2005,7 +1930,7 @@ function insertAtCaret(field, text, start, end) {
   }
 
   /* ------------------------------------------------------------------ events */
-  delegate(listEl, "click", "[data-group]", (_event, button) => openContact(button.getAttribute("data-group")));
+  delegate(listEl, "click", "[data-group]", (_event, button) => open(button.getAttribute("data-group")));
   delegate(channelsEl, "click", "[data-channel]", (_event, button) =>
     openChannel(button.getAttribute("data-channel"))
   );
@@ -2052,20 +1977,6 @@ function insertAtCaret(field, text, start, end) {
 
   on(qs("#grp-new", wrap), "click", createGroup);
 
-  /* Phone only: Groups and Channels are separate lists, one at a time, the way
-     the rest of Messages works. Desktop shows both in the rail and ignores this. */
-  const segButtons = [...wrap.querySelectorAll("[data-seg]")];
-  const setRailSegment = (name) => {
-    wrap.dataset.seg = name;
-    for (const button of segButtons) {
-      const on_ = button.dataset.seg === name;
-      button.classList.toggle("is-active", on_);
-      button.setAttribute("aria-selected", on_ ? "true" : "false");
-    }
-  };
-  for (const button of segButtons) {
-    button.addEventListener("click", () => setRailSegment(button.dataset.seg));
-  }
   delegate(messagesEl, "click", "[data-new-group]", createGroup);
 
   /* ------------------------------------------------------------------ pin */

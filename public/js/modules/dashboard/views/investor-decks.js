@@ -125,6 +125,7 @@ async function paintList({ fresh = false } = {}) {
     .order("created_at", { ascending: false })
     .limit(20);
   const expertRequests = expertRows || [];
+  const directory = await loadDirectory();
 
   root.innerHTML = `
     ${pageHead({
@@ -134,6 +135,8 @@ async function paintList({ fresh = false } = {}) {
     })}
     <div id="deck-builder" ${fresh ? "" : "hidden"}>${builderMarkup()}</div>
     ${expertRequestsMarkup(expertRequests)}
+    ${investorPanelMarkup(directory)}
+    ${summaryMarkup()}
     ${
       (decks || []).length
         ? `<div class="deck-grid">${(decks || []).map(deckCard).join("")}</div>`
@@ -147,7 +150,98 @@ async function paintList({ fresh = false } = {}) {
     <p class="field-hint deck-note">${esc(SHARE_NOTE)}</p>`;
 
   qsa("[data-deck-new]", root).forEach((btn) => on(btn, "click", () => toggleBuilder(true)));
+  qsa("[data-summary]", root).forEach((btn) => on(btn, "click", () => downloadSummary(btn, btn.getAttribute("data-summary"))));
   bindBuilder();
+}
+
+/* ------------------------------------------------- investors and summary */
+
+/** Investors an owner can pitch: the count and each handle. Nothing else about them. */
+async function loadDirectory() {
+  const { data, error } = await sb.rpc("investor_directory");
+  if (error) return { count: 0, investors: [], error: normalizeError(error) };
+  return {
+    count: Number(data?.count || 0),
+    investors: Array.isArray(data?.investors) ? data.investors : [],
+    error: null
+  };
+}
+
+function investorPanelMarkup(directory) {
+  const n = directory.count;
+  const title = directory.error
+    ? "Investors could not be loaded"
+    : `${n} investor${n === 1 ? "" : "s"} available`;
+  const desc = directory.error
+    ? esc(directory.error.message || "Try again in a moment.")
+    : n
+      ? "Open a ready deck and share it with an investor from its Sharing panel. They open it in their own account."
+      : "No investor account has joined yet. Once one has, they appear here.";
+  const names = directory.investors.slice(0, 8).map((i) => `@${esc(i.username)}`).join(" · ");
+  return `<section class="card deck-investors" aria-labelledby="deck-investors-title">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title" id="deck-investors-title">${icon("users-round", { size: 15 })} ${esc(title)}</h2>
+        <p class="field-hint">${desc}</p>
+        ${names ? `<p class="field-hint deck-investors-list">${names}${directory.investors.length > 8 ? " …" : ""}</p>` : ""}
+      </div>
+    </div>
+  </section>`;
+}
+
+function summaryMarkup() {
+  return `<section class="card deck-summary" aria-labelledby="deck-summary-title">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title" id="deck-summary-title">${icon("file-text", { size: 15 })} Business summary</h2>
+        <p class="field-hint">A report on the parts of your business you tick below. The AI writes it from those facts only. Free.</p>
+      </div>
+    </div>
+    <fieldset class="deck-sections" id="summary-sections" data-field="summary-sections">
+      <legend class="field-label">Parts of your business the summary may use</legend>
+      ${DECK_SECTIONS.map(
+        (s) => `<label class="deck-section"><input type="checkbox" name="summary-section" value="${s.id}" ${s.id === "business" ? "checked" : ""} />
+          <span><strong>${esc(s.label)}</strong><span class="field-hint">${esc(s.desc)}</span></span></label>`
+      ).join("")}
+      <span class="field-hint">Nothing else is read. The summary uses only what you tick.</span>
+    </fieldset>
+    <div class="card-actions">
+      <button class="btn btn-secondary btn-sm" type="button" data-summary="pdf">${icon("download", { size: 13 })} Download PDF</button>
+      <button class="btn btn-secondary btn-sm" type="button" data-summary="pptx">${icon("layers", { size: 13 })} Download PowerPoint</button>
+    </div>
+    <p class="field-hint" data-summary-status role="status" aria-live="polite"></p>
+  </section>`;
+}
+
+async function downloadSummary(button, format) {
+  const status = qs("[data-summary-status]", root);
+  const label = format === "pdf" ? "PDF" : "PowerPoint";
+  const sections = qsa('input[name="summary-section"]:checked', root).map((i) => i.value);
+  if (!sections.length) {
+    if (status) status.textContent = "Tick at least one part of your business for the summary to use.";
+    return;
+  }
+  button.disabled = true;
+  if (status) status.textContent = `Writing your ${label} summary…`;
+  try {
+    const blob = await api.deck.summary({ format, sections });
+    const type =
+      format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    const url = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob], { type }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `business-summary.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (status) status.textContent = `Your ${label} summary has downloaded.`;
+  } catch (error) {
+    const normalized = normalizeError(error);
+    if (status) status.textContent = normalized.message || `The ${label} summary could not be created.`;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function deckCard(deck) {
@@ -308,6 +402,8 @@ function bindBuilder() {
       if (normalized.code === "owner_only") error.textContent = "Only business owners can build an investor deck.";
     } finally {
       submit.disabled = false;
+      /* A failed draft must not leave the button saying "Drafting…". */
+      syncMode();
     }
   });
 }
@@ -387,7 +483,7 @@ async function paintEditor(id, { paid = null } = {}) {
     return;
   }
 
-  const shares = await loadShares(id);
+  const [shares, directory] = await Promise.all([loadShares(id), loadDirectory()]);
   const draft = {
     id: deck.id,
     title: deck.title,
@@ -429,7 +525,7 @@ async function paintEditor(id, { paid = null } = {}) {
 
   renderSlides(draft);
   renderExport(draft);
-  renderSharing(draft, shares);
+  renderSharing(draft, shares, directory);
   bindEditor(draft);
 }
 
@@ -513,7 +609,7 @@ function renderExport(draft) {
     <button class="btn btn-secondary btn-sm" type="button" data-export>${icon("download", { size: 13 })} ${isAi ? "Download PDF" : `Export PDF · Rs ${DECK_PDF_RUPEES}`}</button>`;
 }
 
-function renderSharing(draft, shares) {
+function renderSharing(draft, shares, directory = { count: 0, investors: [], error: null }) {
   const host = qs("#deck-sharing", root);
   if (!host) return;
   if (draft.status !== "ready") {
@@ -523,8 +619,29 @@ function renderSharing(draft, shares) {
     return;
   }
   const active = shares.filter((s) => !s.revoked_at);
+  const shared = new Set(active.map((s) => s.investor?.username).filter(Boolean));
+  const pitchable = directory.investors.filter((i) => !shared.has(i.username));
   host.innerHTML = `
     <h2 class="card-title">${icon("users-round", { size: 15 })} Share with an investor</h2>
+    <p class="field-hint" data-pitch-count>${
+      directory.error
+        ? esc(directory.error.message || "Investors could not be loaded.")
+        : `${pitchable.length} investor${pitchable.length === 1 ? "" : "s"} available to pitch.`
+    }</p>
+    ${
+      pitchable.length
+        ? `<ul class="deck-shares deck-pitch-list" aria-label="Investors available to pitch">
+            ${pitchable
+              .map(
+                (i) => `<li class="deck-share">
+                  <span>${esc(i.name)} <span class="field-hint">@${esc(i.username)}</span></span>
+                  <button class="btn btn-primary btn-sm" type="button" data-pitch="${esc(i.username)}">${icon("send", { size: 13 })} Pitch</button>
+                </li>`
+              )
+              .join("")}
+          </ul>`
+        : ""
+    }
     <form id="deck-share-form" class="deck-share-form" novalidate>
       <div class="field" data-field="investor">
         <label class="field-label" for="deck-share-handle">Their handle</label>
@@ -552,8 +669,8 @@ function renderSharing(draft, shares) {
 }
 
 async function refreshSharing(draft) {
-  const shares = await loadShares(draft.id);
-  renderSharing(draft, shares);
+  const [shares, directory] = await Promise.all([loadShares(draft.id), loadDirectory()]);
+  renderSharing(draft, shares, directory);
 }
 
 function bindEditor(draft) {
@@ -577,6 +694,20 @@ function bindEditor(draft) {
       await refreshSharing(draft);
     } catch (err) {
       error.textContent = normalizeError(err).message || "The deck could not be shared.";
+    }
+  });
+
+  delegate(editor, "click", "[data-pitch]", async (_event, button) => {
+    const username = button.getAttribute("data-pitch");
+    button.disabled = true;
+    try {
+      const { error: rpcError } = await sb.rpc("deck_share", { p_deck: draft.id, p_username: username });
+      if (rpcError) throw normalizeError(rpcError);
+      toast({ title: "Pitched", message: `@${username} can now open this deck.` }, { tone: "success" });
+      await refreshSharing(draft);
+    } catch (err) {
+      toastError(err);
+      button.disabled = false;
     }
   });
 
@@ -634,7 +765,7 @@ function bindEditor(draft) {
     draft.status = nextStatus;
     button.textContent = nextStatus === "ready" ? "Back to draft" : "Mark ready to share";
     qs(".deck-status-row", root).innerHTML = `${modeChip(draft)} ${statusChip(draft)}`;
-    renderSharing(draft, await loadShares(draft.id));
+    await refreshSharing(draft);
     toast({ title: nextStatus === "ready" ? "Ready to share" : "Back to draft" }, { tone: "success" });
   });
 

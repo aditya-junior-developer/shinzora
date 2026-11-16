@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Shinzora — Request for Extra Service
+   Shinzora — Social Media & Ads
    --------------------------------------------------------------------------
    This is a request desk, not an advertising switchboard.
 
@@ -93,7 +93,7 @@ export default async function render(root) {
     view.accounts = accountRows.data || [];
     view.campaigns = campaignRows.data || [];
   } catch (error) {
-    root.innerHTML = `${pageHead({ title: "Request for Extra Service" })}${setupNotice(error, "Requests")}`;
+    root.innerHTML = `${pageHead({ title: "Social Media & Ads" })}${setupNotice(error, "Requests")}`;
     return;
   }
 
@@ -113,9 +113,9 @@ function paint(root) {
 
   root.innerHTML = `
     ${pageHead({
-      title: "Request for Extra Service",
-      desc: "Ask the Shinzora team to plan, set up and run advertising for your business. A request is reviewed by a person before anything happens.",
-      actions: `<button class="btn btn-primary btn-sm" id="new-request">${icon("plus", { size: 14 })}New request</button>`
+      title: "Social Media & Ads",
+      desc: "Connect your Instagram, Facebook and other accounts, request an ad campaign, and see where your requests stand. A person reviews every request before anything happens.",
+      actions: `<button class="btn btn-primary btn-sm" id="new-request">${icon("plus", { size: 14 })}New campaign request</button>`
     })}
 
     <div class="alert alert-info" style="margin-bottom:var(--s-4)">
@@ -128,16 +128,19 @@ function paint(root) {
       ${statCard({ label: "Open requests", value: String(open.length), iconName: "inbox", foot: "Waiting or in progress" })}
       ${statCard({ label: "Completed", value: String(done.length), iconName: "check-check", foot: "Finished work" })}
       ${statCard({ label: "Budget requested", value: money(Math.round(budget / 100)), iconName: "indian-rupee", foot: "Across submitted requests" })}
-      ${statCard({ label: "Accounts", value: String(view.accounts.length), iconName: "link", foot: "Submitted for verification" })}
+      ${statCard({ label: "Social accounts", value: String(view.accounts.length), iconName: "link", foot: "Connected or waiting for verification" })}
     </div>
 
-    ${view.step ? wizard() : list(root)}
-
-    <div class="card" style="margin-top:var(--s-4)">
-      <div class="card-head"><div class="card-title">Connected accounts</div>
-        <button class="btn btn-secondary btn-sm" id="manage-accounts">${icon("plus", { size: 13 })}Add an account</button></div>
+    <div class="card" style="margin-bottom:var(--s-4)">
+      <div class="card-head"><div class="card-title">Social accounts</div>
+        <button class="btn btn-secondary btn-sm" id="manage-accounts">${icon("plus", { size: 13 })}Connect an account</button></div>
       <div class="card-body" id="accounts-body">${accountsMarkup()}</div>
     </div>
+
+    ${analyticsMarkup(open, done)}
+
+    <h2 class="section-title" style="margin:var(--s-5) 0 var(--s-3)">Campaign requests</h2>
+    ${view.step ? wizard() : list(root)}
 
     ${
       view.campaigns.length
@@ -161,6 +164,38 @@ function paint(root) {
   `;
 
   wire(root);
+}
+
+/* ---------------------------------------------------------------- analytics */
+
+/* Only what the database holds: the accounts this member connected and the
+   requests they sent. Reach, clicks and engagement come from the platforms, and
+   reading them needs an official connection that this deployment does not have,
+   so no such figure is shown or invented here. */
+function analyticsMarkup(open, done) {
+  const byChannel = (id) => view.accounts.filter((a) => a.channel === id);
+  const verified = view.accounts.filter((a) => a.status === "verified").length;
+  const instagram = byChannel("instagram").length;
+  const facebook = byChannel("facebook").length;
+  const other = view.accounts.length - instagram - facebook;
+  const sent = view.requests.filter((row) => row.status !== "draft").length;
+  return `<div class="card" style="margin-bottom:var(--s-4)">
+    <div class="card-head"><div class="card-title">Social-media analytics</div><span class="card-sub">From your own records</span></div>
+    <div class="card-body stack gap-3">
+      <div class="grid-4">
+        ${statCard({ label: "Instagram", value: String(instagram), iconName: "instagram", foot: "Accounts connected" })}
+        ${statCard({ label: "Facebook", value: String(facebook), iconName: "share-2", foot: "Pages connected" })}
+        ${statCard({ label: "Other channels", value: String(other), iconName: "link", foot: "WhatsApp, email, Google Ads" })}
+        ${statCard({ label: "Verified", value: `${verified} of ${view.accounts.length || 0}`, iconName: "shield-check", foot: "Accounts checked by Shinzora" })}
+      </div>
+      <div class="row gap-4 wrap" style="font-size:var(--fs-xs)">
+        <span class="dim">Requests sent: <span style="color:var(--text-2)">${sent}</span></span>
+        <span class="dim">Open: <span style="color:var(--text-2)">${open.length}</span></span>
+        <span class="dim">Completed: <span style="color:var(--text-2)">${done.length}</span></span>
+      </div>
+      <p class="field-hint">Reach, clicks and engagement are read from Instagram and Facebook once an account is verified through its official connection. That connection is not set up on this deployment, so no platform figures are shown.</p>
+    </div>
+  </div>`;
 }
 
 /* --------------------------------------------------------------------- list */

@@ -84,29 +84,17 @@ for (const vp of VIEWPORTS) {
   const seg = page.locator(".hub-rail-seg");
   const segShown = await seg.isVisible().catch(() => false);
 
+  /* Groups and Channels are separate pages (brief 8). This page is groups only:
+     no Groups / Channels control, and the channels rail stays hidden. */
+  ok("the Groups page has no Groups / Channels control", !segShown && (await page.locator("#grp-seg-groups").count()) === 0 && (await page.locator("#grp-seg-channels").count()) === 0);
+  ok("the channels rail is hidden on the Groups page", !channelsShown);
+  ok("Groups is the list shown", groupsShown, `groups ${groupsShown}`);
+  ok("only the group entries are listed (no channel names)", (await page.locator("#grp-list .chat-item").count()) === GROUPS.length
+    && (await page.locator("#grp-list").innerText()).includes("Design crew"));
   if (vp.split) {
-    ok("Groups is the first list shown", groupsShown && !channelsShown, `groups ${groupsShown}, channels ${channelsShown}`);
-    ok("the Groups / Channels control is shown", segShown);
-    ok("the Groups segment is marked as selected", (await page.getAttribute("#grp-seg-groups", "aria-selected")) === "true");
-    ok("only the group entries are listed (no channel names)", (await page.locator("#grp-list .chat-item").count()) === GROUPS.length
-      && (await page.locator("#grp-list").innerText()).includes("Design crew"));
     const listBox = await page.locator("#grp-list").boundingBox();
-    ok("the group list fits inside the rail (scrolls, does not spill)", listBox && listBox.width > 0 && listBox.height > 0 && listBox.height <= vp.height * 0.45 + 2, `list height ${Math.round(listBox?.height ?? 0)}px`);
+    ok("the group list fits inside the rail (scrolls, does not spill)", listBox && listBox.width > 0 && listBox.height > 0 && listBox.height <= vp.height * 0.45 + 2, `list height ${Math.round(listBox?.height || 0)}`);
     await page.screenshot({ path: `${SHOTS}/groups-${vp.name}-groups.png` });
-
-    await page.click("#grp-seg-channels");
-    await page.waitForTimeout(150);
-    ok("tapping Channels shows the channels only", (await page.locator("#grp-channels").isVisible()) && !(await page.locator("#grp-list").isVisible()));
-    ok("the Channels segment is marked as selected", (await page.getAttribute("#grp-seg-channels", "aria-selected")) === "true");
-    ok("the channel names are listed", (await page.locator("#grp-channels").innerText()).includes("General"));
-    await page.screenshot({ path: `${SHOTS}/groups-${vp.name}-channels.png` });
-
-    await page.click("#grp-seg-groups");
-    await page.waitForTimeout(150);
-    ok("tapping Groups brings the groups back", (await page.locator("#grp-list").isVisible()) && !(await page.locator("#grp-channels").isVisible()));
-  } else {
-    ok("desktop: groups and channels both show in the rail", groupsShown && channelsShown);
-    ok("desktop: the Groups / Channels control is hidden", !segShown);
   }
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

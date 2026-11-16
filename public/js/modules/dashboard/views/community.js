@@ -285,7 +285,7 @@ function paintStream(stream, scroll) {
         ${
           same
             ? `<span class="cm-msg-gutter" aria-hidden="true"></span>`
-            : `<span class="presence-wrap">${avatar(m.authorName, null, "sm")}${presenceDot(m.lastSeenAt, {
+            : `<span class="presence-wrap">${avatar(m.authorName, null, "sm", null, "cover", m.authorId)}${presenceDot(m.lastSeenAt, {
                 size: 9
               })}</span>`
         }

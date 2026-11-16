@@ -188,7 +188,7 @@ function paintMembers(root) {
     .map(
       (member) => `<li class="team-row">
         <span class="team-avatar-wrap">
-          ${avatar(member.fullName, member.email, "sm", member.avatarUrl)}
+          ${avatar(member.fullName, member.email, "sm", member.avatarUrl, "cover", member.userId)}
           ${presenceDot(member.lastSeenAt, { size: 9 })}
         </span>
         <div class="team-row-main">
@@ -256,7 +256,7 @@ function paintResults(root) {
     box.innerHTML = `<ul class="team-list">${results
       .map(
         (person) => `<li class="team-row">
-          ${avatar(person.fullName, person.email, "sm", person.avatarUrl)}
+          ${avatar(person.fullName, person.email, "sm", person.avatarUrl, "cover", person.userId)}
           <div class="team-row-main">
             <div class="team-row-name">${esc(person.fullName || "Member")}</div>
             <div class="mk-note">${person.username ? `@${esc(person.username)} · ` : ""}${esc(person.email || "")}${person.accountType ? ` · ${esc(person.accountType)}` : ""}</div>

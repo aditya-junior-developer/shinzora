@@ -125,7 +125,7 @@ for (const vp of VIEWPORTS) {
   ok("the owner's avatar wears the design the database returns", avatar?.ring === "sakura", JSON.stringify(avatar));
   ok("the avatar points at that design's artwork", (avatar?.art || "").includes("/assets/rings/sakura.png"), avatar?.art || "");
 
-  /* Billing: the picker, the worn design, and the ₹10 payment. */
+  /* Billing: the picker, the worn design, and the price of each design. */
   await page.goto(`${BASE}/app/?view=billing`, { waitUntil: "load" });
   await page.waitForSelector("#ring-card", { timeout: 20000 });
   await page.waitForTimeout(300);
@@ -134,7 +134,11 @@ for (const vp of VIEWPORTS) {
   const current = await page.locator("#ring-card .ring-option[aria-current='true'] strong").textContent().catch(() => "");
   ok("the worn design is marked", current.trim() === "Sakura", `marked=${current.trim()}`);
   const prices = await page.locator("#ring-card [data-ring-apply]").allTextContents();
-  ok("every design costs ₹10", prices.length === 8 && prices.every((t) => t.includes("₹10")), prices.join(" | "));
+  const premium = ["Pink gold", "Diamond wings", "Tiger gold", "Gothic skull"];
+  const names = await page.locator("#ring-card .ring-option strong").allTextContents();
+  const priced = names.map((name, i) => [name.trim(), (prices[i] || "").replace(/\s+/g, " ")]);
+  ok("the four premium designs cost ₹20", priced.filter(([n]) => premium.includes(n)).every(([, t]) => t.includes("₹20")) && priced.filter(([n]) => premium.includes(n)).length === 4, JSON.stringify(priced));
+  ok("the other four designs cost ₹10", priced.filter(([n]) => !premium.includes(n)).every(([, t]) => t.includes("₹10")) && priced.filter(([n]) => !premium.includes(n)).length === 4, JSON.stringify(priced));
   const kuromi = await page.locator("#ring-card .ring-option-art[data-blend='screen']").count();
   ok("the Kuromi art blends with screen", kuromi === 1, `count=${kuromi}`);
   await page.locator("#ring-card").scrollIntoViewIfNeeded();
@@ -144,7 +148,7 @@ for (const vp of VIEWPORTS) {
   await page.waitForTimeout(600);
   const sent = calls.payments.find((b) => b.purpose === "ring_apply:tiger-gold");
   ok("Apply sends a ring_apply:<id> payment", Boolean(sent), JSON.stringify(calls.payments));
-  ok("the browser asks for the same ₹10 the server charges", sent?.amount === 1000, `amount=${sent?.amount}`);
+  ok("the browser asks for the same ₹20 the server charges for tiger gold", sent?.amount === 2000, `amount=${sent?.amount}`);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow on Billing", overflow <= 1, `${overflow}px`);

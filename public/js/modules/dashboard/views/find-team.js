@@ -18,6 +18,7 @@ import { qs, delegate, esc, on, debounce } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { pageHead, emptyState, skeletonView, avatar } from "../components.js";
+import { ringAttribute } from "../../../lib/avatar.js";
 import { presenceDot, presenceLabel, presenceState } from "../../../ui/presence.js";
 import { openModal } from "../../../ui/modal.js";
 import { toastError } from "../../../ui/toast.js";
@@ -85,9 +86,9 @@ function paint(root) {
    way, so a mixed roster still lines up. */
 function personAvatar(person, size = "lg") {
   const picture = (() => {
-    if (!person || !person.avatarUrl) return avatar(person?.name, null, size);
+    if (!person || !person.avatarUrl) return avatar(person?.name, null, size, null, "cover", person?.userId);
     const variant = size.startsWith("avatar-") ? size : `avatar-${size}`;
-    return `<span class="avatar ${variant} ft-avatar"><img src="${esc(person.avatarUrl)}" alt="" loading="lazy" /></span>`;
+    return `<span class="avatar ${variant} ft-avatar"${ringAttribute(person.userId)}><img src="${esc(person.avatarUrl)}" alt="" loading="lazy" /></span>`;
   })();
   /* The dot sits under the picture, the same place it sits everywhere else.
      `lastSeenAt` comes from find_team_search (0033). */

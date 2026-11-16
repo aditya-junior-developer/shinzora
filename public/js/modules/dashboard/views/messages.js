@@ -33,21 +33,19 @@ export default async function render(root, ctx = {}) {
   const conversationId = params.get("c");
   let groupId = params.get("group");
   let messageId = params.get("message");
-  let tab = params.get("tab") === "groups" || groupId ? "groups" : "direct";
+  /* Messages and Groups are two separate places in the navigation (brief 8).
+     This module serves both: `view=groups` (or an old `tab=groups` link, or a
+     notification's `group=`) opens groups; anything else opens direct messages. */
+  let tab = params.get("view") === "groups" || params.get("tab") === "groups" || groupId ? "groups" : "direct";
 
   root.innerHTML = `
     ${pageHead({
-      title: "Messages",
-      desc: "Direct conversations and group rooms. Who can read what is decided by the database, not by this page."
+      title: tab === "groups" ? "Groups" : "Messages",
+      desc:
+        tab === "groups"
+          ? "Private group rooms you are a member of. Who can read what is decided by the database, not by this page."
+          : "Direct conversations with members. Who can read what is decided by the database, not by this page."
     })}
-    <div class="messages-tabs" role="tablist" aria-label="Conversation type">
-      <button class="messages-tab" type="button" role="tab" data-tab="direct" aria-selected="false">
-        ${icon("message-square", { size: 14 })}<span>Direct</span>
-      </button>
-      <button class="messages-tab" type="button" role="tab" data-tab="groups" aria-selected="false">
-        ${icon("users", { size: 14 })}<span>Groups</span>
-      </button>
-    </div>
     <div id="messages-mount"></div>`;
 
   if (answerTopic) {
@@ -56,21 +54,11 @@ export default async function render(root, ctx = {}) {
       .catch(() => {});
   }
 
-  const bar = qs(".messages-tabs", root);
   const mount = qs("#messages-mount", root);
   let current = null;
   let mounted = null;
 
-  function paintTabs() {
-    [...bar.querySelectorAll("[data-tab]")].forEach((button) => {
-      const on_ = button.getAttribute("data-tab") === tab;
-      button.setAttribute("aria-selected", String(on_));
-      button.classList.toggle("is-active", on_);
-    });
-  }
-
   async function mountTab() {
-    paintTabs();
     if (current === tab && mounted) return;
     current = tab;
     mount.innerHTML = "";
@@ -79,25 +67,12 @@ export default async function render(root, ctx = {}) {
     } else {
       mounted = await mountInbox(mount, { conversationId });
     }
-    /* Remember the tab without a reload; the group/message deep link is dropped
-       once it has been honoured so a refresh does not re-scroll forever. */
+    /* Keep the address in step with the surface, without a reload. */
     const url = new URL(location.href);
-    url.searchParams.set("view", "messages");
-    if (tab === "groups") url.searchParams.set("tab", "groups");
-    else url.searchParams.delete("tab");
+    url.searchParams.set("view", tab === "groups" ? "groups" : "messages");
+    url.searchParams.delete("tab");
     history.replaceState({}, "", url.toString());
   }
-
-  delegate(bar, "click", "[data-tab]", (_event, button) => {
-    const next = button.getAttribute("data-tab");
-    if (!next || next === tab) return;
-    tab = next;
-    mountTab().catch((error) => {
-      mount.innerHTML = `<div class="card"><div class="card-body"><p class="muted">${esc(
-        error.message || "That tab could not be opened."
-      )}</p></div></div>`;
-    });
-  });
 
   await mountTab();
 

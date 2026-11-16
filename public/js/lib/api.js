@@ -230,7 +230,9 @@ export const api = {
      a Blob; a manual deck without a paid export answers 402 payment_required. */
   deck: {
     generate: (payload) => invoke("deck", "generate", payload, { timeout: 90000 }),
-    export: (payload) => invoke("deck", "export", payload, { timeout: 60000 })
+    export: (payload) => invoke("deck", "export", payload, { timeout: 60000 }),
+    /* A business summary as a PDF or a PowerPoint file (brief 2). Answers with a Blob. */
+    summary: (payload) => invoke("deck", "summary", payload, { timeout: 120000 })
   },
   integrations: {
     status: () => invoke("integrations", "status"),

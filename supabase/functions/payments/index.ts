@@ -48,9 +48,9 @@ const DECK_EXPERT_PRICE = { amount: 3000, label: "Written by Experts investor de
 const BUSINESS_FIELD_KEYS = ["name", "category", "location", "description", "target_audience", "website_url", "phone", "email"];
 const BUSINESS_FIELD_PAISE = 1000;
 
-/* Profile rings (0069): ₹10 each time a design is applied. The ids and names are
-   kept in step with public.ring_designs. The browser never sets the price. */
-const RING_APPLY_PAISE = 1000;
+/* Profile rings (0069, 0071): each design has its own price in
+   public.ring_designs.price_paise (₹20 premium, ₹10 standard). The ids and names
+   are kept in step with that table. The browser never sets the price. */
 const RING_DESIGNS: Record<string, string> = {
   "kuromi-neon": "Kuromi neon",
   "starlight-vine": "Starlight vine",
@@ -356,7 +356,14 @@ async function resolveAmount(userId: string, purpose: string, fields?: string[])
     const ringId = purpose.slice("ring_apply:".length);
     const name = RING_DESIGNS[ringId];
     if (!name) return null;
-    return { amount: RING_APPLY_PAISE, label: `Profile ring: ${name}` };
+    const { data: design, error: designError } = await admin()
+      .from("ring_designs")
+      .select("price_paise")
+      .eq("id", ringId)
+      .eq("active", true)
+      .maybeSingle();
+    if (designError || !design) return null;
+    return { amount: Number(design.price_paise), label: `Profile ring: ${name}` };
   }
 
   if (purpose.startsWith("subscription:")) {

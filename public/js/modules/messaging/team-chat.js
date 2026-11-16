@@ -20,6 +20,7 @@ import { icon } from "../../lib/icons.js";
 import { composerPopsMarkup, composerToolsBar, bindComposerTools, ATTACH_KINDS } from "./composer-tools.js";
 import { timeAgo, timeAgoShort, dateTime, initials } from "../../lib/format.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
+import { ringAttribute } from "../../lib/avatar.js";
 import { state } from "../../lib/store.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { presenceDot, presenceState, presenceLabel } from "../../ui/presence.js";
@@ -183,7 +184,7 @@ export default async function mountInbox(root, options = {}) {
         return `<button class="chat-item${row.conversationId === active ? " is-active" : ""}${Number(row.unread) ? " has-unread" : ""}"
           type="button" data-conversation="${esc(row.conversationId)}">
           <span class="chat-avatar-wrap">
-            <span class="chat-avatar">${esc(initialsOf(title))}</span>
+            <span class="chat-avatar"${row.kind === "personal" ? ringAttribute(row.peer?.userId) : ""}>${esc(initialsOf(title))}</span>
             ${row.kind === "personal" ? presenceDot(seen, { size: 9 }) : ""}
           </span>
           <span class="chat-item-body">
@@ -217,7 +218,7 @@ export default async function mountInbox(root, options = {}) {
       .map(
         (person) => `<button type="button" class="dm-search-row" data-start-dm="${esc(person.username || "")}">
           <span class="chat-avatar-wrap">
-            <span class="chat-avatar chat-avatar-sm">${esc(initialsOf(person.fullName))}</span>
+            <span class="chat-avatar chat-avatar-sm"${ringAttribute(person.userId)}>${esc(initialsOf(person.fullName))}</span>
             ${presenceDot(person.lastSeenAt, { size: 8 })}
           </span>
           <span class="dm-search-meta">

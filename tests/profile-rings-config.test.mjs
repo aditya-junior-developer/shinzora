@@ -10,7 +10,7 @@
    ========================================================================== */
 
 import { readFileSync, existsSync, statSync } from "node:fs";
-import { RING_DESIGNS, RING_PRICE_RUPEES, ringArtUrl } from "../public/js/config/rings.js";
+import { RING_DESIGNS, RING_PRICE_STANDARD_RUPEES, RING_PRICE_PREMIUM_RUPEES, ringArtUrl, ringPriceRupees } from "../public/js/config/rings.js";
 import { applyRing } from "../public/js/lib/rings.js";
 
 let pass = 0;
@@ -43,10 +43,14 @@ check("the payment function holds no ninth design", (payments.match(/"[a-z-]+": 
 check("the client and the database name the designs the same way", RING_DESIGNS.every((d) => m70.includes(`'${d.name}'`) || m69.includes(`'${d.name}'`) || m70.includes(d.name) || m69.includes(d.name)));
 
 console.log("price");
-check("the client charges ₹10 a ring", RING_PRICE_RUPEES === 10);
-check("the server charges 1000 paise a ring", /const RING_APPLY_PAISE = 1000;/.test(payments));
-check("the client amount and the server price agree", RING_PRICE_RUPEES * 100 === 1000);
-check("the payment function prices a ring from its own table", /purpose\.startsWith\("ring_apply:"\)[\s\S]*?RING_DESIGNS\[ringId\][\s\S]*?RING_APPLY_PAISE/.test(payments));
+check("the standard ring costs ₹10 and the premium ring ₹20", RING_PRICE_STANDARD_RUPEES === 10 && RING_PRICE_PREMIUM_RUPEES === 20);
+const premium = RING_DESIGNS.filter((d) => d.premium).map((d) => d.id).sort();
+check("the four premium designs are pink-gold, diamond-wings, tiger-gold, gothic-skull", premium.join(",") === ["diamond-wings", "gothic-skull", "pink-gold", "tiger-gold"].join(","));
+check("exactly four designs are premium", premium.length === 4);
+check("every other design is ₹10", RING_DESIGNS.filter((d) => !d.premium).every((d) => ringPriceRupees(d) === 10));
+check("the server reads each ring price from ring_designs", /ring_designs/.test(payments) && /price_paise/.test(payments) && !/RING_APPLY_PAISE/.test(payments));
+check("the client prices match the table seeded by 0071", ringPriceRupees({ premium: true }) * 100 === 2000 && ringPriceRupees({ premium: false }) * 100 === 1000);
+check("the payment function prices a ring from its own table", /purpose\.startsWith\("ring_apply:"\)[\s\S]*?RING_DESIGNS\[ringId\][\s\S]*?price_paise/.test(payments));
 check("an unknown design is refused by resolveAmount", /if \(!name\) return null;/.test(payments));
 check("the payment function never reads a client amount", !/body\.amount/.test(payments));
 check("a ring order records exactly the server price", /ring_orders"\)\.insert\(\{[\s\S]*?amount_paise: resolved\.amount/.test(payments));
@@ -69,7 +73,7 @@ console.log("Billing");
 check("Billing shows the ring picker", /id="ring-card"/.test(billing) && /data-ring-apply=/.test(billing));
 check("Billing reads the worn design from profile_ring_choices", /from\("profile_ring_choices"\)/.test(billing));
 check("Billing sends ring_apply:<id> through startPayment", /purpose: `ring_apply:\$\{design\.id\}`/.test(billing));
-check("Billing reads the price from the shared config", /RING_PRICE_RUPEES/.test(billing));
+check("Billing reads the price from the shared config", /ringPriceRupees/.test(billing));
 
 console.log("rings on avatars");
 check("rings.js reads design ids from member_rings", /member_rings/.test(rings) && /row\.ring_id/.test(rings));
@@ -79,7 +83,8 @@ check("applyRing refuses an id outside the catalogue", /KNOWN\.has\(ring\.id\)/.
 check("components.css draws the overlay from --ring-art", /\.avatar\[data-ring\]::after/.test(components) && /var\(--ring-art\)/.test(components));
 check("no tier ring rules remain in components.css", !/\.avatar\[data-tier\]/.test(components));
 check("no tier ring rules remain in views.css", !/\[data-tier\]/.test(views.replace(/\.premium-badge\[data-tier[^\n]*\n/g, "")));
-check("no ring animation remains", !/ring-breathe|ring-toggle/.test(views + components));
+check("rings are animated: a spinning halo and a breathing artwork layer", /ring-spin/.test(components) && /ring-breathe/.test(components));
+check("the ring halo is bold and circular", /border-radius: 50%/.test(components) && /conic-gradient/.test(components));
 
 console.log("ring test helper");
 const fake = () => {

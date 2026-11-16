@@ -186,7 +186,7 @@ check("a member cannot read the ring ledger", (await errorCode(() => q(`select *
 await asUser(ids.admin);
 const ledger = await q(`select order_id, ring_id, ring_name, payment_amount, payment_status, applied from public.admin_ring_ledger(50)`);
 check("an administrator reads every ring order", ledger.length === 4, `rows=${ledger.length}`);
-check("the ledger shows the ₹10 amount", ledger.every((r) => Number(r.payment_amount) === 1000));
+check("the ledger shows each order at its design's price (₹10 or ₹20)", ledger.every((r) => [1000, 2000].includes(Number(r.payment_amount))));
 check("exactly one of alice's orders is the applied one", ledger.filter((r) => r.applied && r.ring_id === "thorn-rose").length === 1);
 check("the cancelled order is shown as not applied", ledger.some((r) => r.ring_id === "gothic-skull" && r.payment_status === "cancelled" && r.applied === false));
 await asAnon();

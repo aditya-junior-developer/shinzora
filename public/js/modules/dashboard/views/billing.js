@@ -19,7 +19,7 @@ import { sb, normalizeError } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
 import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
 import { DECK_PDF_RUPEES } from "../../../config/investor-deck.js";
-import { RING_DESIGNS, RING_PRICE_RUPEES, ringArtUrl } from "../../../config/rings.js";
+import { RING_DESIGNS, ringArtUrl, ringPriceRupees } from "../../../config/rings.js";
 import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
 import { PREMIUM_EVENT } from "../../../lib/premium-live.js";
 import { payments as fetchPayments, subscription } from "../data.js";
@@ -326,8 +326,8 @@ export default async function render(root) {
     if (ringBuy) {
       const design = RING_DESIGNS.find((d) => d.id === ringBuy.getAttribute("data-ring-apply"));
       if (!design) return;
-      /* The server sets the ₹10 price for ring_apply:<id>; the amount here is for the dialog only. */
-      startPayment({ purpose: `ring_apply:${design.id}`, label: `Profile ring: ${design.name}`, amount: RING_PRICE_RUPEES * 100 });
+      /* The server sets the price for ring_apply:<id> from ring_designs; the amount here is for the dialog only. */
+      startPayment({ purpose: `ring_apply:${design.id}`, label: `Profile ring: ${design.name}`, amount: ringPriceRupees(design) * 100 });
       return;
     }
 
@@ -453,7 +453,7 @@ export default async function render(root) {
       <div class="card-head">
         <div>
           <div class="card-title">Profile ring</div>
-          <div class="card-sub">Wear one of eight designs around your photo. ₹${RING_PRICE_RUPEES} each time you apply one. It appears once the payment is verified.</div>
+          <div class="card-sub">Wear one of eight designs around your photo. ₹10 each time you apply one; the four premium designs are ₹20. It appears once the payment is verified.</div>
         </div>
         ${worn ? `<span class="badge badge-neutral">Wearing ${esc(worn.name)}</span>` : ""}
       </div>
@@ -463,7 +463,7 @@ export default async function render(root) {
             (d) => `<div class="ring-option" ${worn?.id === d.id ? 'aria-current="true"' : ""}>
               <span class="ring-option-art" ${d.blend === "screen" ? 'data-blend="screen"' : ""}><img src="${esc(ringArtUrl(d.id))}" alt="" loading="lazy" decoding="async" /></span>
               <strong>${esc(d.name)}</strong>
-              <button class="btn btn-primary btn-sm btn-block" type="button" data-ring-apply="${esc(d.id)}">Apply · ₹${RING_PRICE_RUPEES}</button>
+              <button class="btn btn-primary btn-sm btn-block" type="button" data-ring-apply="${esc(d.id)}">Apply · ₹${ringPriceRupees(d)}</button>
             </div>`
           ).join("")}
         </div>

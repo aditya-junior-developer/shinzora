@@ -56,10 +56,10 @@ export const NAV = [
     items: [
       { id: "marketplace", label: "Marketplace", icon: "package" },
       { id: "community", label: "Community", icon: "messages-square" },
-      { id: "requests", label: "Extra Services", icon: "sparkles" },
-      { id: "marketing", label: "Ad campaigns", icon: "megaphone" },
+      { id: "marketing", label: "Social Media & Ads", icon: "megaphone" },
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
+      { id: "groups", label: "Groups", icon: "users" },
       { id: "meeting", label: "Meetings", icon: "video" },
       { id: "analytics", label: "Analytics", icon: "chart-line" },
       { id: "investor-decks", label: "Investor deck", icon: "layers" }
@@ -95,6 +95,7 @@ export const AGENT_NAV = [
       { id: "team", label: "Team", icon: "users" },
       { id: "community", label: "Community", icon: "messages-square" },
       { id: "messages", label: "Messages", icon: "messages-square" },
+      { id: "groups", label: "Groups", icon: "users" },
       { id: "meeting", label: "Meetings", icon: "video" }
     ]
   },

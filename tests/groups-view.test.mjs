@@ -167,7 +167,7 @@ function makeWorld({
   window.Element.prototype.scrollIntoView = function scrollIntoView() {};
   /* The views read `location.search` and rewrite it with `history.replaceState`,
      so both must exist as globals — the harness runs one page at a time. */
-  globalThis.location = new URL("https://shinzora.test/app/?view=messages");
+  globalThis.location = new URL("https://shinzora.test/app/?view=groups");
   window.location = globalThis.location;
   globalThis.history = { replaceState: () => {}, pushState: () => {} };
   /* Every browser has `navigator`; Node 20 does not. The view only reads it to
@@ -206,32 +206,25 @@ const count = (calls, name) => calls.filter((call) => call.name === name).length
 const lastArgs = (calls, name) => calls.filter((call) => call.name === name).at(-1)?.args;
 const click = (window, node) => node.dispatchEvent(new window.Event("click", { bubbles: true }));
 
-/* Opens the Groups tab. By default the member then picks the first group, as
-   they would by hand, so tests that need a thread get one. Pass pick:false to
-   see the tab exactly as it opens: the list, and no chat. */
+/* Opens the Groups page (its own surface, not a tab inside Messages). By default
+   the member then picks the first group, as they would by hand, so tests that
+   need a thread get one. Pass pick:false to see the page exactly as it opens:
+   the list, and no chat. */
 async function openGroupsTab(world, { pick = true } = {}) {
   const view = await bundle(path.join(viewsDir, "messages.js"));
   await view.default(world.root, {});
-  const tab = world.root.querySelector('[data-tab="groups"]');
-  assert.ok(tab, "the Groups tab exists");
-  click(world.window, tab);
+  assert.equal(world.root.querySelector('[data-tab="groups"]'), null, "Messages has no Groups tab any more");
   await settle();
   const first = pick ? world.root.querySelector("[data-group]") : null;
   if (first) {
-    /* Selecting a group shows its contact number first; the chat opens from the button. */
     click(world.window, first);
     await settle();
-    const openChat = world.root.querySelector("[data-open-chat]");
-    if (openChat) {
-      click(world.window, openChat);
-      await settle();
-    }
   }
 }
 
 /* ------------------------------------------------------------------- tests */
 
-test("the Groups tab asks the database for the member's groups", async () => {
+test("the Groups page asks the database for the member's groups", async () => {
   const world = makeWorld();
   await openGroupsTab(world);
 
@@ -273,34 +266,20 @@ test("picking a group opens its thread", async () => {
   assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "three messages painted");
 });
 
-test("selecting a group shows its contact number, not its chat", async () => {
+test("selecting a group opens its chat directly, with no contact number", async () => {
   const world = makeWorld();
   await openGroupsTab(world, { pick: false });
 
   click(world.window, world.root.querySelector("[data-group]"));
   await settle();
 
-  assert.equal(count(world.calls, "group_contact"), 1, "the group's contact number is read");
-  assert.deepEqual(lastArgs(world.calls, "group_contact"), { p_group: GROUP.id });
-  assert.equal(count(world.calls, "group_get"), 0, "the group's chat is not opened");
-  assert.equal(count(world.calls, "group_messages_list"), 0, "no thread is requested");
-  assert.equal(world.root.querySelectorAll("[data-message]").length, 0, "no message is shown");
-  assert.match(world.root.textContent, /\+919876543210/, "the number is on screen");
-  assert.ok(world.root.querySelector('a[href="tel:+919876543210"]'), "the number is a tel link");
-  assert.ok(world.root.querySelector("[data-open-chat]"), "an Open chat button is offered");
-});
-
-test("Open chat opens the thread for the selected group", async () => {
-  const world = makeWorld();
-  await openGroupsTab(world, { pick: false });
-  click(world.window, world.root.querySelector("[data-group]"));
-  await settle();
-
-  click(world.window, world.root.querySelector("[data-open-chat]"));
-  await settle();
-
-  assert.equal(count(world.calls, "group_get"), 1, "the chat was opened by the button");
+  assert.equal(count(world.calls, "group_contact"), 0, "the contact number is never read");
+  assert.equal(count(world.calls, "group_get"), 1, "the group's chat is opened");
+  assert.equal(count(world.calls, "group_messages_list"), 1, "its thread is requested");
   assert.equal(world.root.querySelectorAll("[data-message]").length, 3, "the thread is painted");
+  assert.equal(world.root.querySelector("[data-open-chat]"), null, "there is no separate Open chat step");
+  assert.equal(world.root.querySelector('a[href^="tel:"]'), null, "no tel link is shown");
+  assert.doesNotMatch(world.root.textContent, /\+919876543210/, "the number is not on screen");
 });
 
 test("a stored mention becomes a chip; a bare @word does not", async () => {
@@ -801,36 +780,32 @@ test("a public room does not offer mentions it cannot resolve", async () => {
   assert.deepEqual(world.toasts, [], "and nothing failed loudly");
 });
 
-test("a group opened after a room promises mentions again", async () => {
+test("the Groups page lists groups only, never channels, and a group promises mentions", async () => {
   const world = makeWorld();
-  await openGroupsTab(world);
-  click(world.window, world.root.querySelector('[data-channel="general"]'));
-  await settle();
-  /* Selecting the group shows its number; the chat opens from the button. */
+  await openGroupsTab(world, { pick: false });
+  /* The channels rail is kept in the DOM for the shared wiring, but hidden here. */
+  const rail = world.root.querySelector('[data-rail="channels"]');
+  assert.ok(rail, "the channels rail exists for the shared wiring");
+  assert.ok(rail.hasAttribute("hidden"), "the channels rail is hidden on the Groups page");
+  assert.ok(world.root.querySelector('[data-rail="groups"]') && !world.root.querySelector('[data-rail="groups"]').hasAttribute("hidden"), "the groups rail is shown");
   click(world.window, world.root.querySelector("[data-group]"));
   await settle();
-  click(world.window, world.root.querySelector("[data-open-chat]"));
-  await settle();
-  assert.match(world.root.querySelector("#grp-body").placeholder, /@/, "the promise comes back with a group");
+  assert.match(world.root.querySelector("#grp-body").placeholder, /@/, "a group promises mentions");
 });
 
-test("the owner sets the group's contact number; a member does not see the form", async () => {
+test("no contact-number form for the owner, and no number for a member", async () => {
   const owner = makeWorld({ groups: [{ ...GROUP, role: "owner" }] });
   await openGroupsTab(owner, { pick: false });
   click(owner.window, owner.root.querySelector("[data-group]"));
   await settle();
-
-  const form = owner.root.querySelector("[data-contact-form]");
-  assert.ok(form, "the owner sees the number form");
-  owner.root.querySelector("#grp-contact-phone").value = "+91 98765-43210";
-  form.dispatchEvent(new owner.window.Event("submit", { bubbles: true, cancelable: true }));
-  await settle();
-  assert.deepEqual(lastArgs(owner.calls, "group_set_contact"), { p_group: GROUP.id, p_phone: "+91 98765-43210" });
+  assert.equal(owner.root.querySelector("[data-contact-form]"), null, "the owner sees no number form");
+  assert.equal(owner.root.querySelector("#grp-contact-phone"), null, "there is no number field");
+  assert.equal(count(owner.calls, "group_set_contact"), 0, "no number can be saved");
 
   const member = makeWorld({ groups: [{ ...GROUP, role: "member" }] });
   await openGroupsTab(member, { pick: false });
   click(member.window, member.root.querySelector("[data-group]"));
   await settle();
-  assert.equal(member.root.querySelector("[data-contact-form]"), null, "a member does not see the form");
-  assert.ok(member.root.querySelector("a[href^=\"tel:\"]"), "a member still sees the number");
+  assert.equal(member.root.querySelector("[data-contact-form]"), null, "a member sees no form");
+  assert.equal(member.root.querySelector('a[href^="tel:"]'), null, "a member sees no number");
 });

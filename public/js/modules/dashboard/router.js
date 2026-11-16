@@ -26,6 +26,7 @@ const LOADERS = {
   marketing: () => import("./views/marketing.js"),
   support: () => import("./views/support.js"),
   messages: () => import("./views/messages.js"),
+  groups: () => import("./views/messages.js"),
   meeting: () => import("./views/meeting.js"),
   requests: () => import("./views/requests.js"),
   marketplace: () => import("./views/marketplace.js"),
