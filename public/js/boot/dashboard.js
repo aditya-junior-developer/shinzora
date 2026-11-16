@@ -20,6 +20,7 @@ import { start as startRouter, currentView, landingView } from "../modules/dashb
 import { paintBootFailure, paintIdentityWarning } from "../modules/dashboard/boot-error.js";
 import { initInstallPrompt } from "../ui/pwa.js";
 import { toast } from "../ui/toast.js";
+import { startRingWatch } from "../lib/rings.js";
 
 hydrateIcons();
 
@@ -76,6 +77,7 @@ async function paintShell(initialView) {
   step("identity chrome", () => paintIdentity());
   step("icons", () => hydrateIcons());
   step("chrome", () => bindChrome({ navigate: (view) => (location.href = `/app/?view=${view}`) }));
+  step("rings", () => startRingWatch());
   window.addEventListener("shinzora:view", (event) => {
     step("sidebar", () => renderSidebar(event.detail.view));
     step("icons", () => hydrateIcons());

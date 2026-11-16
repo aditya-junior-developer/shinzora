@@ -26,16 +26,24 @@ import { initials } from "./format.js";
  * @param {string} [options.className]   extra classes on the wrapper
  * @param {string} [options.alt]         alt text; defaults to the name
  * @param {"cover"|"contain"} [options.fit] how the image fills the circle
+ * @param {string} [options.userId]      the member's id; lets the profile ring
+ *                                       be painted on this avatar (see rings.js)
  */
-export function avatarMarkup({ name = "", email = "", avatarUrl = null, size = "", className = "", alt = "", fit = "cover" } = {}) {
+export function avatarMarkup({ name = "", email = "", avatarUrl = null, size = "", className = "", alt = "", fit = "cover", userId = "" } = {}) {
   const variant = !size ? "" : size.startsWith("avatar-") ? size : `avatar-${size}`;
   const url = usableAvatar(avatarUrl) ? avatarUrl.trim() : "";
   const fitClass = url && fit === "contain" ? "is-logo" : "";
   const cls = ["avatar", variant, fitClass, className].filter(Boolean).join(" ");
+  const ring = ringAttribute(userId);
 
-  if (!url) return `<span class="${cls}">${esc(initials(name || email || "SZ"))}</span>`;
+  if (!url) return `<span class="${cls}"${ring}>${esc(initials(name || email || "SZ"))}</span>`;
 
-  return `<span class="${cls}">${avatarImage(url, alt || name || "Profile photo")}</span>`;
+  return `<span class="${cls}"${ring}>${avatarImage(url, alt || name || "Profile photo")}</span>`;
+}
+
+/** The data-ring-user attribute for a member id, or "" when there is none. */
+export function ringAttribute(userId) {
+  return typeof userId === "string" && /^[0-9a-f-]{36}$/i.test(userId.trim()) ? ` data-ring-user="${esc(userId.trim())}"` : "";
 }
 
 /** The <img> on its own, for a caller that already owns the circle. */
@@ -56,8 +64,9 @@ export function avatarImage(url, alt = "Profile photo") {
  * So the markup helpers are for holders, and this is for the real thing: it
  * touches contents and one state class, never nesting a circle in a circle.
  */
-export function paintAvatar(node, { name = "", email = "", avatarUrl = null, alt = "", fit = "cover" } = {}) {
+export function paintAvatar(node, { name = "", email = "", avatarUrl = null, alt = "", fit = "cover", userId = "" } = {}) {
   if (!node) return;
+  if (ringAttribute(userId)) node.setAttribute("data-ring-user", userId.trim());
   const url = usableAvatar(avatarUrl) ? avatarUrl.trim() : "";
   node.classList.toggle("is-logo", Boolean(url) && fit === "contain");
   node.innerHTML = url ? avatarImage(url, alt || name || "Profile photo") : esc(initials(name || email || "SZ"));

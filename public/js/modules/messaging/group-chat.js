@@ -23,7 +23,7 @@ import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { timeAgo, timeAgoShort, dateTime, initials, bytes } from "../../lib/format.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
-import { avatarMarkup, paintAvatar } from "../../lib/avatar.js";
+import { avatarMarkup, paintAvatar, ringAttribute } from "../../lib/avatar.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { openModal, confirmDialog, formDialog } from "../../ui/modal.js";
 import { openProfile } from "../dashboard/views/find-team.js";
@@ -448,6 +448,10 @@ export default async function mountGroups(root, options = {}) {
     }
     let lastAuthor = null;
     let lastDay = "";
+    /* A channel reads like a room, not a chat: the first line of each run from an
+       author carries their avatar and name, and the lines under it sit flush with
+       that name (Discord-style). Groups and direct messages keep the bubbles. */
+    messagesEl.classList.add("is-channel");
     messagesEl.innerHTML = rows
       .map((message) => {
         const mine = message.authorId === me;
@@ -461,10 +465,15 @@ export default async function mountGroups(root, options = {}) {
             ? `<div class="hub-day">${esc(dayLabel(message.createdAt))}</div>`
             : "";
         lastDay = day || lastDay;
-        return `${pill}<div class="bubble-row${mine ? " is-mine" : ""}" data-message="${esc(message.id)}">
-          ${showWho && !mine ? `<span class="bubble-avatar">${initials(message.authorName || "Member")}</span>` : ""}
-          <div class="bubble${mine ? " bubble-mine" : ""}">
-            ${mine || !showWho ? "" : `<div class="bubble-who">${esc(message.authorName || "Member")}</div>`}
+        const who = esc(message.authorName || "Member");
+        return `${pill}<div class="bubble-row chan-line${mine ? " is-mine" : ""}${showWho ? " is-first" : ""}" data-message="${esc(message.id)}">
+          ${
+            showWho
+              ? `<span class="bubble-avatar"${ringAttribute(message.authorId)}>${initials(message.authorName || "Member")}</span>`
+              : `<span class="chan-gutter" aria-hidden="true"></span>`
+          }
+          <div class="bubble">
+            ${showWho ? `<div class="bubble-who">${who}</div>` : ""}
             <div class="bubble-text">${paintBody(message.body, [])}</div>
             <div class="bubble-time" title="${esc(dateTime(message.createdAt))}">${esc(timeAgo(message.createdAt))}</div>
           </div>
@@ -1020,6 +1029,7 @@ export default async function mountGroups(root, options = {}) {
   let lastThread = [];
 
   async function paintThread(rows, focusMessageId = null) {
+    messagesEl.classList.remove("is-channel");
     lastThread = rows;
     if (!rows.length) {
       messagesEl.innerHTML = `<div class="chat-empty-line">Nothing here yet. Say hello — the others will see it in their notifications.</div>`;
@@ -1046,7 +1056,7 @@ export default async function mountGroups(root, options = {}) {
         return `<div class="bubble-row${mine ? " is-mine" : ""}${highlighted ? " is-focused" : ""}" data-message="${esc(
           message.id
         )}">
-          ${showWho && !mine ? `<span class="bubble-avatar">${initials(message.authorName || "Member")}</span>` : ""}
+          ${showWho && !mine ? `<span class="bubble-avatar"${ringAttribute(message.authorId)}>${initials(message.authorName || "Member")}</span>` : ""}
           <div class="bubble${mine ? " bubble-mine" : ""}">
             ${mine || !showWho ? "" : `<div class="bubble-who">${esc(message.authorName || "Member")}</div>`}
             ${message.body ? `<div class="bubble-text">${paintBody(message.body, message.mentions)}</div>` : ""}
@@ -1136,7 +1146,8 @@ function insertAtCaret(field, text, start, end) {
         name: person.name || person.username || "Member",
         username: person.username,
         role: person.role,
-        avatarUrl: person.avatarUrl
+        avatarUrl: person.avatarUrl,
+        userId: person.userId
       }));
 
     const every = canEveryone();
@@ -1167,7 +1178,7 @@ function insertAtCaret(field, text, start, end) {
           <span class="mention-row-avatar">${
             item.everyone
               ? icon("megaphone", { size: 13 })
-              : avatarMarkup({ name: item.name, avatarUrl: item.avatarUrl, alt: "" })
+              : avatarMarkup({ name: item.name, avatarUrl: item.avatarUrl, alt: "", userId: item.userId })
           }</span>
           <span class="mention-row-body">
             <span class="mention-row-name">${esc(item.name)}</span>
@@ -1629,7 +1640,7 @@ function insertAtCaret(field, text, start, end) {
               )}" title="${esc(member.name || member.username || "Member")} · ${
                 ROLE_LABEL[member.role] || "Member"
               }">
-                ${avatarMarkup({ name: member.name, avatarUrl: member.avatarUrl, alt: "" })}
+                ${avatarMarkup({ name: member.name, avatarUrl: member.avatarUrl, alt: "", userId: member.userId })}
               </button>`
             )
             .join("")}
@@ -1676,7 +1687,7 @@ function insertAtCaret(field, text, start, end) {
     const canTransfer = detail.role === "owner" && member.role === "admin";
     return `<div class="grp-member" data-member="${esc(member.userId)}">
       <button class="grp-member-ident" type="button" data-profile="${esc(member.username || "")}">
-        ${avatarMarkup({ name: member.name, avatarUrl: member.avatarUrl, alt: "" })}
+        ${avatarMarkup({ name: member.name, avatarUrl: member.avatarUrl, alt: "", userId: member.userId })}
         <span class="grp-member-meta">
           <span class="grp-member-name">${esc(member.name || "Member")}${isMe ? " · you" : ""}</span>
           <span class="grp-member-handle mono">@${esc(member.username || "")}</span>
@@ -1960,7 +1971,7 @@ function insertAtCaret(field, text, start, end) {
                 ? people
                     .map(
                       (person) => `<button class="dm-search-row" type="button" data-invite="${esc(person.userId)}">
-                        ${avatarMarkup({ name: person.fullName, avatarUrl: person.avatarUrl, alt: "" })}
+                        ${avatarMarkup({ name: person.fullName, avatarUrl: person.avatarUrl, alt: "", userId: person.userId })}
                         <span class="dm-search-meta">
                           <span class="dm-search-name">${esc(person.fullName || person.username)}</span>
                           <span class="dm-search-handle mono">@${esc(person.username || "")}</span>

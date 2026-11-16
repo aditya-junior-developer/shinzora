@@ -5280,3 +5280,74 @@ html {
   .hub-rail-groups .chat-pane-title { display: none; }
   .hub-rail-groups { justify-content: flex-end; }
 }
+
+/* ---------------------------------------------------------------------------
+   R6 — profile rings on every avatar that names a member, and the Discord-style
+   channel room. The ring is the same tier ring as the owner's own photo
+   (components.css); this block only lets it reach every avatar that carries a
+   data-ring-user id. Values come from member_rings() via rings.js.
+   --------------------------------------------------------------------------- */
+[data-ring-user][data-tier] {
+  --premium-ring: var(--violet);
+  box-shadow: 0 0 0 2px var(--surface, #111), 0 0 0 4px var(--premium-ring), 0 0 12px 1px color-mix(in srgb, var(--premium-ring) 38%, transparent);
+}
+[data-ring-user][data-tier="elite"][data-accent="rose"] { --premium-ring: #f43f5e; }
+[data-ring-user][data-tier="elite"][data-accent="amber"] { --premium-ring: #f59e0b; }
+[data-ring-user][data-tier="elite"][data-accent="teal"] { --premium-ring: #14b8a6; }
+[data-ring-user][data-tier="elite"][data-accent="sky"] { --premium-ring: #0ea5e9; }
+[data-ring-user][data-tier="elite"][data-accent="violet"] { --premium-ring: #8b5cf6; }
+/* A ringed initials badge in a thread needs room for the outer ring. */
+.bubble-avatar[data-ring-user][data-tier] { margin: 3px 11px 3px 3px; }
+
+/* Channel rooms: a flat, Discord-style run of messages. */
+#grp-messages.is-channel { padding: var(--s-2) 0; gap: 0; }
+#grp-messages.is-channel .bubble-row.chan-line {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 1px var(--s-4);
+  margin: 0;
+  border-radius: 0;
+}
+#grp-messages.is-channel .bubble-row.chan-line.is-first { margin-top: var(--s-3); }
+#grp-messages.is-channel .bubble-row.chan-line:hover { background: color-mix(in srgb, var(--panel-2) 70%, transparent); }
+#grp-messages.is-channel .chan-gutter { flex: 0 0 34px; width: 34px; }
+#grp-messages.is-channel .bubble-row.chan-line .bubble-avatar {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  font-size: var(--fs-2xs);
+}
+#grp-messages.is-channel .bubble-row.chan-line .bubble {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+#grp-messages.is-channel .bubble-row.chan-line .bubble-who {
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  color: var(--text);
+  margin-bottom: 1px;
+}
+#grp-messages.is-channel .bubble-row.chan-line .bubble-text { color: var(--text-2); }
+#grp-messages.is-channel .bubble-row.chan-line .bubble-time {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  margin-top: 1px;
+  text-align: left;
+}
+
+/* Channel rail headings read as categories. */
+.hub-rail-channels > .hub-rail-head {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+/* The open row is marked with a violet bar on its left edge, as in the sidebar. */
+.hub-rail .chat-item.is-active { box-shadow: inset 3px 0 0 var(--violet); }
