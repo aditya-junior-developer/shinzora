@@ -36,10 +36,34 @@ export function applyRing(node, ring) {
     node.setAttribute("data-tier", ring.tier);
     if (ring.accent) node.setAttribute("data-accent", ring.accent);
     else node.removeAttribute("data-accent");
+    node.setAttribute("data-animated", ring.animated === false ? "false" : "true");
   } else {
     node.removeAttribute("data-tier");
     node.removeAttribute("data-accent");
+    node.removeAttribute("data-animated");
   }
+}
+
+/** Read the signed-in member's own ring settings (migration 0068). */
+export async function fetchRingPrefs() {
+  const { data, error } = await sb.rpc("ring_prefs_get");
+  if (error) throw error;
+  return { tierOk: data?.tierOk === true, animated: data?.animated !== false, shown: data?.shown !== false };
+}
+
+/** Save the member's ring settings. The database refuses a free member. */
+export async function saveRingPrefs(animated, shown) {
+  const { data, error } = await sb.rpc("ring_prefs_set", { p_animated: Boolean(animated), p_shown: Boolean(shown) });
+  if (error) throw error;
+  forgetRing(null);
+  return data;
+}
+
+/** Drop cached rings (one member, or all when id is null) and repaint. */
+export function forgetRing(id) {
+  if (id) cache.delete(id);
+  else cache.clear();
+  if (typeof document !== "undefined") markRings(document).catch(() => {});
 }
 
 function fresh(id, now) {
@@ -63,7 +87,12 @@ async function fetchRings(ids) {
           const stamp = Date.now();
           for (const id of pending) {
             const row = seen.get(id);
-            cache.set(id, { tier: row?.ring_tier || null, accent: row?.ring_accent || null, at: stamp });
+            cache.set(id, {
+              tier: row?.ring_tier || null,
+              accent: row?.ring_accent || null,
+              animated: row?.ring_animated !== false,
+              at: stamp
+            });
           }
         })
         .catch(() => {
@@ -78,9 +107,9 @@ async function fetchRings(ids) {
   }
 }
 
-/** Paint the ring on every avatar under `root` that names a member. */
+/** Paint the ring on every avatar under `root` (or `root` itself) that names a member. */
 export async function markRings(root = document) {
-  const nodes = [...root.querySelectorAll("[data-ring-user]")];
+  const nodes = [...(root.matches?.("[data-ring-user]") ? [root] : []), ...root.querySelectorAll("[data-ring-user]")];
   if (!nodes.length) return;
   const ids = [...new Set(nodes.map((node) => node.getAttribute("data-ring-user")).filter((id) => UUID.test(id || "")))];
   await fetchRings(ids);

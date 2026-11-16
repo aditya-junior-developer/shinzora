@@ -6,7 +6,8 @@
 
 import { qs, esc, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { dateTime, timeAgo, statusLabel } from "../../../lib/format.js";
+import { dateTime, timeAgo, statusLabel, money } from "../../../lib/format.js";
+import { sb, normalizeError } from "../../../lib/supabase.js";
 import { adminApi } from "../api.js";
 import { confirmDialog, formDialog } from "../../../ui/modal.js";
 import { toast, toastError } from "../../../ui/toast.js";
@@ -47,9 +48,19 @@ export default async function render(root) {
         </div>
       </div>
       <div id="premium-table"></div>
+    </div>
+    <div class="admin-card" style="margin-top:var(--s-4)" id="ring-ledger-card">
+      <div class="admin-card-head">
+        <div>
+          <div class="admin-card-title">Ring payments</div>
+          <div class="admin-card-sub">Every ring order with its payment. Administrators only: members never see this list.</div>
+        </div>
+      </div>
+      <div id="ring-ledger"><div class="admin-empty">Loading…</div></div>
     </div>`;
 
   await load();
+  await loadLedger();
 
   root.querySelector("#premium-tabs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-tab]");
@@ -98,6 +109,49 @@ export default async function render(root) {
       await load();
     }
   });
+
+  /* The ledger reads straight from the database with this admin's session.
+     admin_ring_ledger() checks is_admin() itself, so a member gets an error. */
+  async function loadLedger() {
+    try {
+      const { data, error } = await sb.rpc("admin_ring_ledger", { p_limit: 100 });
+      if (error) throw normalizeError(error);
+      paintLedger(Array.isArray(data) ? data : []);
+    } catch (error) {
+      safeSet("#ring-ledger", `<div class="admin-empty">${esc(error.message || "The ring ledger could not be loaded.")}</div>`);
+    }
+  }
+
+  function paintLedger(rows) {
+    if (!rows.length) {
+      safeSet("#ring-ledger", `<div class="admin-empty">No ring orders yet.</div>`);
+      return;
+    }
+    const body = rows
+      .map((row) => {
+        const paid = row.paid_at ? dateTime(row.paid_at) : "—";
+        const shown = row.ring_shown === false ? `<span class="badge badge-neutral">Hidden</span>` : `<span class="badge badge-ok">Shown</span>`;
+        return `<tr>
+          <td><div>${esc(row.member_name || "—")}</div><div class="dim ring-ledger-cell">${esc(row.member_email || "")}</div></td>
+          <td><strong>${esc(tierName(row.tier))}</strong></td>
+          <td class="ring-ledger-cell">
+            <div>${esc(money(Number(row.payment_amount || 0)))}</div>
+            <div class="mono dim">${esc(row.payment_reference || "—")}</div>
+          </td>
+          <td><span class="badge ${row.payment_status === "verified" ? "badge-ok" : "badge-neutral"}">${esc(statusLabel(row.payment_status || "—"))}</span></td>
+          <td class="ring-ledger-cell"><span>${esc(paid)}</span></td>
+          <td><span class="badge ${row.order_status === "activated" ? "badge-ok" : row.order_status === "cancelled" ? "badge-danger" : "badge-warn"}">${esc(statusLabel(row.order_status || "—"))}</span></td>
+          <td>${shown}</td>
+        </tr>`;
+      })
+      .join("");
+    safeSet(
+      "#ring-ledger",
+      `<div class="table-wrap"><table class="table"><thead><tr>
+        <th>Member</th><th>Ring</th><th>Payment</th><th>Payment status</th><th>Paid</th><th>Order</th><th>Shown to members</th>
+      </tr></thead><tbody>${body}</tbody></table></div>`
+    );
+  }
 
   async function load() {
     try {

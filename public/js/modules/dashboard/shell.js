@@ -16,6 +16,7 @@ import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.
 import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
 import { ringAttributes } from "../../lib/premium.js";
+import { markRings } from "../../lib/rings.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 import { initNotifications, presentNotification } from "../../ui/notify.js";
 import { mountNotificationOnboarding } from "../../ui/notify-reminders.js";
@@ -280,6 +281,12 @@ export function paintIdentity() {
     else accAvatar.removeAttribute("data-tier");
     if (ring.accent) accAvatar.setAttribute("data-accent", ring.accent);
     else accAvatar.removeAttribute("data-accent");
+    /* Your own ring is painted from the database too, so a still ring stays still
+       here and a hidden ring still shows to you (0068). */
+    if (state.user?.id) {
+      accAvatar.setAttribute("data-ring-user", state.user.id);
+      markRings(accAvatar).catch(() => {});
+    }
   }
   if (accEmail) accEmail.textContent = state.user?.email || "";
   if (adminLink) adminLink.hidden = !state.isAdmin;

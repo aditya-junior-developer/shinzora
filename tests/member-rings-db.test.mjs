@@ -92,14 +92,14 @@ const errorCode = async (fn) => {
 const all = [ids.viewer, ids.glow, ids.elite, ids.free];
 
 await asUser(ids.viewer);
-const rings = await q(`select member_id, ring_tier, ring_accent from public.member_rings($1::uuid[]) order by ring_tier`, [all]);
+const rings = await q(`select member_id, ring_tier, ring_accent, ring_animated from public.member_rings($1::uuid[]) order by ring_tier`, [all]);
 const byId = Object.fromEntries(rings.map((r) => [r.member_id, r]));
 check("a member sees the Glow tier of another member", byId[ids.glow]?.ring_tier === "glow");
 check("a member sees the Elite tier of another member", byId[ids.elite]?.ring_tier === "elite");
 check("accent is returned for Elite", byId[ids.elite]?.ring_accent === "rose");
 check("Glow has no accent", byId[ids.glow]?.ring_accent === null);
 check("a Free member is absent, so no ring is drawn", !(ids.free in byId));
-check("the result has only the three ring fields", rings.length > 0 && Object.keys(rings[0]).sort().join(",") === "member_id,ring_accent,ring_tier");
+check("the result has only the four ring fields", rings.length > 0 && Object.keys(rings[0]).sort().join(",") === "member_id,ring_accent,ring_animated,ring_tier");
 
 const leak = await q(`select * from public.member_rings($1::uuid[])`, [[ids.elite]]);
 const text = JSON.stringify(leak);

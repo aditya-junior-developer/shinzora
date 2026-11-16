@@ -5368,3 +5368,42 @@ html {
 .own-wallpaper-tile { display: grid; gap: var(--s-1); min-width: 0; }
 .own-wallpaper-tile .wallpaper-tile { width: 100%; min-height: 84px; }
 .own-wallpaper-remove { justify-self: start; }
+
+/* ---------------------------------------------------------------------------
+   R8 — ring animation and ring management (migration 0068).
+   Both tiers animate by default; Elite pulses faster. A member who chose a
+   still ring has data-animated="false", which switches the animation off. The
+   selectors name the ring elements only, so the premium badge never pulses.
+   Reduced-motion users get a still ring whatever they chose.
+   --------------------------------------------------------------------------- */
+@keyframes ring-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 2px var(--surface, #111), 0 0 0 4px var(--premium-ring), 0 0 8px 0 color-mix(in srgb, var(--premium-ring) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--surface, #111), 0 0 0 4px var(--premium-ring), 0 0 22px 4px color-mix(in srgb, var(--premium-ring) 55%, transparent);
+  }
+}
+.avatar[data-tier]:not([data-animated="false"]),
+[data-ring-user][data-tier]:not([data-animated="false"]) {
+  animation: ring-breathe 3.2s ease-in-out infinite;
+}
+.avatar[data-tier="elite"]:not([data-animated="false"]),
+[data-ring-user][data-tier="elite"]:not([data-animated="false"]) {
+  animation-duration: 1.6s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar[data-tier],
+  [data-ring-user][data-tier] {
+    animation: none !important;
+  }
+}
+
+.ring-toggle {
+  display: flex; align-items: center; gap: var(--s-2);
+  font-size: var(--fs-sm); color: var(--text-2); cursor: pointer;
+}
+.ring-toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--violet); flex: none; }
+
+/* Admin: the ring payment ledger, shown under the premium orders. */
+.ring-ledger-cell { font-size: var(--fs-xs); }

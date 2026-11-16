@@ -7,7 +7,7 @@
      - a valid PNG is uploaded to the caller's folder, recorded, and put in use
      - at five uploads the input is disabled and the count is shown
      - removing an upload deletes its record and its stored file
-     - no horizontal overflow and no page errors at 390 and 1440 px
+     - no horizontal overflow and no page errors at 390, 820 and 1440 px
 
      BASE=http://127.0.0.1:4173 node tests/browser/member-wallpaper.mjs
    ========================================================================== */
@@ -150,6 +150,7 @@ const reset = (mode) => {
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 const VIEWPORTS = [
   { name: "phone", width: 390, height: 844, touch: true },
+  { name: "tablet", width: 820, height: 1180, touch: true },
   { name: "desktop", width: 1440, height: 900, touch: false }
 ];
 

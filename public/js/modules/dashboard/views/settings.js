@@ -35,6 +35,7 @@ import { resolveWallpaper, savedChoiceUnavailable, tierLabel, isSafeWallpaperUrl
 import { loadMemberWallpapers, uploadMemberWallpaper, useMemberWallpaper, removeMemberWallpaper, memberWallpaperUrl } from "../../../lib/member-wallpaper.js";
 import { MEMBER_WALLPAPER_MAX_COUNT, formatSize } from "../../../config/member-wallpaper.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
+import { fetchRingPrefs, saveRingPrefs } from "../../../lib/rings.js";
 import { BUSINESS_FIELDS, BUSINESS_FIELD_RUPEES, BUSINESS_FIELD_MAX, fieldsTotalRupees } from "../../../config/business-fields.js";
 import { openPaymentDialog } from "../payment-dialog.js";
 
@@ -69,6 +70,8 @@ let section = "profile";
 
 /* Repaints this page when a plan or profile changes (premium-live.js). */
 let onPremiumChange = null;
+/* The member's ring settings (0068): { animated, shown } once loaded, else null. */
+let ringPrefs = null;
 
 export default async function render(root) {
   root.innerHTML = skeletonView(3);
@@ -99,6 +102,7 @@ export default async function render(root) {
   });
 
   paint();
+  loadRingPrefs();
 
   if (onPremiumChange) document.removeEventListener(PREMIUM_EVENT, onPremiumChange);
   onPremiumChange = () => {
@@ -108,6 +112,7 @@ export default async function render(root) {
       return;
     }
     paint();
+    loadRingPrefs();
     /* A new profile unlocks wallpapers the catalog marked locked, so reload it
        from the server rather than repaint the old answer. No-op off that section. */
     loadWallpaperPicker();
@@ -242,11 +247,75 @@ export default async function render(root) {
                   : "Premium profiles add a glowing ring and a badge to your photo."
               } <a href="/app/?view=billing">See plans in Billing</a>.</p>`
         }
+        ${tier ? `<div id="ring-settings" class="stack gap-3">${ringControls(tier)}</div>` : ""}
       </div>
     </div>`;
   }
 
+  /* Ring style and visibility (0068). Only the database decides who may save;
+     a free member never reaches these controls because they have no tier. */
+  function ringControls(tier) {
+    if (!ringPrefs) {
+      return `<p class="muted" style="font-size:var(--fs-sm);margin:0">Loading your ring settings…</p>`;
+    }
+    return `
+      <div class="field">
+        <label class="field-label" for="ring-style">Ring style</label>
+        <select class="select" id="ring-style">
+          <option value="animated" ${ringPrefs.animated ? "selected" : ""}>Animated</option>
+          <option value="still" ${ringPrefs.animated ? "" : "selected"}>Still</option>
+        </select>
+        <div class="field-hint">${tier === "elite" ? "Elite rings pulse faster than Glow rings." : "Glow rings pulse slowly."} Choose still to stop the animation.</div>
+      </div>
+      <label class="ring-toggle"><input type="checkbox" id="ring-shown" ${ringPrefs.shown ? "checked" : ""} /><span>Show my ring to other members</span></label>
+      <div class="field-hint">Hiding your ring does not change your plan. You still see your own ring.</div>
+      <div class="row gap-2"><button class="btn btn-secondary btn-sm" type="button" id="save-ring">Save ring</button></div>`;
+  }
+
+  /* Read the member's ring settings once the card is on screen. A free member
+     has no settings to read, so nothing is requested for them. */
+  async function loadRingPrefs() {
+    const tier = activeTier(state.entitlement);
+    if (!tier) {
+      ringPrefs = null;
+      return;
+    }
+    try {
+      ringPrefs = await fetchRingPrefs();
+    } catch {
+      ringPrefs = null;
+    }
+    const box = qs("#ring-settings");
+    if (box) {
+      box.innerHTML = ringControls(activeTier(state.entitlement));
+      bindRing();
+    }
+  }
+
+  function bindRing() {
+    const button = qs("#save-ring");
+    if (!button) return;
+    button.addEventListener("click", async () => {
+      const animated = qs("#ring-style")?.value !== "still";
+      const shown = Boolean(qs("#ring-shown")?.checked);
+      button.disabled = true;
+      try {
+        await saveRingPrefs(animated, shown);
+        ringPrefs = { tierOk: true, animated, shown };
+        toast(
+          { title: "Ring saved", message: shown ? "Other members can see your ring." : "Your ring is hidden from other members. You still see it." },
+          { tone: "success" }
+        );
+      } catch (error) {
+        toastError(normalizeError(error));
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   function bindProfile() {
+    bindRing();
     const accentButton = qs("#save-accent");
     if (accentButton) {
       accentButton.addEventListener("click", async () => {
