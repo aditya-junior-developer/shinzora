@@ -1968,8 +1968,14 @@ function insertAtCaret(field, text, start, end) {
       await open(created.id);
       toast({ title: "Group created", message: "You are the owner of this group." }, { tone: "success" });
       /* A group of one is not useful, so the next step is offered rather than
-         left to be discovered inside Group info. */
-      openInfo();
+         left to be discovered inside Group info. On a phone the details panel
+         is not on screen, so a modal would cover the new group: point to it
+         with a message instead. */
+      if (window.matchMedia("(min-width: 1181px)").matches) {
+        openInfo();
+      } else {
+        toast({ title: "Add people next", message: "Tap Details at the top of the group to add members." }, { tone: "info" });
+      }
     } catch (error) {
       toastError(error);
     }

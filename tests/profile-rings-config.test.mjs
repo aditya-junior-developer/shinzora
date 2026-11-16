@@ -50,7 +50,8 @@ check("exactly four designs are premium", premium.length === 4);
 check("every other design is ₹10", RING_DESIGNS.filter((d) => !d.premium).every((d) => ringPriceRupees(d) === 10));
 check("the server reads each ring price from ring_designs", /ring_designs/.test(payments) && /price_paise/.test(payments) && !/RING_APPLY_PAISE/.test(payments));
 check("the client prices match the table seeded by 0071", ringPriceRupees({ premium: true }) * 100 === 2000 && ringPriceRupees({ premium: false }) * 100 === 1000);
-check("the payment function prices a ring from its own table", /purpose\.startsWith\("ring_apply:"\)[\s\S]*?RING_DESIGNS\[ringId\][\s\S]*?price_paise/.test(payments));
+check("the payment function prices a ring from its own table", /purpose\.startsWith\("ring_apply:"\)[\s\S]*?own\(RING_DESIGNS, ringId\)[\s\S]*?price_paise/.test(payments));
+check("price and plan tables are read only by their own keys (no inherited 'constructor')", /Object\.hasOwn\(table, key\)/.test(payments) && !/PLAN_PRICES\[plan\]|PREMIUM_PRICES\[tier\]|RING_DESIGNS\[ringId\]/.test(payments));
 check("an unknown design is refused by resolveAmount", /if \(!name\) return null;/.test(payments));
 check("the payment function never reads a client amount", !/body\.amount/.test(payments));
 check("a ring order records exactly the server price", /ring_orders"\)\.insert\(\{[\s\S]*?amount_paise: resolved\.amount/.test(payments));
@@ -71,7 +72,7 @@ check("Settings still saves the profile", /id="profile-form"/.test(settings) && 
 
 console.log("Billing");
 check("Billing shows the ring card and mounts the shared picker", /id="ring-card"/.test(billing) && /mountRingPicker\(/.test(billing));
-check("Billing buys through startPayment with ring_apply:<id>", /purpose: `ring_apply:\$\{design\.id\}`/.test(billing));
+check("Billing buys through startPayment, with the purpose from ringPurpose (ring_apply:<id> or rgb_ring)", /purpose: ringPurpose\(design\)/.test(billing) && /ringLabel\(design\)/.test(billing));
 check("Billing reads the price from the shared config", /ringPriceRupees/.test(billing));
 check("Billing no longer charges for an owned ring (no direct apply)", !/data-ring-apply/.test(billing));
 
@@ -89,7 +90,7 @@ console.log("Settings");
 const settingsSrc = readFileSync("public/js/modules/dashboard/views/settings.js", "utf8");
 check("Settings shows the ring card and mounts the picker", /id="ring-card-settings"/.test(settingsSrc) && /mountRingPicker\(ringHost/.test(settingsSrc));
 check("the Settings profile photo carries the member id, so the ring shows", /avatarUrl: profile\.avatar_url, size: "xl", userId: state\.user\?\.id/.test(settingsSrc));
-check("Settings buys a ring through the same payment as Billing", /ring_apply:\$\{design\.id\}/.test(settingsSrc));
+check("Settings buys a ring through the same payment as Billing (ringPurpose)", /ringPurpose\(design\)/.test(settingsSrc) && /ringLabel\(design\)/.test(settingsSrc));
 
 console.log("Server guard");
 check("the payment function refuses a ring already owned (409)", /profile_ring_owned/.test(payments) && /409, "ring_owned"/.test(payments));
@@ -108,7 +109,12 @@ check("applyRing refuses an id outside the catalogue", /KNOWN\.has\(ring\.id\)/.
 check("components.css draws the overlay from --ring-art", /\.avatar\[data-ring\]::after/.test(components) && /var\(--ring-art\)/.test(components));
 check("no tier ring rules remain in components.css", !/\.avatar\[data-tier\]/.test(components));
 check("no tier ring rules remain in views.css", !/\[data-tier\]/.test(views.replace(/\.premium-badge\[data-tier[^\n]*\n/g, "")));
-check("rings are animated: a spinning halo, an orbiting artwork and a pulsing glow", /ring-spin/.test(components) && /ring-orbit/.test(components) && /ring-glow/.test(components));
+check("rings are still: no spin, orbit or pulse remains in components.css", !/ring-spin|ring-orbit|ring-glow/.test(components) && !/animation: ring-(spin|orbit|glow)/.test(components));
+check("the PFP photo and artwork never move: no transform animation on the avatar itself", !/\.avatar\[data-ring\][^{]*\{[^}]*animation/.test(components));
+check("the rainbow halo is only for the RGB ring (never on a PFP design)", /\.avatar\[data-ring="rgb"\]::before/.test(components) && !/\.avatar\[data-ring\]::before/.test(components));
+check("sparkles: a few stars on their own elements, with reduced motion kept still", /\.ring-spark::after/.test(components) && /ring-spark 7s/.test(components) && /prefers-reduced-motion: reduce\) \{\s*\.ring-spark::after \{ animation: none/.test(components));
+check("the sparkle layer is added by rings.js and skips image elements", /data-ring-sparks/.test(rings) && /tagName === "IMG"/.test(rings));
+check("the RGB ring is a separate purpose, priced ₹30 (0074)", /export function ringPurpose[\s\S]*rgb_ring/.test(readFileSync("public/js/config/rings.js","utf8")) && /RGB_PRICE_RUPEES = 30/.test(readFileSync("public/js/config/rings.js","utf8")));
 check("the ring halo is bold and circular", /border-radius: 50%/.test(components) && /conic-gradient/.test(components));
 
 console.log("ring test helper");
@@ -134,7 +140,9 @@ check("a design writes its artwork", a.styles.get("--ring-art") === 'url("/asset
 check("a plain design has no screen blend", a.getAttribute("data-ring-blend") === null);
 const k = fake();
 applyRing(k, { id: "kuromi-neon", name: "Kuromi neon" });
-check("Kuromi writes the screen blend", k.getAttribute("data-ring-blend") === "screen");
+/* Kuromi is drawn with normal blending. The old screen blend, on the picker's
+   dark tile, showed the artwork's backing as a black disc. The PNG is clean. */
+check("Kuromi uses normal blending (no black disc)", k.getAttribute("data-ring-blend") === null);
 applyRing(a, null);
 check("a null ring clears the design", a.getAttribute("data-ring") === null && a.styles.get("--ring-art") === undefined);
 const bad = fake();

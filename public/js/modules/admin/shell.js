@@ -35,6 +35,7 @@ export const NAV = [
       { id: "subscriptions", label: "Subscriptions", icon: "crown" },
       { id: "projects", label: "Projects & deploys", icon: "panels-top-left" },
       { id: "support", label: "Support", icon: "life-buoy" },
+      { id: "support-requests", label: "Support requests", icon: "life-buoy" },
       { id: "themes", label: "Themes", icon: "palette" },
       { id: "contacts", label: "Contact messages", icon: "mail" }
     ]
@@ -63,6 +64,7 @@ const LOADERS = {
   subscriptions: () => import("./views/operations.js"),
   projects: () => import("./views/operations.js"),
   support: () => import("./views/operations.js"),
+  "support-requests": () => import("./views/support-requests.js"),
   contacts: () => import("./views/operations.js"),
   chat: () => import("./views/chat.js"),
   messaging: () => import("./views/messaging.js"),

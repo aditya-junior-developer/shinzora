@@ -19,7 +19,7 @@ import { sb, normalizeError } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
 import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
 import { DECK_PDF_RUPEES } from "../../../config/investor-deck.js";
-import { ringPriceRupees } from "../../../config/rings.js";
+import { ringLabel, ringPriceRupees, ringPurpose } from "../../../config/rings.js";
 import { mountRingPicker } from "../ring-picker.js";
 import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
 import { PREMIUM_EVENT } from "../../../lib/premium-live.js";
@@ -448,7 +448,7 @@ export default async function render(root) {
       <div class="card-head">
         <div>
           <div class="card-title">Profile ring</div>
-          <div class="card-sub">Preview any design on your photo before you buy. Buy a ring once and keep it: wear, change or remove it at no extra cost. ₹10 each; the four premium designs are ₹20.</div>
+          <div class="card-sub">Preview any design on your photo before you buy. Buy a ring once and keep it: wear, change or remove it at no extra cost. ₹10 each; the four premium designs are ₹20. The RGB ring is a separate feature, ₹30 once, and is never worn together with a PFP ring.</div>
         </div>
       </div>
       <div class="card-body" id="ring-card-body"></div>
@@ -465,8 +465,8 @@ export default async function render(root) {
       avatarUrl: state.profile?.avatar_url,
       onBuy: (design) =>
         startPayment({
-          purpose: `ring_apply:${design.id}`,
-          label: `Profile ring: ${design.name}`,
+          purpose: ringPurpose(design),
+          label: ringLabel(design),
           amount: ringPriceRupees(design) * 100,
           after: () => ringPicker?.refresh()
         })

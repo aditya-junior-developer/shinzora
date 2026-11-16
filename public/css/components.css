@@ -2297,16 +2297,19 @@ body.ip-open {
 .alerts-prompt .btn { flex: none; }
 
 /* ---------------------------------------------------------------------------
-   Profile rings (0069, 0071, 0073). A member's worn design is drawn around the
-   photo or initials as a bold, circular, animated frame. rings.js sets
-   data-ring (the design id) and --ring-art (its artwork); nothing here is
-   decided in the browser.
+   Profile rings (0069, 0071, 0073, 0074). A member's worn ring is drawn around
+   the photo or initials. rings.js sets data-ring (the design id) and --ring-art
+   (its artwork). nothing here is decided in the browser.
 
-   Two layers, both kept OUTSIDE the photo so the picture is never washed out:
-   - the halo: a thick, solid, colour-cycling band from the photo's edge outward,
-     so the ring reads at any size and at any zoom;
-   - the artwork: the design itself, masked so its centre is cut away and it
-     only sits around the photo.
+   Two separate looks, never combined:
+   - A PFP design is only its artwork. The photo and the ring stay completely
+     still and centred. There is no spin, no orbit and no pulse.
+   - The RGB ring (data-ring="rgb", 0074) is its own feature. It is a static
+     rainbow halo with no artwork, and it is never drawn with a PFP design.
+
+   Occasional sparkle: a few small four-point stars, each on its own element
+   (.ring-sparks, added by rings.js), that shine now and then around the ring.
+   They never move the photo. Reduced motion keeps them still.
    --------------------------------------------------------------------------- */
 .avatar[data-ring],
 .chat-avatar[data-ring] {
@@ -2314,22 +2317,10 @@ body.ip-open {
   overflow: visible;
   isolation: isolate;
   border-radius: 50%;
-  animation: ring-glow 2.4s ease-in-out infinite;
 }
 .avatar[data-ring] > img { border-radius: 50%; }
-.avatar[data-ring]::before,
-.chat-avatar[data-ring]::before {
-  content: "";
-  position: absolute;
-  inset: -24%;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, #ff2fb9, #ffd23f, #2ee6ff, #8b5cff, #ff2fb9);
-  -webkit-mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
-          mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
-  animation: ring-spin 3.2s linear infinite;
-  pointer-events: none;
-  z-index: -1;
-}
+
+/* PFP design: the artwork, masked so its centre is cut away. */
 .avatar[data-ring]::after,
 .chat-avatar[data-ring]::after {
   content: "";
@@ -2340,21 +2331,61 @@ body.ip-open {
           mask: radial-gradient(circle closest-side, transparent 62%, #000 66%);
   pointer-events: none;
   z-index: 2;
-  animation: ring-orbit 22s linear infinite;
 }
 .avatar[data-ring][data-ring-blend="screen"]::after,
 .chat-avatar[data-ring][data-ring-blend="screen"]::after { mix-blend-mode: screen; }
-@keyframes ring-spin { to { transform: rotate(360deg); } }
-@keyframes ring-orbit { to { transform: rotate(-360deg); } }
-@keyframes ring-glow {
-  0%, 100% { box-shadow: 0 0 8px 2px rgba(255, 47, 185, 0.35), 0 0 18px 4px rgba(46, 230, 255, 0.15); }
-  50%      { box-shadow: 0 0 18px 6px rgba(255, 210, 63, 0.55), 0 0 30px 10px rgba(139, 92, 255, 0.35); }
+
+/* RGB ring: a static rainbow halo just outside the photo. No artwork, no motion. */
+.avatar[data-ring="rgb"]::before,
+.chat-avatar[data-ring="rgb"]::before {
+  content: "";
+  position: absolute;
+  inset: -24%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #ff2fb9, #ffd23f, #2ee6ff, #8b5cff, #ff2fb9);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
+          mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
+  pointer-events: none;
+  z-index: -1;
+}
+.avatar[data-ring="rgb"]::after,
+.chat-avatar[data-ring="rgb"]::after { content: none; }
+
+/* The sparkle layer: one full-size box per star, so each star can sit at its own angle. */
+.ring-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.ring-spark {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--a, 0deg));
+}
+.ring-spark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -30%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  background: #fff;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: ring-spark 7s ease-in-out var(--delay, 0s) infinite;
+}
+.ring-spark:nth-child(even)::after { width: 6px; height: 6px; margin-left: -3px; top: -26%; }
+@keyframes ring-spark {
+  0%, 84%, 100% { opacity: 0; transform: scale(0.3); }
+  90%           { opacity: 1; transform: scale(1); }
+  96%           { opacity: 0; transform: scale(0.5); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .avatar[data-ring], .chat-avatar[data-ring],
-  .avatar[data-ring]::before, .chat-avatar[data-ring]::before,
-  .avatar[data-ring]::after, .chat-avatar[data-ring]::after { animation: none; }
+  .ring-spark::after { animation: none; opacity: 0.55; transform: none; }
 }
+
 /* The ring picker: a live preview of the ring on the member's own photo. */
 .ring-pick { display: grid; gap: var(--s-4); }
 .ring-preview {
@@ -2369,6 +2400,14 @@ body.ip-open {
 .ring-preview-actions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .ring-option-state { font-size: var(--fs-xs); color: var(--text-3); }
 .ring-option.is-selected { outline: 2px solid var(--brand-500, #a78bfa); outline-offset: 2px; }
+.ring-rgb-section { display: grid; gap: var(--s-3); }
+.ring-rgb-note { margin: 0; font-size: var(--fs-xs); color: var(--text-3); }
+.ring-picker-rgb { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+.ring-option-art.ring-option-rgb {
+  background: conic-gradient(from 0deg, #ff2fb9, #ffd23f, #2ee6ff, #8b5cff, #ff2fb9);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
+          mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
+}
 .premium-badge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: var(--fs-2xs); padding: 2px 8px; border-radius: 999px;

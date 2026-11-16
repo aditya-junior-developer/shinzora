@@ -148,7 +148,11 @@ for (const vp of VIEWPORTS) {
   await page.waitForSelector("#ring-card-host [data-ring-select]", { timeout: 20000 });
   await page.waitForTimeout(500);
   const optionCount = await page.locator("#ring-card-host .ring-option").count();
-  ok("Settings lists the default look and all eight designs", optionCount === 9, `count=${optionCount}`);
+  ok("Settings lists the default look and all eight designs", optionCount === 10, `count=${optionCount}`);
+  const gridCount = await page.locator("#ring-card-host .ring-picker:not(.ring-picker-rgb) .ring-option").count();
+  ok("the design grid holds the default look and the eight designs (nine tiles)", gridCount === 9, `grid=${gridCount}`);
+  const rgbTile = (await page.locator("#ring-card-host .ring-picker-rgb .ring-option").innerText().catch(() => "")).trim();
+  ok("the RGB ring is its own tile, priced ₹30, outside the design grid", /RGB ring/.test(rgbTile) && /₹30/.test(rgbTile), rgbTile);
   const previewRing = await page.locator("#ring-card-host [data-ring-stage] .avatar").getAttribute("data-ring");
   ok("the preview shows the ring being worn", previewRing === "sakura", `preview=${previewRing}`);
   const settingsAvatarRing = await page.locator("#avatar-slot .avatar").getAttribute("data-ring").catch(() => null);
@@ -201,7 +205,7 @@ for (const vp of VIEWPORTS) {
   await page.waitForSelector("#ring-card [data-ring-select]", { timeout: 20000 });
   await page.waitForTimeout(400);
   const billingOptions = await page.locator("#ring-card .ring-option").count();
-  ok("Billing lists the same nine choices", billingOptions === 9, `count=${billingOptions}`);
+  ok("Billing lists the same choices: the default look, eight designs and the RGB ring", billingOptions === 10, `count=${billingOptions}`);
   const stateOf = async (id) => (await page.locator(`#ring-card [data-ring-select='${id}'] .ring-option-state`).innerText().catch(() => "")).trim();
   ok("the worn ring is marked as wearing", /Wearing/.test(await stateOf("sakura")), await stateOf("sakura"));
   ok("an owned ring is marked as owned", /Owned/.test(await stateOf("thorn-rose")), await stateOf("thorn-rose"));

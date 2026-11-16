@@ -35,7 +35,7 @@ import { loadMemberWallpapers, uploadMemberWallpaper, useMemberWallpaper, remove
 import { MEMBER_WALLPAPER_MAX_COUNT, formatSize } from "../../../config/member-wallpaper.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
 import { mountRingPicker } from "../ring-picker.js";
-import { ringPriceRupees } from "../../../config/rings.js";
+import { ringLabel, ringPriceRupees, ringPurpose } from "../../../config/rings.js";
 import { BUSINESS_FIELDS, BUSINESS_FIELD_RUPEES, BUSINESS_FIELD_MAX, fieldsTotalRupees } from "../../../config/business-fields.js";
 import { openPaymentDialog } from "../payment-dialog.js";
 
@@ -220,13 +220,14 @@ export default async function render(root) {
   /* The ring picker's handle, so a finished purchase can repaint the card. */
   let ringHandle = null;
 
-  /* Buying a ring is a payment, the same one Billing makes. The ring is owned
-     (and can be worn) once the payment is verified. */
+  /* Buying a ring is a payment, the same one Billing makes. A PFP design and the
+     RGB ring (0074) have their own purposes, so each is owned on its own. The
+     ring is owned (and can be worn) once the payment is verified. */
   async function startRingPurchase(design) {
     const amount = ringPriceRupees(design) * 100;
-    const label = `Profile ring: ${design.name}`;
+    const label = ringLabel(design);
     try {
-      const response = await api.payments.create({ purpose: `ring_apply:${design.id}`, label, amount, plan: null });
+      const response = await api.payments.create({ purpose: ringPurpose(design), label, amount, plan: null });
       openPaymentDialog({
         payment: response?.payment,
         upi: response?.upi,

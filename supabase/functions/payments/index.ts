@@ -48,6 +48,16 @@ const DECK_EXPERT_PRICE = { amount: 3000, label: "Written by Experts investor de
 const BUSINESS_FIELD_KEYS = ["name", "category", "location", "description", "target_audience", "website_url", "phone", "email"];
 const BUSINESS_FIELD_PAISE = 1000;
 
+/* Read a price or limit table by key, but only its own keys. A plain object
+   lookup would return inherited members such as "constructor" for a bad key. */
+function own<T>(table: Record<string, T>, key: unknown): T | undefined {
+  return typeof key === "string" && Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
+/* The RGB ring (0074): a separate one-time purchase, ₹30. Never sold as a PFP
+   design, and never read from the browser. */
+const RGB_RING_PAISE = 3000;
+
 /* Profile rings (0069, 0071): each design has its own price in
    public.ring_designs.price_paise (₹20 premium, ₹10 standard). The ids and names
    are kept in step with that table. The browser never sets the price. */
@@ -172,6 +182,19 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
     }
   }
 
+  /* The RGB ring is bought once (0074). A second purchase is refused here. */
+  if (purpose === "rgb_ring") {
+    const { data: owned, error: ownedError } = await admin()
+      .from("profile_rgb_owned")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (ownedError) return fail(500, "payments_error", "Could not check your rings. Try again.");
+    if (owned) {
+      return fail(409, "rgb_owned", "You already own the RGB ring. Wear it from your profile. No payment is needed.");
+    }
+  }
+
   const fields = purpose === "business_fields" ? normaliseFields(body.fields) : null;
   if (purpose === "business_fields" && !fields) {
     return fail(400, "invalid_input", "Tick at least one business profile field, and no more than eight.");
@@ -214,13 +237,13 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   /* A premium tier the member already holds (or a higher one) is refused on the
      server. The browser hides the button too, but that is not the check. */
   if (purpose.startsWith("premium:")) {
-    const wanted = PREMIUM_PRICES[purpose.split(":")[1]];
+    const wanted = own(PREMIUM_PRICES, purpose.split(":")[1]);
     const { data: held } = await admin()
       .from("profile_entitlements")
       .select("tier")
       .eq("user_id", userId)
       .maybeSingle();
-    const heldRank = held ? (PREMIUM_PRICES[held.tier]?.rank ?? 0) : 0;
+    const heldRank = held ? (own(PREMIUM_PRICES, held.tier)?.rank ?? 0) : 0;
     if (heldRank >= wanted.rank) {
       return fail(409, "already_entitled", "You already have this profile or a higher one.", {
         hint: "Premium profiles are one-time purchases. Pick a tier above your current one."
@@ -368,9 +391,13 @@ async function resolveAmount(userId: string, purpose: string, fields?: string[])
     };
   }
 
+  if (purpose === "rgb_ring") {
+    return { amount: RGB_RING_PAISE, label: "RGB ring" };
+  }
+
   if (purpose.startsWith("ring_apply:")) {
     const ringId = purpose.slice("ring_apply:".length);
-    const name = RING_DESIGNS[ringId];
+    const name = own(RING_DESIGNS, ringId);
     if (!name) return null;
     const { data: design, error: designError } = await admin()
       .from("ring_designs")
@@ -384,13 +411,14 @@ async function resolveAmount(userId: string, purpose: string, fields?: string[])
 
   if (purpose.startsWith("subscription:")) {
     const plan = purpose.split(":")[1];
-    if (!PLAN_PRICES[plan]) return null;
-    return { amount: PLAN_PRICES[plan], label: `${plan === "pro" ? "Pro" : "Enterprise"} plan`, plan };
+    const planPrice = own(PLAN_PRICES, plan);
+    if (!planPrice) return null;
+    return { amount: planPrice, label: `${plan === "pro" ? "Pro" : "Enterprise"} plan`, plan };
   }
 
   if (purpose.startsWith("premium:")) {
     const tier = purpose.split(":")[1];
-    const entry = PREMIUM_PRICES[tier];
+    const entry = own(PREMIUM_PRICES, tier);
     if (!entry) return null;
     return { amount: entry.amount, label: entry.label };
   }
@@ -405,7 +433,7 @@ async function resolveAmount(userId: string, purpose: string, fields?: string[])
 
   if (purpose.startsWith("service:")) {
     const service = purpose.split(":")[1];
-    const entry = SERVICE_PRICES[service];
+    const entry = own(SERVICE_PRICES, service);
     if (!entry) return null;
     return { amount: entry.amount, label: entry.label };
   }

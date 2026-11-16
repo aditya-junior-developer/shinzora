@@ -76,3 +76,8 @@ verify_jwt = true
 
 [functions.deck]
 verify_jwt = true
+
+# Customer Support assistant for Shinzora users: its own prompt and history, not the
+# Website Builder AI or the Gemini assistant. Signed-in users only.
+[functions.support-ai]
+verify_jwt = true

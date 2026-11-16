@@ -24,6 +24,12 @@ const PLAN_LIMITS: Record<string, { credits: number; label: string }> = {
   enterprise: { credits: 6000, label: "Enterprise" }
 };
 
+/* Read a plan table by key, but only its own keys (a plain lookup would return
+   inherited members such as "constructor" for a bad key). */
+function own<T>(table: Record<string, T>, key: unknown): T | undefined {
+  return typeof key === "string" && Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
 /* A malformed id used to reach Postgres and come back as a 500, which reads to
    an operator like the console is broken. Reject it here with a plain 400. */
 const isUuid = (value: string) =>
@@ -372,7 +378,7 @@ async function applyPaymentEffect(payment: Record<string, any>) {
 
   if (purpose.startsWith("subscription:")) {
     const plan = purpose.split(":")[1];
-    const limits = PLAN_LIMITS[plan];
+    const limits = own(PLAN_LIMITS, plan);
     if (!limits) return;
 
     const periodEnd = new Date();
@@ -845,7 +851,8 @@ async function subscriptionUpdate(adminId: string, body: Record<string, unknown>
   const userId = clean(body.userId, 64);
   const plan = clean(body.plan, 20);
   const status = clean(body.status, 20) || "active";
-  if (!userId || !PLAN_LIMITS[plan]) return fail(400, "invalid_input", "A customer and a valid plan are required.");
+  const planLimit = own(PLAN_LIMITS, plan);
+  if (!userId || !planLimit) return fail(400, "invalid_input", "A customer and a valid plan are required.");
 
   const { data, error } = await admin()
     .from("subscriptions")
@@ -854,7 +861,7 @@ async function subscriptionUpdate(adminId: string, body: Record<string, unknown>
         user_id: userId,
         plan,
         status,
-        ai_credits_limit: PLAN_LIMITS[plan].credits,
+        ai_credits_limit: planLimit.credits,
         updated_at: new Date().toISOString()
       },
       { onConflict: "user_id" }
@@ -866,7 +873,7 @@ async function subscriptionUpdate(adminId: string, body: Record<string, unknown>
   await admin().from("notifications").insert({
     user_id: userId,
     title: "Subscription updated",
-    body: `An administrator set your plan to ${PLAN_LIMITS[plan].label} (${status}).`,
+    body: `An administrator set your plan to ${planLimit.label} (${status}).`,
     type: "account",
     link: "/app/?view=billing"
   });

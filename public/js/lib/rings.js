@@ -1,7 +1,7 @@
 /* ==========================================================================
    Shinzora — profile rings on every avatar
    --------------------------------------------------------------------------
-   A member who has applied a ring design (₹10 each time, see 0069) wears it on
+   A member who wears a PFP ring design, or the separate RGB ring (0074), wears it on
    their photo or initials wherever their avatar appears. The choice is decided
    by the database, never by the browser:
 
@@ -17,12 +17,17 @@
    ========================================================================== */
 
 import { sb } from "./supabase.js";
-import { RING_DESIGNS, ringArtUrl } from "../config/rings.js";
+import { RING_DESIGNS, RGB_RING, ringArtUrl } from "../config/rings.js";
 
 const TTL_MS = 5 * 60 * 1000;
 const CHUNK = 200;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const KNOWN = new Set(RING_DESIGNS.map((design) => design.id));
+const KNOWN = new Set([...RING_DESIGNS.map((design) => design.id), RGB_RING.id]);
+
+/* Small stars that shine now and then around the ring (see components.css). They sit
+   on their own elements, so the photo itself never moves. Five stars, staggered. */
+const SPARK_ANGLES = [22, 96, 171, 244, 317];
+const SPARK_DELAYS = ["0s", "1.6s", "3.1s", "4.7s", "6.2s"];
 
 /** member id -> { ring: { id, name } | null, at }. ring is null for a member with no ring. */
 const cache = new Map();
@@ -30,19 +35,49 @@ const inflight = new Map();
 let watching = false;
 let scheduled = null;
 
-/** Write the ring onto one element. A null or unknown ring removes it. */
+/** Add or remove the sparkle layer on one element. Images cannot hold children, so they get none. */
+function setSparks(node, on) {
+  if (!node || node.tagName === "IMG" || !node.children || typeof node.appendChild !== "function") return;
+  const existing = [...node.children].find((child) => child.hasAttribute?.("data-ring-sparks"));
+  if (!on) {
+    existing?.remove?.();
+    return;
+  }
+  if (existing || typeof document === "undefined") return;
+  const box = document.createElement("span");
+  box.className = "ring-sparks";
+  box.setAttribute("data-ring-sparks", "");
+  box.setAttribute("aria-hidden", "true");
+  box.innerHTML = SPARK_ANGLES.map(
+    (angle, i) => `<span class="ring-spark" style="--a:${angle}deg;--delay:${SPARK_DELAYS[i]}"></span>`
+  ).join("");
+  node.appendChild(box);
+}
+
+/**
+ * Write the ring onto one element. A null or unknown ring removes it.
+ * A PFP design draws its artwork. The RGB ring (0074) draws its own rainbow
+ * halo and never uses artwork, so the two are never drawn together.
+ */
 export function applyRing(node, ring) {
   if (!node) return;
   if (ring?.id && KNOWN.has(ring.id)) {
     node.setAttribute("data-ring", ring.id);
-    node.style.setProperty("--ring-art", `url("${ringArtUrl(ring.id)}")`);
-    const blend = RING_DESIGNS.find((design) => design.id === ring.id)?.blend;
-    if (blend === "screen") node.setAttribute("data-ring-blend", "screen");
-    else node.removeAttribute("data-ring-blend");
+    if (ring.id === RGB_RING.id) {
+      node.style.removeProperty("--ring-art");
+      node.removeAttribute("data-ring-blend");
+    } else {
+      node.style.setProperty("--ring-art", `url("${ringArtUrl(ring.id)}")`);
+      const blend = RING_DESIGNS.find((design) => design.id === ring.id)?.blend;
+      if (blend === "screen") node.setAttribute("data-ring-blend", "screen");
+      else node.removeAttribute("data-ring-blend");
+    }
+    setSparks(node, true);
   } else {
     node.removeAttribute("data-ring");
     node.removeAttribute("data-ring-blend");
     node.style.removeProperty("--ring-art");
+    setSparks(node, false);
   }
 }
 

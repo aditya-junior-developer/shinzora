@@ -242,5 +242,80 @@ check("the ring settings table from 0068 is gone", (await q(`select to_regclass(
 check("the ring settings functions from 0068 are gone", (await q(`select to_regprocedure('public.ring_prefs_get()') as p`))[0].p === null);
 check("the ring settings save function from 0068 is gone", (await q(`select to_regprocedure('public.ring_prefs_set(boolean,boolean)') as p`))[0].p === null);
 
+console.log("the RGB ring (0074): a separate ₹30 feature");
+const countAsBob = async () => { const n = await paymentCount(ids.bob); await asUser(ids.bob); return n; };
+const rgbOwnedOf = async (userId) => (await q(`select user_id from public.profile_rgb_owned where user_id = $1`, [userId])).length;
+const rgbChoiceOf = async (userId) => (await q(`select user_id from public.profile_rgb_choices where user_id = $1`, [userId])).length;
+const rgbPayment = async (ownerId) => {
+  await asSystem();
+  const { rows: [pay] } = await db.query(
+    `insert into public.payments (owner_id, purpose, label, amount, status) values ($1, 'rgb_ring', 'RGB ring', 3000, 'pending') returning id`,
+    [ownerId]
+  );
+  return pay.id;
+};
+const memberRingOf = async (userId) => q(`select ring_id, ring_name from public.member_rings($1::uuid[])`, [[userId]]);
+
+await asSystem();
+const rgbPendingBob = await rgbPayment(ids.bob);
+check("a pending RGB payment does not grant the ring", (await rgbOwnedOf(ids.bob)) === 0);
+await asUser(ids.bob);
+check("the RGB ring cannot be worn before it is bought", (await errorCode(() => q(`select public.rgb_wear()`))) === "42501");
+
+await setStatus(rgbPendingBob, "verified");
+check("a verified RGB payment records the ring as owned", (await rgbOwnedOf(ids.bob)) === 1);
+check("buying the RGB ring wears it, like a design purchase does", (await rgbChoiceOf(ids.bob)) === 1);
+const rgbPayCount = await paymentCount(ids.bob);
+await asUser(ids.bob);
+check("a member cannot add their own RGB ownership", (await errorCode(() => q(`insert into public.profile_rgb_owned (user_id) values ($1)`, [ids.bob]))) === "42501");
+check("a member cannot switch the RGB ring on directly", (await errorCode(() => q(`insert into public.profile_rgb_choices (user_id) values ($1)`, [ids.bob]))) === "42501");
+
+await q(`select public.rgb_wear()`);
+check("an owner can wear the RGB ring", (await rgbChoiceOf(ids.bob)) === 1);
+check("wearing the RGB ring creates no payment", (await countAsBob()) === rgbPayCount);
+const bobRing = await memberRingOf(ids.bob);
+check("the RGB ring is what other members see", bobRing.length === 1 && bobRing[0].ring_id === "rgb" && bobRing[0].ring_name === "RGB ring", JSON.stringify(bobRing));
+check("a PFP design is cleared while the RGB ring is worn (never both)", (await choiceOf(ids.bob)).length === 0);
+
+await q(`select public.ring_wear('tiger-gold')`);
+check("wearing a PFP design turns the RGB ring off", (await rgbChoiceOf(ids.bob)) === 0);
+const bobDesign = await memberRingOf(ids.bob);
+check("after switching back, the design is shown and not the RGB ring", bobDesign.length === 1 && bobDesign[0].ring_id === "tiger-gold", JSON.stringify(bobDesign));
+check("the RGB ring stays owned after switching to a design", (await rgbOwnedOf(ids.bob)) === 1);
+
+await q(`select public.rgb_wear()`);
+await q(`select public.ring_remove()`);
+check("removing the ring clears the RGB ring too", (await rgbChoiceOf(ids.bob)) === 0 && (await memberRingOf(ids.bob)).length === 0);
+check("removing the ring keeps the RGB ring owned", (await rgbOwnedOf(ids.bob)) === 1);
+await q(`select public.rgb_wear()`);
+check("an owned RGB ring can be worn again without paying", (await rgbChoiceOf(ids.bob)) === 1 && (await countAsBob()) === rgbPayCount);
+
+await asUser(ids.alice);
+check("a member who never bought the RGB ring cannot wear it", (await errorCode(() => q(`select public.rgb_wear()`))) === "42501");
+check("a PFP design purchase does not grant the RGB ring", (await rgbOwnedOf(ids.alice)) === 0);
+await asAnon();
+check("anonymous visitors cannot wear the RGB ring", (await errorCode(() => q(`select public.rgb_wear()`))) === "42501");
+
+await asUser(ids.bob);
+/* Bob wears the RGB ring, then buys a PFP design. The purchase must wear the
+   design and turn the RGB ring off: never both. (0075) */
+await q(`select public.rgb_wear()`);
+check("before the purchase, the RGB ring is worn", (await rgbChoiceOf(ids.bob)) === 1);
+const pfpAfterRgb = await order(ids.bob, "kuromi-neon", "pending");
+await setStatus(pfpAfterRgb, "verified");
+check("a verified design purchase wears the design", (await choiceOf(ids.bob)).some((r) => r.ring_id === "kuromi-neon"));
+check("a verified design purchase turns the RGB ring off (never both)", (await rgbChoiceOf(ids.bob)) === 0);
+await asUser(ids.bob);
+check("only the design is shown after the purchase", JSON.stringify((await memberRingOf(ids.bob)).map((r) => r.ring_id)) === JSON.stringify(["kuromi-neon"]), JSON.stringify(await memberRingOf(ids.bob)));
+check("the RGB ring stays owned after a design purchase", (await rgbOwnedOf(ids.bob)) === 1);
+
+await asUser(ids.bob);
+await q(`select public.rgb_wear()`);
+check("wearing RGB again turns the design off (never both)", (await choiceOf(ids.bob)).length === 0 && (await rgbChoiceOf(ids.bob)) === 1);
+await asSystem();
+const rgbPayAgain = await rgbPayment(ids.bob);
+await setStatus(rgbPayAgain, "verified");
+check("a second verified RGB payment keeps one ownership row", (await rgbOwnedOf(ids.bob)) === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
