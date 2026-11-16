@@ -156,6 +156,22 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   const purpose = clean(body.purpose, 80);
   if (!purpose) return fail(400, "invalid_input", "A payment purpose is required.");
 
+  /* A ring the member already owns is worn from their profile, not bought
+     again (0073). Refused here so a second charge can never be created. */
+  if (purpose.startsWith("ring_apply:")) {
+    const ownedRing = purpose.slice("ring_apply:".length);
+    const { data: owned, error: ownedError } = await admin()
+      .from("profile_ring_owned")
+      .select("ring_id")
+      .eq("user_id", userId)
+      .eq("ring_id", ownedRing)
+      .maybeSingle();
+    if (ownedError) return fail(500, "payments_error", "Could not check your rings. Try again.");
+    if (owned) {
+      return fail(409, "ring_owned", "You already own this ring. Wear it from your profile. No payment is needed.");
+    }
+  }
+
   const fields = purpose === "business_fields" ? normaliseFields(body.fields) : null;
   if (purpose === "business_fields" && !fields) {
     return fail(400, "invalid_input", "Tick at least one business profile field, and no more than eight.");

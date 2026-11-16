@@ -19,7 +19,8 @@ import { sb, normalizeError } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
 import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
 import { DECK_PDF_RUPEES } from "../../../config/investor-deck.js";
-import { RING_DESIGNS, ringArtUrl, ringPriceRupees } from "../../../config/rings.js";
+import { ringPriceRupees } from "../../../config/rings.js";
+import { mountRingPicker } from "../ring-picker.js";
 import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
 import { PREMIUM_EVENT } from "../../../lib/premium-live.js";
 import { payments as fetchPayments, subscription } from "../data.js";
@@ -38,7 +39,7 @@ const SERVICES = [
 
 let paymentRows = [];
 let premiumOrders = [];
-let ringChoice = null;
+let ringPicker = null;
 let current = null;
 let runtime = null;
 
@@ -64,16 +65,14 @@ export default async function render(root) {
 
   runtime = await runtimeConfig();
   try {
-    const [paymentsRes, subRes, premiumRes, ringRes] = await Promise.all([
+    const [paymentsRes, subRes, premiumRes] = await Promise.all([
       fetchPayments(60),
       subscription(),
-      sb.from("premium_orders").select("id, tier, status, due_by, created_at").order("created_at", { ascending: false }).limit(10),
-      sb.from("profile_ring_choices").select("ring_id").maybeSingle()
+      sb.from("premium_orders").select("id, tier, status, due_by, created_at").order("created_at", { ascending: false }).limit(10)
     ]);
     paymentRows = paymentsRes.data;
     current = subRes;
     premiumOrders = premiumRes?.data || [];
-    ringChoice = ringRes?.data || null;
   } catch (error) {
     root.innerHTML = `${pageHead({ title: "Billing" })}${setupNotice(error, "Billing")}`;
     return;
@@ -177,7 +176,7 @@ export default async function render(root) {
           </div>
         </div>
 
-        ${ringCard()}
+        ${ringCardShell()}
 
         <div class="card">
           <div class="card-head">
@@ -280,6 +279,8 @@ export default async function render(root) {
         </div>
       </div>
     </div>`;
+  /* The profile ring picker (0073). */
+  await mountRingCard(root);
 
   /* Investor deck PDF (P9). Owners only: the server refuses it for any other
      account, and the card is hidden for them too. Price is Rs 20 per export. */
@@ -319,15 +320,6 @@ export default async function render(root) {
       /* The amount shown is paise, as elsewhere in billing. The gateway charges
          its own price for `premium:<tier>` and refuses a tier already held. */
       startPayment({ purpose: `premium:${tier.id}`, label: `${tier.name} profile`, amount: tier.priceRupees * 100 });
-      return;
-    }
-
-    const ringBuy = event.target.closest("[data-ring-apply]");
-    if (ringBuy) {
-      const design = RING_DESIGNS.find((d) => d.id === ringBuy.getAttribute("data-ring-apply"));
-      if (!design) return;
-      /* The server sets the price for ring_apply:<id> from ring_designs; the amount here is for the dialog only. */
-      startPayment({ purpose: `ring_apply:${design.id}`, label: `Profile ring: ${design.name}`, amount: ringPriceRupees(design) * 100 });
       return;
     }
 
@@ -411,7 +403,7 @@ export default async function render(root) {
     }
   }
 
-  async function startPayment({ purpose, label, amount, plan: planId }) {
+  async function startPayment({ purpose, label, amount, plan: planId, after }) {
     try {
       const response = await api.payments.create({ purpose, label, amount, plan: planId || null });
       openPaymentDialog({
@@ -419,7 +411,10 @@ export default async function render(root) {
         upi: response?.upi,
         label,
         amount,
-        onDone: refreshRows
+        onDone: () => {
+          refreshRows();
+          after?.();
+        }
       });
       if (response?.payment) paymentRows.unshift(response.payment);
     } catch (error) {
@@ -444,31 +439,38 @@ export default async function render(root) {
   }
 
 
-  /* Profile rings (0069). One design is worn at a time; each application is a
-     ₹10 payment, and the ring changes only once that payment is verified. */
-  function ringCard() {
-    const worn = RING_DESIGNS.find((d) => d.id === ringChoice?.ring_id);
+  /* Profile rings (0069, 0073). The picker shows a live preview on the member's
+     own photo, a purchase is made once, and wearing, changing or removing a ring
+     that is owned costs nothing. */
+  function ringCardShell() {
     return `
     <div class="card" id="ring-card">
       <div class="card-head">
         <div>
           <div class="card-title">Profile ring</div>
-          <div class="card-sub">Wear one of eight designs around your photo. ₹10 each time you apply one; the four premium designs are ₹20. It appears once the payment is verified.</div>
-        </div>
-        ${worn ? `<span class="badge badge-neutral">Wearing ${esc(worn.name)}</span>` : ""}
-      </div>
-      <div class="card-body">
-        <div class="ring-picker">
-          ${RING_DESIGNS.map(
-            (d) => `<div class="ring-option" ${worn?.id === d.id ? 'aria-current="true"' : ""}>
-              <span class="ring-option-art" ${d.blend === "screen" ? 'data-blend="screen"' : ""}><img src="${esc(ringArtUrl(d.id))}" alt="" loading="lazy" decoding="async" /></span>
-              <strong>${esc(d.name)}</strong>
-              <button class="btn btn-primary btn-sm btn-block" type="button" data-ring-apply="${esc(d.id)}">Apply · ₹${ringPriceRupees(d)}</button>
-            </div>`
-          ).join("")}
+          <div class="card-sub">Preview any design on your photo before you buy. Buy a ring once and keep it: wear, change or remove it at no extra cost. ₹10 each; the four premium designs are ₹20.</div>
         </div>
       </div>
+      <div class="card-body" id="ring-card-body"></div>
     </div>`;
+  }
+
+  async function mountRingCard(root) {
+    const host = qs("#ring-card-body", root);
+    if (!host) return;
+    ringPicker = await mountRingPicker(host, {
+      userId: state.user?.id,
+      name: state.profile?.full_name,
+      email: state.user?.email,
+      avatarUrl: state.profile?.avatar_url,
+      onBuy: (design) =>
+        startPayment({
+          purpose: `ring_apply:${design.id}`,
+          label: `Profile ring: ${design.name}`,
+          amount: ringPriceRupees(design) * 100,
+          after: () => ringPicker?.refresh()
+        })
+    });
   }
 
   function showReceipt(row) {

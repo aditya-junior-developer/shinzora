@@ -91,14 +91,16 @@ let seq = 0;
 async function order(ownerId, ringId, status = "pending") {
   seq += 1;
   await asSystem();
+  /* The price comes from the design, as the Edge Function reads it: ₹20 for the premium designs, ₹10 otherwise. */
   const { rows: [pay] } = await db.query(
     `insert into public.payments (owner_id, purpose, label, amount, status)
-     values ($1, $2, 'Profile ring', 1000, 'pending') returning id`,
-    [ownerId, `ring_apply:${ringId}`]
+     select $1, $2, 'Profile ring', price_paise, 'pending' from public.ring_designs where id = $3
+     returning id, amount`,
+    [ownerId, `ring_apply:${ringId}`, ringId]
   );
   await db.query(
-    `insert into public.ring_orders (payment_id, owner_id, ring_id, amount_paise) values ($1, $2, $3, 1000)`,
-    [pay.id, ownerId, ringId]
+    `insert into public.ring_orders (payment_id, owner_id, ring_id, amount_paise) values ($1, $2, $3, $4)`,
+    [pay.id, ownerId, ringId, Math.round(Number(pay.amount))]
   );
   if (status !== "pending") {
     await db.query(`update public.payments set status = $2 where id = $1`, [pay.id, status]);
@@ -168,7 +170,8 @@ check("a member cannot insert a choice", (await errorCode(() => q(`insert into p
 check("a member cannot write an order", (await errorCode(() => q(`insert into public.ring_orders (payment_id, owner_id, ring_id, amount_paise) values (gen_random_uuid(), $1, 'sakura', 1000)`, [ids.bob]))) === "42501");
 
 await asSystem();
-check("an order must cost exactly ₹10", (await errorCode(() => q(`insert into public.ring_orders (payment_id, owner_id, ring_id, amount_paise) values ($1, $2, 'sakura', 500)`, [payBob, ids.bob]))) === "23514");
+check("an order must cost exactly ₹10 or ₹20", (await errorCode(() => q(`insert into public.ring_orders (payment_id, owner_id, ring_id, amount_paise) values ($1, $2, 'sakura', 500)`, [payBob, ids.bob]))) === "23514");
+check("a premium ring (tiger-gold) order is stored at ₹20", Number((await q(`select amount_paise from public.ring_orders where payment_id = $1`, [payBob]))[0]?.amount_paise) === 2000);
 
 await asAnon();
 check("anonymous visitors get no rings", (await errorCode(() => q(`select * from public.member_rings($1::uuid[])`, [[ids.alice]]))) === "42501");
@@ -191,6 +194,47 @@ check("exactly one of alice's orders is the applied one", ledger.filter((r) => r
 check("the cancelled order is shown as not applied", ledger.some((r) => r.ring_id === "gothic-skull" && r.payment_status === "cancelled" && r.applied === false));
 await asAnon();
 check("anonymous visitors cannot read the ledger", (await errorCode(() => q(`select * from public.admin_ring_ledger(10)`))) === "42501");
+
+console.log("owning a ring (0073)");
+const ownedOf = async (userId) => (await q(`select ring_id from public.profile_ring_owned where user_id = $1 order by ring_id`, [userId])).map((r) => r.ring_id);
+const paymentCount = async (userId) => {
+  await asSystem();
+  return Number((await q(`select count(*)::int as n from public.payments where owner_id = $1`, [userId]))[0].n);
+};
+await asSystem();
+const aliceBuysOne = await order(ids.alice, "thorn-rose", "verified");
+check("a verified purchase records the ring as owned", (await ownedOf(ids.alice)).includes("thorn-rose"));
+check("the bought ring is worn straight away", (await choiceOf(ids.alice))[0]?.ring_id === "thorn-rose");
+await asUser(ids.alice);
+check("a member can read the rings they own", (await ownedOf(ids.alice)).includes("thorn-rose"));
+await asUser(ids.bob);
+check("another member cannot read someone else's rings", (await ownedOf(ids.alice)).length === 0);
+await asUser(ids.alice);
+check("a member cannot add an owned ring for themselves", (await errorCode(() => q(`insert into public.profile_ring_owned (user_id, ring_id) values ($1, 'tiger-gold')`, [ids.alice]))) === "42501");
+check("a member cannot change their worn ring directly", (await errorCode(() => q(`update public.profile_ring_choices set ring_id = 'tiger-gold' where user_id = $1`, [ids.alice]))) === "42501");
+
+const before = await paymentCount(ids.alice);
+await asUser(ids.alice);
+await q(`select public.ring_wear('sakura')`).catch(() => {});
+check("wearing a ring that was bought earlier works", (await choiceOf(ids.alice))[0]?.ring_id === "sakura");
+check("wearing an owned ring creates no payment", (await paymentCount(ids.alice)) === before);
+await asUser(ids.alice);
+await q(`select public.ring_wear('sakura')`).catch(() => {});
+check("wearing and removing rings wrote no payment", (await paymentCount(ids.alice)) === before);
+await q(`select public.ring_wear('tiger-gold')`).catch(() => {});
+check("wearing a ring not owned is refused", (await choiceOf(ids.alice))[0]?.ring_id === "sakura");
+
+await asUser(ids.alice);
+await q(`select public.ring_remove()`);
+check("removing the ring returns to the default look", (await choiceOf(ids.alice)).length === 0);
+await asUser(ids.bob);
+check("after removal other members see no ring", (await q(`select * from public.member_rings($1::uuid[])`, [[ids.alice]])).length === 0);
+await asUser(ids.alice);
+check("the removed ring is still owned", (await ownedOf(ids.alice)).includes("sakura"));
+await q(`select public.ring_wear('thorn-rose')`);
+check("the owned ring can be worn again after removal", (await choiceOf(ids.alice))[0]?.ring_id === "thorn-rose");
+await asAnon();
+check("anonymous visitors cannot wear a ring", (await errorCode(() => q(`select public.ring_wear('sakura')`))) === "42501");
 
 console.log("removed");
 await asSystem();

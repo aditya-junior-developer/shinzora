@@ -2297,11 +2297,16 @@ body.ip-open {
 .alerts-prompt .btn { flex: none; }
 
 /* ---------------------------------------------------------------------------
-   Profile rings (0069, 0071). A member's chosen design is drawn around the
-   photo or initials as a bold, circular, animated frame. rings.js sets data-ring
-   (the design id) and --ring-art (its artwork); nothing here is decided in the
-   browser. Two layers: a spinning brand-coloured halo that makes the ring
-   visible at any size, and the artwork on top of it, breathing slowly.
+   Profile rings (0069, 0071, 0073). A member's worn design is drawn around the
+   photo or initials as a bold, circular, animated frame. rings.js sets
+   data-ring (the design id) and --ring-art (its artwork); nothing here is
+   decided in the browser.
+
+   Two layers, both kept OUTSIDE the photo so the picture is never washed out:
+   - the halo: a thick, solid, colour-cycling band from the photo's edge outward,
+     so the ring reads at any size and at any zoom;
+   - the artwork: the design itself, masked so its centre is cut away and it
+     only sits around the photo.
    --------------------------------------------------------------------------- */
 .avatar[data-ring],
 .chat-avatar[data-ring] {
@@ -2314,11 +2319,12 @@ body.ip-open {
 .chat-avatar[data-ring]::before {
   content: "";
   position: absolute;
-  inset: -22%;
+  inset: -24%;
   border-radius: 50%;
-  background: conic-gradient(from 0deg, #ff4fd8, #ffd45c, #47e6ff, #9d7bff, #ff4fd8);
-  -webkit-mask: radial-gradient(circle, transparent 58%, #000 62%, #000 70%, transparent 74%);
-          mask: radial-gradient(circle, transparent 58%, #000 62%, #000 70%, transparent 74%);
+  background: conic-gradient(from 0deg, #ff2fb9, #ffd23f, #2ee6ff, #8b5cff, #ff2fb9);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
+          mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.45));
   animation: ring-spin 3.2s linear infinite;
   pointer-events: none;
   z-index: -1;
@@ -2327,24 +2333,39 @@ body.ip-open {
 .chat-avatar[data-ring]::after {
   content: "";
   position: absolute;
-  inset: -26%;
+  inset: -28%;
   background: var(--ring-art) center / contain no-repeat;
+  -webkit-mask: radial-gradient(circle closest-side, transparent 62%, #000 66%);
+          mask: radial-gradient(circle closest-side, transparent 62%, #000 66%);
   pointer-events: none;
   z-index: 2;
   animation: ring-breathe 2.6s ease-in-out infinite;
-  filter: drop-shadow(0 0 6px rgba(255, 79, 216, 0.55));
 }
 .avatar[data-ring][data-ring-blend="screen"]::after,
 .chat-avatar[data-ring][data-ring-blend="screen"]::after { mix-blend-mode: screen; }
 @keyframes ring-spin { to { transform: rotate(360deg); } }
 @keyframes ring-breathe {
-  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(255, 79, 216, 0.45)); }
-  50% { transform: scale(1.04); filter: drop-shadow(0 0 10px rgba(255, 213, 92, 0.7)); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 @media (prefers-reduced-motion: reduce) {
   .avatar[data-ring]::before, .chat-avatar[data-ring]::before,
   .avatar[data-ring]::after, .chat-avatar[data-ring]::after { animation: none; }
 }
+/* The ring picker: a live preview of the ring on the member's own photo. */
+.ring-pick { display: grid; gap: var(--s-4); }
+.ring-preview {
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  padding: var(--s-4); border-radius: var(--r-lg);
+  background: var(--surface-2, rgba(255,255,255,0.03));
+  border: 1px solid var(--border);
+}
+.ring-preview-stage { padding: 22%; display: inline-flex; }
+.ring-preview-copy { display: grid; gap: var(--s-2); min-width: 0; flex: 1 1 220px; }
+.ring-preview-copy strong { font-size: var(--fs-md); }
+.ring-preview-actions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.ring-option-state { font-size: var(--fs-xs); color: var(--text-3); }
+.ring-option.is-selected { outline: 2px solid var(--brand-500, #a78bfa); outline-offset: 2px; }
 .premium-badge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: var(--fs-2xs); padding: 2px 8px; border-radius: 999px;
@@ -2354,3 +2375,4 @@ body.ip-open {
 .premium-badge[data-tier="elite"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, transparent); background: color-mix(in srgb, var(--warn) 14%, transparent); }
 .premium-tier-card { border: 1px solid var(--border, #2a2a33); border-radius: var(--r-md, 12px); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); }
 .premium-tier-card .plan-price { font-size: var(--fs-xl, 1.5rem); }
+.ring-option-none { display: grid; place-items: center; font-size: 1.6rem; color: var(--text-3); min-height: 84px; }

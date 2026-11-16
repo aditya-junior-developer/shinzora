@@ -37,9 +37,15 @@ const ROWS = {
   onboarding_progress: [{ id: "cccccccc-1111-2222-3333-444444444444", user_id: UID, status: "completed", current_step: 6, draft: {} }]
 };
 
-/* The stub's memory for this member. */
-const calls = { rings: 0, payments: [] };
+/* The stub's memory for this member: the rings they own and the one they wear. */
+const calls = { rings: 0, payments: [], wear: [], remove: 0 };
 let worn = "sakura";
+let owned = new Set(["sakura", "thorn-rose"]);
+
+const NAMES = {
+  sakura: "Sakura", "thorn-rose": "Thorn and rose", "tiger-gold": "Tiger gold", "pink-gold": "Pink gold",
+  "gothic-skull": "Gothic skull", "diamond-wings": "Diamond wings", "kuromi-neon": "Kuromi neon", "starlight-vine": "Starlight vine"
+};
 
 async function stub(route) {
   const req = route.request();
@@ -49,23 +55,43 @@ async function stub(route) {
   if (path.includes("/functions/v1/payments")) {
     const body = req.postDataJSON() || {};
     calls.payments.push(body);
+    if (owned.has((body.purpose || "").replace("ring_apply:", ""))) {
+      return send(route, 409, { error: "You already own this ring. Wear it from your profile. No payment is needed.", code: "ring_owned" });
+    }
     return send(route, 200, {
-      payment: { id: "dddddddd-1111-2222-3333-444444444444", reference: "SZ-RING-1", amount: 1000, currency: "INR", status: "pending", purpose: body.purpose, label: body.label },
+      payment: { id: "dddddddd-1111-2222-3333-444444444444", reference: "SZ-RING-1", amount: body.amount, currency: "INR", status: "pending", purpose: body.purpose, label: body.label },
       upi: null, reused: false
     });
   }
 
   if (path.includes("/rpc/")) {
     const name = path.split("/rpc/")[1];
+    const body = req.postDataJSON() || {};
     if (name === "member_rings") {
       calls.rings += 1;
-      const ids = req.postDataJSON()?.p_user_ids || [];
+      const ids = body.p_user_ids || [];
       if (!worn || !ids.includes(UID)) return send(route, 200, "[]");
-      return send(route, 200, [{ member_id: UID, ring_id: worn, ring_name: "Sakura" }]);
+      return send(route, 200, [{ member_id: UID, ring_id: worn, ring_name: NAMES[worn] }]);
+    }
+    if (name === "ring_wear") {
+      calls.wear.push(body.p_ring_id);
+      if (!owned.has(body.p_ring_id)) return send(route, 400, { code: "42501", message: "You have not bought this ring yet." });
+      worn = body.p_ring_id;
+      return send(route, 200, body.p_ring_id);
+    }
+    if (name === "ring_remove") {
+      calls.remove += 1;
+      worn = null;
+      return send(route, 200, "");
     }
     if (name === "theme_catalog") return send(route, 200, { collections: [], chosenWallpaperId: null, tier: "glow" });
     if (name === "member_wallpaper_state") return send(route, 200, { tierOk: true, limit: 5, chosenId: null, chosenPath: null, uploads: [] });
     return send(route, 200, "[]");
+  }
+
+  if (path.includes("/rest/v1/profile_ring_owned")) {
+    const rows = [...owned].map((ring_id) => ({ ring_id }));
+    return send(route, 200, rows, { "content-range": `0-${Math.max(rows.length - 1, 0)}/${rows.length}` });
   }
 
   if (path.includes("/rest/v1/profile_ring_choices")) {
@@ -76,8 +102,7 @@ async function stub(route) {
   }
 
   if (path.includes("/rest/v1/entitlement") || path.includes("/rest/v1/profile_entitlements")) {
-    const row = [{ tier: "glow", accent: null }];
-    return send(route, 200, row, { "content-range": "0-0/1" });
+    return send(route, 200, [{ tier: "glow", accent: null }], { "content-range": "0-0/1" });
   }
 
   const table = Object.keys(ROWS).find((name) => path.includes(`/rest/v1/${name}`));
@@ -99,6 +124,14 @@ const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 900, touch: false }
 ];
 
+const reset = () => {
+  worn = "sakura";
+  owned = new Set(["sakura", "thorn-rose"]);
+  calls.payments.length = 0;
+  calls.wear.length = 0;
+  calls.remove = 0;
+};
+
 for (const vp of VIEWPORTS) {
   console.log(`${vp.name} (${vp.width}px)`);
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, hasTouch: vp.touch, isMobile: vp.touch });
@@ -109,53 +142,80 @@ for (const vp of VIEWPORTS) {
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-  /* Settings: the Premium card and its ring controls are gone. */
-  worn = "sakura";
-  calls.payments.length = 0;
+  /* Settings > Profile: the ring card, with a live preview on the member's photo. */
+  reset();
   await page.goto(`${BASE}/app/?view=settings`, { waitUntil: "load" });
-  await page.waitForSelector("#profile-form", { timeout: 20000 });
+  await page.waitForSelector("#ring-card-host [data-ring-select]", { timeout: 20000 });
+  await page.waitForTimeout(500);
+  const optionCount = await page.locator("#ring-card-host .ring-option").count();
+  ok("Settings lists the default look and all eight designs", optionCount === 9, `count=${optionCount}`);
+  const previewRing = await page.locator("#ring-card-host [data-ring-stage] .avatar").getAttribute("data-ring");
+  ok("the preview shows the ring being worn", previewRing === "sakura", `preview=${previewRing}`);
+  const settingsAvatarRing = await page.locator("#avatar-slot .avatar").getAttribute("data-ring").catch(() => null);
+  ok("the Settings profile photo wears the ring", settingsAvatarRing === "sakura", `avatar=${settingsAvatarRing}`);
+  const settingsAvatarUser = await page.locator("#avatar-slot .avatar").getAttribute("data-ring-user").catch(() => null);
+  ok("the Settings profile photo carries the member id", settingsAvatarUser === UID, `user=${settingsAvatarUser}`);
+
+  /* Previewing a design the member does not own: no payment, no change saved. */
+  await page.locator('#ring-card-host [data-ring-select="tiger-gold"]').click();
+  await page.waitForTimeout(200);
+  const previewTiger = await page.locator("#ring-card-host [data-ring-stage] .avatar").getAttribute("data-ring");
+  ok("a design can be previewed on the photo before buying", previewTiger === "tiger-gold", `preview=${previewTiger}`);
+  ok("previewing charges nothing and saves nothing", calls.payments.length === 0 && calls.wear.length === 0 && worn === "sakura");
+  const buyLabel = (await page.locator("#ring-card-host [data-ring-buy='tiger-gold']").innerText().catch(() => "")).trim();
+  ok("an unowned premium design offers Buy at ₹20", /₹20/.test(buyLabel), buyLabel);
+  await page.locator("#ring-card-host").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${SHOTS}/rings-preview-${vp.name}.png` });
+
+  /* A ring already owned: wear it, with no payment. */
+  await page.locator('#ring-card-host [data-ring-select="thorn-rose"]').click();
+  await page.locator("#ring-card-host [data-ring-wear='thorn-rose']").click();
+  await page.waitForTimeout(500);
+  ok("an owned ring is worn without a payment", calls.wear.includes("thorn-rose") && calls.payments.length === 0, `wear=${calls.wear.join(",")} payments=${calls.payments.length}`);
+  ok("the worn ring changed", worn === "thorn-rose");
+
+  /* Take the ring off: back to the default look. The ring stays owned. */
+  await page.locator("#ring-card-host [data-ring-remove]").click();
+  await page.waitForTimeout(500);
+  ok("removing the ring returns to the default look", calls.remove === 1 && worn === null, `remove=${calls.remove}`);
+  ok("the removed ring is still owned", owned.has("thorn-rose"));
+  const defaultState = (await page.locator("#ring-card-host [data-ring-select='none'] .ring-option-state").innerText()).trim();
+  ok("the default look is marked as wearing once the ring is off", /Wearing/.test(defaultState), defaultState);
+
+  /* Wear it again, with no payment. */
+  await page.locator('#ring-card-host [data-ring-select="thorn-rose"]').click();
+  await page.locator("#ring-card-host [data-ring-wear='thorn-rose']").click();
   await page.waitForTimeout(400);
-  ok("Settings has no Premium profile card", (await page.locator("#premium-settings").count()) === 0);
-  ok("Settings has no ring style or visibility control", (await page.locator("#ring-style, #ring-shown, #save-ring").count()) === 0);
-  ok("Settings has no accent control", (await page.locator("#premium-accent, #save-accent").count()) === 0);
+  ok("a removed ring can be worn again without paying", worn === "thorn-rose" && calls.payments.length === 0);
 
-  /* The owner's own ring comes from the database. */
-  await page.waitForFunction(() => document.querySelector("#account-avatar")?.hasAttribute("data-ring"), null, { timeout: 10000 }).catch(() => {});
-  const avatar = await page.locator("#account-avatar").evaluate((el) => ({ ring: el.getAttribute("data-ring"), art: el.style.getPropertyValue("--ring-art") })).catch(() => null);
-  ok("the owner's avatar wears the design the database returns", avatar?.ring === "sakura", JSON.stringify(avatar));
-  ok("the avatar points at that design's artwork", (avatar?.art || "").includes("/assets/rings/sakura.png"), avatar?.art || "");
+  /* Buying an unowned ring: the payment is for the design's own price. */
+  await page.locator('#ring-card-host [data-ring-select="pink-gold"]').click();
+  await page.locator("#ring-card-host [data-ring-buy='pink-gold']").click();
+  await page.waitForTimeout(500);
+  const sent = calls.payments.find((b) => b.purpose === "ring_apply:pink-gold");
+  ok("buying sends one ring_apply payment at ₹20", Boolean(sent) && sent.amount === 2000, JSON.stringify(sent || calls.payments));
 
-  /* Billing: the picker, the worn design, and the price of each design. */
+  /* Billing: the same picker, with prices and states. */
+  reset();
   await page.goto(`${BASE}/app/?view=billing`, { waitUntil: "load" });
-  await page.waitForSelector("#ring-card", { timeout: 20000 });
-  await page.waitForTimeout(300);
-  const options = await page.locator("#ring-card .ring-option").count();
-  ok("Billing lists the eight ring designs", options === 8, `count=${options}`);
-  const current = await page.locator("#ring-card .ring-option[aria-current='true'] strong").textContent().catch(() => "");
-  ok("the worn design is marked", current.trim() === "Sakura", `marked=${current.trim()}`);
-  const prices = await page.locator("#ring-card [data-ring-apply]").allTextContents();
-  const premium = ["Pink gold", "Diamond wings", "Tiger gold", "Gothic skull"];
-  const names = await page.locator("#ring-card .ring-option strong").allTextContents();
-  const priced = names.map((name, i) => [name.trim(), (prices[i] || "").replace(/\s+/g, " ")]);
-  ok("the four premium designs cost ₹20", priced.filter(([n]) => premium.includes(n)).every(([, t]) => t.includes("₹20")) && priced.filter(([n]) => premium.includes(n)).length === 4, JSON.stringify(priced));
-  ok("the other four designs cost ₹10", priced.filter(([n]) => !premium.includes(n)).every(([, t]) => t.includes("₹10")) && priced.filter(([n]) => !premium.includes(n)).length === 4, JSON.stringify(priced));
-  const kuromi = await page.locator("#ring-card .ring-option-art[data-blend='screen']").count();
-  ok("the Kuromi art blends with screen", kuromi === 1, `count=${kuromi}`);
-  await page.locator("#ring-card").scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `${SHOTS}/rings-billing-${vp.name}.png` });
-
-  await page.locator("[data-ring-apply='tiger-gold']").click();
-  await page.waitForTimeout(600);
-  const sent = calls.payments.find((b) => b.purpose === "ring_apply:tiger-gold");
-  ok("Apply sends a ring_apply:<id> payment", Boolean(sent), JSON.stringify(calls.payments));
-  ok("the browser asks for the same ₹20 the server charges for tiger gold", sent?.amount === 2000, `amount=${sent?.amount}`);
+  await page.waitForSelector("#ring-card [data-ring-select]", { timeout: 20000 });
+  await page.waitForTimeout(400);
+  const billingOptions = await page.locator("#ring-card .ring-option").count();
+  ok("Billing lists the same nine choices", billingOptions === 9, `count=${billingOptions}`);
+  const stateOf = async (id) => (await page.locator(`#ring-card [data-ring-select='${id}'] .ring-option-state`).innerText().catch(() => "")).trim();
+  ok("the worn ring is marked as wearing", /Wearing/.test(await stateOf("sakura")), await stateOf("sakura"));
+  ok("an owned ring is marked as owned", /Owned/.test(await stateOf("thorn-rose")), await stateOf("thorn-rose"));
+  ok("a premium ring shows ₹20", /₹20/.test(await stateOf("tiger-gold")), await stateOf("tiger-gold"));
+  ok("a standard ring shows ₹10", /₹10/.test(await stateOf("kuromi-neon")), await stateOf("kuromi-neon"));
+  const legacyApply = await page.locator("#ring-card [data-ring-apply]").count();
+  ok("Billing no longer has the old per-apply buttons", legacyApply === 0, `count=${legacyApply}`);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow on Billing", overflow <= 1, `${overflow}px`);
-  ok("no page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+  ok("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
   await ctx.close();
 }
 
 await browser.close();
-console.log(bad ? `\n${bad} failed` : "\nall checks passed");
+console.log(bad ? `\n${bad} check(s) failed` : "\nAll profile-ring checks passed");
 process.exit(bad ? 1 : 0);

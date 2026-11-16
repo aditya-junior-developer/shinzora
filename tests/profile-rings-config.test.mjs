@@ -70,10 +70,35 @@ check("no accent control remains in Settings", !/premium-accent|save-accent|set_
 check("Settings still saves the profile", /id="profile-form"/.test(settings) && /save-profile/.test(settings));
 
 console.log("Billing");
-check("Billing shows the ring picker", /id="ring-card"/.test(billing) && /data-ring-apply=/.test(billing));
-check("Billing reads the worn design from profile_ring_choices", /from\("profile_ring_choices"\)/.test(billing));
-check("Billing sends ring_apply:<id> through startPayment", /purpose: `ring_apply:\$\{design\.id\}`/.test(billing));
+check("Billing shows the ring card and mounts the shared picker", /id="ring-card"/.test(billing) && /mountRingPicker\(/.test(billing));
+check("Billing buys through startPayment with ring_apply:<id>", /purpose: `ring_apply:\$\{design\.id\}`/.test(billing));
 check("Billing reads the price from the shared config", /ringPriceRupees/.test(billing));
+check("Billing no longer charges for an owned ring (no direct apply)", !/data-ring-apply/.test(billing));
+
+const picker = readFileSync("public/js/modules/dashboard/ring-picker.js", "utf8");
+console.log("Shared ring picker");
+check("the picker reads what is owned and what is worn", /from\("profile_ring_owned"\)/.test(picker) && /from\("profile_ring_choices"\)/.test(picker));
+check("wearing an owned ring calls ring_wear, which charges nothing", /sb\.rpc\("ring_wear"/.test(picker) && !/payments/.test(picker.split("ring_wear")[1] || ""));
+check("removing a ring calls ring_remove (back to default)", /sb\.rpc\("ring_remove"\)/.test(picker));
+check("buying goes through the caller's payment, once", /data-ring-buy/.test(picker) && /onBuy\(chosen\)/.test(picker));
+check("an owned ring is never offered for purchase", /owned\.has\(chosen\.id\)[\s\S]*?data-ring-wear[\s\S]*?data-ring-buy/.test(picker));
+check("the preview uses the same ring attributes as a worn ring", /applyRing\(avatar,/.test(picker) && /data-ring-stage/.test(picker));
+check("the preview is never saved", !/preview[^\n]*rpc\(/i.test(picker));
+
+console.log("Settings");
+const settingsSrc = readFileSync("public/js/modules/dashboard/views/settings.js", "utf8");
+check("Settings shows the ring card and mounts the picker", /id="ring-card-settings"/.test(settingsSrc) && /mountRingPicker\(ringHost/.test(settingsSrc));
+check("the Settings profile photo carries the member id, so the ring shows", /avatarUrl: profile\.avatar_url, size: "xl", userId: state\.user\?\.id/.test(settingsSrc));
+check("Settings buys a ring through the same payment as Billing", /ring_apply:\$\{design\.id\}/.test(settingsSrc));
+
+console.log("Server guard");
+check("the payment function refuses a ring already owned (409)", /profile_ring_owned/.test(payments) && /409, "ring_owned"/.test(payments));
+check("the ownership migration is in the repo", existsSync("supabase/migrations/0073_ring_ownership.sql"));
+
+console.log("Visibility");
+const comps = readFileSync("public/css/components.css", "utf8");
+check("the halo is a solid band, wide enough to read when zoomed", /inset: -24%/.test(comps) && /transparent 64%, #000 67\.5%/.test(comps));
+check("the artwork is cut away from the photo centre", /transparent 62%, #000 66%/.test(comps));
 
 console.log("rings on avatars");
 check("rings.js reads design ids from member_rings", /member_rings/.test(rings) && /row\.ring_id/.test(rings));

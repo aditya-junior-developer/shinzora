@@ -34,6 +34,8 @@ import { resolveWallpaper, savedChoiceUnavailable, tierLabel, isSafeWallpaperUrl
 import { loadMemberWallpapers, uploadMemberWallpaper, useMemberWallpaper, removeMemberWallpaper, memberWallpaperUrl } from "../../../lib/member-wallpaper.js";
 import { MEMBER_WALLPAPER_MAX_COUNT, formatSize } from "../../../config/member-wallpaper.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
+import { mountRingPicker } from "../ring-picker.js";
+import { ringPriceRupees } from "../../../config/rings.js";
 import { BUSINESS_FIELDS, BUSINESS_FIELD_RUPEES, BUSINESS_FIELD_MAX, fieldsTotalRupees } from "../../../config/business-fields.js";
 import { openPaymentDialog } from "../payment-dialog.js";
 
@@ -141,7 +143,13 @@ export default async function render(root) {
   /* ------------------------------------------------------------- profile */
   function profileSection() {
     const profile = state.profile || {};
-    return `<div class="card">
+    return `<div class="card" id="ring-card-settings">
+      <div class="card-head">
+        <div><div class="card-title">Profile ring</div><div class="card-sub">Shown around your photo everywhere you appear. Preview a design on your photo, buy it once, then wear, change or remove it at no extra cost.</div></div>
+      </div>
+      <div class="card-body" id="ring-card-host"></div>
+    </div>
+    <div class="card">
       <div class="card-head">
         <div><div class="card-title">Your profile</div><div class="card-sub">Shown across your workspace and on your storefront footer.</div></div>
         <span class="badge badge-neutral">Member since ${esc(date(profile.created_at || state.user?.created_at))}</span>
@@ -149,7 +157,7 @@ export default async function render(root) {
       <div class="card-body">
         <form class="stack gap-4" id="profile-form" novalidate>
           <div class="row gap-4 wrap" style="align-items:center">
-            <span id="avatar-slot">${avatarMarkup({ name: profile.full_name, email: state.user?.email, avatarUrl: profile.avatar_url, size: "xl" })}</span>
+            <span id="avatar-slot">${avatarMarkup({ name: profile.full_name, email: state.user?.email, avatarUrl: profile.avatar_url, size: "xl", userId: state.user?.id })}</span>
             <div class="grow">
               <label class="field-label" for="avatar">Profile photo</label>
               <input class="input" id="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
@@ -209,7 +217,44 @@ export default async function render(root) {
     </div>`;
   }
 
+  /* The ring picker's handle, so a finished purchase can repaint the card. */
+  let ringHandle = null;
+
+  /* Buying a ring is a payment, the same one Billing makes. The ring is owned
+     (and can be worn) once the payment is verified. */
+  async function startRingPurchase(design) {
+    const amount = ringPriceRupees(design) * 100;
+    const label = `Profile ring: ${design.name}`;
+    try {
+      const response = await api.payments.create({ purpose: `ring_apply:${design.id}`, label, amount, plan: null });
+      openPaymentDialog({
+        payment: response?.payment,
+        upi: response?.upi,
+        label,
+        amount,
+        onDone: () => ringHandle?.refresh()
+      });
+    } catch (error) {
+      toastError(error);
+    }
+  }
+
   function bindProfile() {
+    /* The profile ring picker (0073): a preview on the member's own photo. */
+    const ringHost = qs("#ring-card-host");
+    if (ringHost && state.user?.id) {
+      mountRingPicker(ringHost, {
+        userId: state.user.id,
+        name: state.profile?.full_name,
+        email: state.user?.email,
+        avatarUrl: state.profile?.avatar_url,
+        onBuy: (design) => startRingPurchase(design)
+      })
+        .then((handle) => {
+          ringHandle = handle;
+        })
+        .catch(() => {});
+    }
     qs("#profile-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -282,7 +327,7 @@ export default async function render(root) {
         await loadIdentity({ force: true });
         /* Painted immediately as well as after the reload: the round trip to
            loadIdentity() is a second of looking at the old picture. */
-        if (slot) slot.innerHTML = avatarMarkup({ name: state.profile?.full_name, email: state.user?.email, avatarUrl: data.publicUrl, size: "xl" });
+        if (slot) slot.innerHTML = avatarMarkup({ name: state.profile?.full_name, email: state.user?.email, avatarUrl: data.publicUrl, size: "xl", userId: state.user?.id });
         const clear = qs("#avatar-clear");
         if (clear) clear.disabled = false;
         sayAvatar(`<div class="alert alert-ok" style="margin-top:var(--s-2)"><span>Photo saved. It now shows wherever your name did.</span></div>`);
