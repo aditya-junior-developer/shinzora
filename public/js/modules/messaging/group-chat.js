@@ -144,6 +144,11 @@ function paintBody(body, mentions = []) {
   return out;
 }
 
+/* "1 member", "2 members", "0 members". */
+function memberWord(count) {
+  return `${count} member${count === 1 ? "" : "s"}`;
+}
+
 /* ---------------------------------------------------------------- the surface */
 
 export default async function mountGroups(root, options = {}) {
@@ -153,28 +158,42 @@ export default async function mountGroups(root, options = {}) {
   const withGroups = options.groups !== false;
   const wrap = document.createElement("div");
   wrap.className = `chat group-chat hub${withGroups ? "" : " hub-channels-only"}`;
+  wrap.dataset.seg = withGroups ? "groups" : "channels";
   wrap.innerHTML = `
     <aside class="chat-pane chat-pane-list hub-rail">
-      <div class="hub-rail-head">
-        <div class="chat-pane-title">${icon("message-square", { size: 15 })}<span>Channels</span></div>
-      </div>
-      <div class="chat-list hub-channels" id="grp-channels">
-        <div class="chat-empty-line">Loading channels…</div>
+      ${
+        withGroups
+          ? `<div class="hub-rail-seg" role="tablist" aria-label="Groups or channels">
+        <button class="hub-rail-seg-btn is-active" type="button" role="tab" id="grp-seg-groups" data-seg="groups" aria-selected="true">${icon("users", { size: 14 })}<span>Groups</span></button>
+        <button class="hub-rail-seg-btn" type="button" role="tab" id="grp-seg-channels" data-seg="channels" aria-selected="false">${icon("message-square", { size: 14 })}<span>Channels</span></button>
+      </div>`
+          : ""
+      }
+
+      <div class="hub-rail-section hub-rail-channels" data-rail="channels">
+        <div class="hub-rail-head">
+          <div class="chat-pane-title">${icon("message-square", { size: 15 })}<span>Channels</span></div>
+        </div>
+        <div class="chat-list hub-channels" id="grp-channels">
+          <div class="chat-empty-line">Loading channels…</div>
+        </div>
       </div>
 
       ${
         withGroups
-          ? `<div class="hub-rail-head hub-rail-groups">
-        <div class="chat-pane-title">${icon("users", { size: 15 })}<span>Groups</span></div>
-        <div class="pane-head-actions">
-          <button class="btn btn-primary btn-sm" type="button" id="grp-new">${icon("plus", { size: 13 })}New</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="grp-refresh" aria-label="Refresh groups">${icon(
-            "refresh-cw",
-            { size: 13 }
-          )}</button>
+          ? `<div class="hub-rail-section hub-rail-groups-section" data-rail="groups">
+        <div class="hub-rail-head hub-rail-groups">
+          <div class="chat-pane-title">${icon("users", { size: 15 })}<span>Groups</span></div>
+          <div class="pane-head-actions">
+            <button class="btn btn-primary btn-sm" type="button" id="grp-new">${icon("plus", { size: 13 })}New</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="grp-refresh" aria-label="Refresh groups">${icon(
+              "refresh-cw",
+              { size: 13 }
+            )}</button>
+          </div>
         </div>
-      </div>
-      <div class="chat-list hub-groups" id="grp-list"><div class="chat-empty-line">Loading groups…</div></div>`
+        <div class="chat-list hub-groups" id="grp-list"><div class="chat-empty-line">Loading groups…</div></div>
+      </div>`
           : ""
       }
     </aside>
@@ -320,7 +339,7 @@ export default async function mountGroups(root, options = {}) {
             <span class="chat-item-snippet">${
               group.lastMessage
                 ? `${group.lastSender ? `${esc(group.lastSender)}: ` : ""}${esc(String(group.lastMessage).slice(0, 80))}`
-                : `${Number(group.memberCount) || 1} member${Number(group.memberCount) === 1 ? "" : "s"}`
+                : memberWord(Number(group.memberCount) || 1)
             }</span>
           </span>
           ${Number(group.unread) ? `<span class="chat-unread">${esc(group.unread)}</span>` : ""}
@@ -1354,7 +1373,7 @@ function insertAtCaret(field, text, start, end) {
     openCallSurface({
       call,
       self: { userId: me, name: selfName() },
-      subtitle: `${detail.name} · ${(detail.members || []).length} members`,
+      subtitle: `${detail.name} · ${memberWord((detail.members || []).length)}`,
       onClose: () => {
         if (currentCall === call) currentCall = null;
       }
@@ -2021,6 +2040,21 @@ function insertAtCaret(field, text, start, end) {
   }
 
   on(qs("#grp-new", wrap), "click", createGroup);
+
+  /* Phone only: Groups and Channels are separate lists, one at a time, the way
+     the rest of Messages works. Desktop shows both in the rail and ignores this. */
+  const segButtons = [...wrap.querySelectorAll("[data-seg]")];
+  const setRailSegment = (name) => {
+    wrap.dataset.seg = name;
+    for (const button of segButtons) {
+      const on_ = button.dataset.seg === name;
+      button.classList.toggle("is-active", on_);
+      button.setAttribute("aria-selected", on_ ? "true" : "false");
+    }
+  };
+  for (const button of segButtons) {
+    button.addEventListener("click", () => setRailSegment(button.dataset.seg));
+  }
   delegate(messagesEl, "click", "[data-new-group]", createGroup);
 
   /* ------------------------------------------------------------------ pin */

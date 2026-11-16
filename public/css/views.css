@@ -5226,3 +5226,57 @@ html {
     min-height: 44px;
   }
 }
+
+/* ==========================================================================
+   Messages → Groups on a phone (brief 5)
+   --------------------------------------------------------------------------
+   On a phone the rail used to stack Channels and Groups in one short scroll
+   area. Now a segmented control at the top of the rail shows one list at a
+   time: Groups or Channels. Desktop keeps both lists in the rail, and the
+   control is hidden there. The community page (channels only) has no control.
+   ========================================================================== */
+.hub-rail-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hub-rail-groups-section { flex: 1 1 auto; }
+.hub-rail-channels { flex: 0 1 auto; }
+.hub-rail-seg { display: none; }
+
+@media (max-width: 900px) {
+  .hub-rail-seg {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .hub-rail-seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text-2);
+    font-size: var(--fs-2xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .hub-rail-seg-btn.is-active {
+    border-color: var(--line-violet);
+    color: var(--lavender);
+  }
+  .hub[data-seg="groups"] .hub-rail-channels { display: none; }
+  .hub[data-seg="channels"] .hub-rail-groups-section { display: none; }
+  .hub:not(.hub-channels-only) .hub-rail-channels > .hub-rail-head { display: none; }
+  /* The segment already names the list; keep the group actions (New, refresh). */
+  .hub-rail-groups .chat-pane-title { display: none; }
+  .hub-rail-groups { justify-content: flex-end; }
+}

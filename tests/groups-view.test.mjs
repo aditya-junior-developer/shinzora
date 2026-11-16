@@ -459,12 +459,11 @@ test("the rail lists the public channels above the groups", async () => {
   assert.equal(world.root.querySelectorAll("#grp-list [data-group]").length, 1, "the groups are still there");
   /* The order is part of the design: public rooms on top, the member's own
      groups under them. */
-  const channels = world.root.querySelector("#grp-channels");
-  const groups = world.root.querySelector("#grp-list");
-  assert.ok(
-    channels.compareDocumentPosition(groups) & 4,
-    "the channels section comes before the groups section"
-  );
+  /* Document order, read from querySelectorAll. linkedom (the test DOM) reports
+     nested siblings as "preceding" in compareDocumentPosition, which browsers
+     do not; the order of the list itself is what matters. */
+  const order = [...world.root.querySelectorAll("#grp-channels, #grp-list")].map((el) => el.id);
+  assert.deepEqual(order, ["grp-channels", "grp-list"], "the channels section comes before the groups section");
 });
 
 test("a channel opens in the middle column and is text-only", async () => {
