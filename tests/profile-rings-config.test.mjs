@@ -108,7 +108,7 @@ check("applyRing refuses an id outside the catalogue", /KNOWN\.has\(ring\.id\)/.
 check("components.css draws the overlay from --ring-art", /\.avatar\[data-ring\]::after/.test(components) && /var\(--ring-art\)/.test(components));
 check("no tier ring rules remain in components.css", !/\.avatar\[data-tier\]/.test(components));
 check("no tier ring rules remain in views.css", !/\[data-tier\]/.test(views.replace(/\.premium-badge\[data-tier[^\n]*\n/g, "")));
-check("rings are animated: a spinning halo and a breathing artwork layer", /ring-spin/.test(components) && /ring-breathe/.test(components));
+check("rings are animated: a spinning halo, an orbiting artwork and a pulsing glow", /ring-spin/.test(components) && /ring-orbit/.test(components) && /ring-glow/.test(components));
 check("the ring halo is bold and circular", /border-radius: 50%/.test(components) && /conic-gradient/.test(components));
 
 console.log("ring test helper");

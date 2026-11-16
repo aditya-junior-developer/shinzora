@@ -2313,6 +2313,8 @@ body.ip-open {
   position: relative;
   overflow: visible;
   isolation: isolate;
+  border-radius: 50%;
+  animation: ring-glow 2.4s ease-in-out infinite;
 }
 .avatar[data-ring] > img { border-radius: 50%; }
 .avatar[data-ring]::before,
@@ -2324,7 +2326,6 @@ body.ip-open {
   background: conic-gradient(from 0deg, #ff2fb9, #ffd23f, #2ee6ff, #8b5cff, #ff2fb9);
   -webkit-mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
           mask: radial-gradient(circle closest-side, transparent 64%, #000 67.5%);
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.45));
   animation: ring-spin 3.2s linear infinite;
   pointer-events: none;
   z-index: -1;
@@ -2339,16 +2340,18 @@ body.ip-open {
           mask: radial-gradient(circle closest-side, transparent 62%, #000 66%);
   pointer-events: none;
   z-index: 2;
-  animation: ring-breathe 2.6s ease-in-out infinite;
+  animation: ring-orbit 22s linear infinite;
 }
 .avatar[data-ring][data-ring-blend="screen"]::after,
 .chat-avatar[data-ring][data-ring-blend="screen"]::after { mix-blend-mode: screen; }
 @keyframes ring-spin { to { transform: rotate(360deg); } }
-@keyframes ring-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+@keyframes ring-orbit { to { transform: rotate(-360deg); } }
+@keyframes ring-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(255, 47, 185, 0.35), 0 0 18px 4px rgba(46, 230, 255, 0.15); }
+  50%      { box-shadow: 0 0 18px 6px rgba(255, 210, 63, 0.55), 0 0 30px 10px rgba(139, 92, 255, 0.35); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .avatar[data-ring], .chat-avatar[data-ring],
   .avatar[data-ring]::before, .chat-avatar[data-ring]::before,
   .avatar[data-ring]::after, .chat-avatar[data-ring]::after { animation: none; }
 }

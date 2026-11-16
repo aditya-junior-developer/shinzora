@@ -57,6 +57,7 @@ export const NAV = [
       { id: "marketplace", label: "Marketplace", icon: "package" },
       { id: "community", label: "Community", icon: "messages-square" },
       { id: "marketing", label: "Social Media & Ads", icon: "megaphone" },
+      { id: "requests", label: "Extra Services", icon: "sparkles" },
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
       { id: "groups", label: "Groups", icon: "users" },

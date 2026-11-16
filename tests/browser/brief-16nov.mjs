@@ -182,6 +182,7 @@ for (const vp of VIEWPORTS) {
   const title = (await page.locator("h1").first().innerText()).trim();
   ok("the page is Social Media & Ads", /Social Media & Ads/.test(title), title);
   ok("the Extra Service request wording is gone", (await page.locator("body").innerText()).includes("Request for Extra Service") === false);
+  ok("Extra Services is back in the menu, next to Social Media & Ads", (await page.locator('a[href*="view=requests"]').count()) >= 1 && (await page.locator('a[href*="view=marketing"]').count()) >= 1);
   ok("the social accounts card is shown", (await page.getByText("Social accounts").count()) >= 1);
   ok("the analytics show the Instagram count", (await page.locator(".card", { hasText: "Social-media analytics" }).innerText()).includes("Instagram"));
   ok("campaign requests are listed", (await page.getByText("Campaign requests").count()) >= 1);
