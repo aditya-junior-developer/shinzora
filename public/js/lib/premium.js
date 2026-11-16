@@ -38,20 +38,6 @@ export function hoursUntilDue(order, now = Date.now()) {
   return Math.max(0, Math.round(((due - now) / 36e5) * 10) / 10);
 }
 
-/**
- * The ring a profile photo gets, as attributes the CSS reads. Both tiers animate
- * unless the member chose a still ring (ringPrefs from 0068; absent means animated).
- */
-export function ringAttributes(entitlement, ringPrefs) {
-  const tier = activeTier(entitlement);
-  if (!tier) return { tier: null, accent: null, animated: true };
-  return {
-    tier,
-    accent: tier === "elite" ? entitlement?.accent || null : null,
-    animated: ringPrefs?.animated !== false
-  };
-}
-
 /** Plain-language status for the billing card. */
 export function statusLine(entitlement, orders = []) {
   const tier = activeTier(entitlement);

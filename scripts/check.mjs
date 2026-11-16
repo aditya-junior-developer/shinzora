@@ -268,13 +268,19 @@ if (!fs.existsSync(migrationsDir)) {
   const admin = await import("./lib/supabase-admin.mjs");
   const listed = new Set(admin.APPLICATION_TABLES);
   const created = new Set();
+  const dropped = new Set();
   for (const file of fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"))) {
     const body = fs.readFileSync(path.join(migrationsDir, file), "utf8");
     for (const match of body.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?public\.([a-z_][a-z0-9_]*)/gi)) {
       created.add(match[1]);
     }
+    /* A table a later migration drops (0069 retires profile_ring_prefs from 0068)
+       holds no data to back up, so it is not required in the list. */
+    for (const match of body.matchAll(/drop\s+table\s+(?:if\s+exists\s+)?public\.([a-z_][a-z0-9_]*)/gi)) {
+      dropped.add(match[1]);
+    }
   }
-  const missing = [...created].filter((table) => !listed.has(table)).sort();
+  const missing = [...created].filter((table) => !listed.has(table) && !dropped.has(table)).sort();
   if (missing.length) {
     fail(`APPLICATION_TABLES is missing ${missing.join(", ")} — those tables would never be backed up`);
   } else {

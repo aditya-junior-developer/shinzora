@@ -53,7 +53,7 @@ export default async function render(root) {
       <div class="admin-card-head">
         <div>
           <div class="admin-card-title">Ring payments</div>
-          <div class="admin-card-sub">Every ring order with its payment. Administrators only: members never see this list.</div>
+          <div class="admin-card-sub">Every ring order (₹10 each) with its payment. Administrators only: members never see this list.</div>
         </div>
       </div>
       <div id="ring-ledger"><div class="admin-empty">Loading…</div></div>
@@ -130,25 +130,24 @@ export default async function render(root) {
     const body = rows
       .map((row) => {
         const paid = row.paid_at ? dateTime(row.paid_at) : "—";
-        const shown = row.ring_shown === false ? `<span class="badge badge-neutral">Hidden</span>` : `<span class="badge badge-ok">Shown</span>`;
+        const applied = row.applied ? `<span class="badge badge-ok">Worn now</span>` : `<span class="badge badge-neutral">Replaced</span>`;
         return `<tr>
           <td><div>${esc(row.member_name || "—")}</div><div class="dim ring-ledger-cell">${esc(row.member_email || "")}</div></td>
-          <td><strong>${esc(tierName(row.tier))}</strong></td>
+          <td><strong>${esc(row.ring_name || row.ring_id || "—")}</strong></td>
           <td class="ring-ledger-cell">
             <div>${esc(money(Number(row.payment_amount || 0)))}</div>
             <div class="mono dim">${esc(row.payment_reference || "—")}</div>
           </td>
-          <td><span class="badge ${row.payment_status === "verified" ? "badge-ok" : "badge-neutral"}">${esc(statusLabel(row.payment_status || "—"))}</span></td>
+          <td><span class="badge ${row.payment_status === "verified" ? "badge-ok" : row.payment_status === "cancelled" ? "badge-danger" : "badge-neutral"}">${esc(statusLabel(row.payment_status || "—"))}</span></td>
           <td class="ring-ledger-cell"><span>${esc(paid)}</span></td>
-          <td><span class="badge ${row.order_status === "activated" ? "badge-ok" : row.order_status === "cancelled" ? "badge-danger" : "badge-warn"}">${esc(statusLabel(row.order_status || "—"))}</span></td>
-          <td>${shown}</td>
+          <td>${applied}</td>
         </tr>`;
       })
       .join("");
     safeSet(
       "#ring-ledger",
       `<div class="table-wrap"><table class="table"><thead><tr>
-        <th>Member</th><th>Ring</th><th>Payment</th><th>Payment status</th><th>Paid</th><th>Order</th><th>Shown to members</th>
+        <th>Member</th><th>Design</th><th>Payment</th><th>Payment status</th><th>Paid</th><th>Status</th>
       </tr></thead><tbody>${body}</tbody></table></div>`
     );
   }

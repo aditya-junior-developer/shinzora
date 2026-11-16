@@ -143,7 +143,7 @@ export const APPLICATION_TABLES = [
   "community_groups", "community_group_members", "community_mentions",
   "business_field_catalog", "business_field_orders",
   "member_wallpapers",
-  "profile_ring_prefs",
+  "ring_designs", "ring_orders", "profile_ring_choices",
   "group_polls", "group_poll_votes",
   "notification_preferences", "push_subscriptions", "call_invites",
   "call_responses", "meetings", "meeting_attendees",

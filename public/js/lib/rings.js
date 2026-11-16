@@ -1,62 +1,49 @@
 /* ==========================================================================
-   Shinzora — profile rings on every avatar (brief item 6)
+   Shinzora — profile rings on every avatar
    --------------------------------------------------------------------------
-   A member who holds Glow or Elite wears a ring on their photo or initials
-   wherever their avatar appears. The ring is decided by the database, never by
-   the browser:
+   A member who has applied a ring design (₹10 each time, see 0069) wears it on
+   their photo or initials wherever their avatar appears. The choice is decided
+   by the database, never by the browser:
 
      - an avatar carries data-ring-user="<member id>" (see avatar.js)
-     - markRings() asks member_rings() (migration 0066) for the tier and accent
-       of the members on the page, in one call per 200, and caches the answer
-       for five minutes
-     - the answer is written as data-tier / data-accent, which components.css
-       and views.css turn into the ring
+     - markRings() asks member_rings() for the design of the members on the page,
+       in one call per 200, and caches the answer for five minutes
+     - the design is written as data-ring and --ring-art, which components.css
+       draws as an overlay
 
-   Only the ring leaves the database: no order, payment or contact detail.
-   A member with no tier has no ring. A failed lookup leaves the avatar plain
+   Only the design leaves the database: no order, payment or contact detail.
+   A member with no ring has no overlay. A failed lookup leaves the avatar plain
    and is retried the next time the page changes.
    ========================================================================== */
 
 import { sb } from "./supabase.js";
+import { RING_DESIGNS, ringArtUrl } from "../config/rings.js";
 
 const TTL_MS = 5 * 60 * 1000;
 const CHUNK = 200;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const KNOWN = new Set(RING_DESIGNS.map((design) => design.id));
 
-/** member id -> { tier, accent, at }. tier is null for a member with no ring. */
+/** member id -> { ring: { id, name } | null, at }. ring is null for a member with no ring. */
 const cache = new Map();
 const inflight = new Map();
 let watching = false;
 let scheduled = null;
 
-/** Write the ring onto one element. A null ring removes it. */
+/** Write the ring onto one element. A null or unknown ring removes it. */
 export function applyRing(node, ring) {
   if (!node) return;
-  if (ring?.tier) {
-    node.setAttribute("data-tier", ring.tier);
-    if (ring.accent) node.setAttribute("data-accent", ring.accent);
-    else node.removeAttribute("data-accent");
-    node.setAttribute("data-animated", ring.animated === false ? "false" : "true");
+  if (ring?.id && KNOWN.has(ring.id)) {
+    node.setAttribute("data-ring", ring.id);
+    node.style.setProperty("--ring-art", `url("${ringArtUrl(ring.id)}")`);
+    const blend = RING_DESIGNS.find((design) => design.id === ring.id)?.blend;
+    if (blend === "screen") node.setAttribute("data-ring-blend", "screen");
+    else node.removeAttribute("data-ring-blend");
   } else {
-    node.removeAttribute("data-tier");
-    node.removeAttribute("data-accent");
-    node.removeAttribute("data-animated");
+    node.removeAttribute("data-ring");
+    node.removeAttribute("data-ring-blend");
+    node.style.removeProperty("--ring-art");
   }
-}
-
-/** Read the signed-in member's own ring settings (migration 0068). */
-export async function fetchRingPrefs() {
-  const { data, error } = await sb.rpc("ring_prefs_get");
-  if (error) throw error;
-  return { tierOk: data?.tierOk === true, animated: data?.animated !== false, shown: data?.shown !== false };
-}
-
-/** Save the member's ring settings. The database refuses a free member. */
-export async function saveRingPrefs(animated, shown) {
-  const { data, error } = await sb.rpc("ring_prefs_set", { p_animated: Boolean(animated), p_shown: Boolean(shown) });
-  if (error) throw error;
-  forgetRing(null);
-  return data;
 }
 
 /** Drop cached rings (one member, or all when id is null) and repaint. */
@@ -88,9 +75,7 @@ async function fetchRings(ids) {
           for (const id of pending) {
             const row = seen.get(id);
             cache.set(id, {
-              tier: row?.ring_tier || null,
-              accent: row?.ring_accent || null,
-              animated: row?.ring_animated !== false,
+              ring: row?.ring_id ? { id: row.ring_id, name: row.ring_name || "" } : null,
               at: stamp
             });
           }
@@ -117,7 +102,7 @@ export async function markRings(root = document) {
   for (const node of nodes) {
     const id = node.getAttribute("data-ring-user");
     if (!UUID.test(id || "")) continue;
-    if (fresh(id, now)) applyRing(node, cache.get(id));
+    if (fresh(id, now)) applyRing(node, cache.get(id)?.ring);
   }
 }
 

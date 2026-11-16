@@ -139,7 +139,7 @@ async function render(root, { planId = "pro" } = {}) {
           export const sb = {
             from: () => ({
               insert: async () => ({ error: null }),
-              select: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }), order: () => ({ limit: async () => ({ data: [], error: null }) }), limit: async () => ({ data: [], error: null }) }),
+              select: () => ({ maybeSingle: async () => ({ data: null, error: null }), eq: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }), order: () => ({ limit: async () => ({ data: [], error: null }) }), limit: async () => ({ data: [], error: null }) }),
               maybeSingle: async () => ({ data: null, error: null })
             })
           };

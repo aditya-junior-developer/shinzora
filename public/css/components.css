@@ -2297,18 +2297,24 @@ body.ip-open {
 .alerts-prompt .btn { flex: none; }
 
 /* ---------------------------------------------------------------------------
-   Premium profile ring (P6). The attributes are set from the database tier
-   (data-tier, data-accent); nothing here is decided in the browser.
+   Profile rings (0069). The member's chosen design is drawn over the photo or
+   initials as an overlay. rings.js sets data-ring (the design id) and
+   --ring-art (its artwork); nothing here is decided in the browser.
    --------------------------------------------------------------------------- */
-.avatar[data-tier] {
-  --premium-ring: var(--violet);
-  box-shadow: 0 0 0 2px var(--surface, #111), 0 0 0 4px var(--premium-ring), 0 0 16px 2px color-mix(in srgb, var(--premium-ring) 40%, transparent);
+.avatar[data-ring] {
+  position: relative;
+  overflow: visible;
 }
-.avatar[data-tier="elite"][data-accent="rose"] { --premium-ring: #f43f5e; }
-.avatar[data-tier="elite"][data-accent="amber"] { --premium-ring: #f59e0b; }
-.avatar[data-tier="elite"][data-accent="teal"] { --premium-ring: #14b8a6; }
-.avatar[data-tier="elite"][data-accent="sky"] { --premium-ring: #0ea5e9; }
-.avatar[data-tier="elite"][data-accent="violet"] { --premium-ring: #8b5cf6; }
+.avatar[data-ring] > img { border-radius: 50%; }
+.avatar[data-ring]::after {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  background: var(--ring-art) center / contain no-repeat;
+  pointer-events: none;
+  z-index: 2;
+}
+.avatar[data-ring][data-ring-blend="screen"]::after { mix-blend-mode: screen; }
 .premium-badge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: var(--fs-2xs); padding: 2px 8px; border-radius: 999px;

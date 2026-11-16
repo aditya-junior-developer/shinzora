@@ -19,6 +19,7 @@ import { sb, normalizeError } from "../../../lib/supabase.js";
 import { api, runtimeConfig } from "../../../lib/api.js";
 import { PLANS, PREMIUM_TIERS, planById } from "../../../config/env.js";
 import { DECK_PDF_RUPEES } from "../../../config/investor-deck.js";
+import { RING_DESIGNS, RING_PRICE_RUPEES, ringArtUrl } from "../../../config/rings.js";
 import { buyableTiers, activeTier, pendingOrders, statusLine } from "../../../lib/premium.js";
 import { PREMIUM_EVENT } from "../../../lib/premium-live.js";
 import { payments as fetchPayments, subscription } from "../data.js";
@@ -37,6 +38,7 @@ const SERVICES = [
 
 let paymentRows = [];
 let premiumOrders = [];
+let ringChoice = null;
 let current = null;
 let runtime = null;
 
@@ -62,14 +64,16 @@ export default async function render(root) {
 
   runtime = await runtimeConfig();
   try {
-    const [paymentsRes, subRes, premiumRes] = await Promise.all([
+    const [paymentsRes, subRes, premiumRes, ringRes] = await Promise.all([
       fetchPayments(60),
       subscription(),
-      sb.from("premium_orders").select("id, tier, status, due_by, created_at").order("created_at", { ascending: false }).limit(10)
+      sb.from("premium_orders").select("id, tier, status, due_by, created_at").order("created_at", { ascending: false }).limit(10),
+      sb.from("profile_ring_choices").select("ring_id").maybeSingle()
     ]);
     paymentRows = paymentsRes.data;
     current = subRes;
     premiumOrders = premiumRes?.data || [];
+    ringChoice = ringRes?.data || null;
   } catch (error) {
     root.innerHTML = `${pageHead({ title: "Billing" })}${setupNotice(error, "Billing")}`;
     return;
@@ -172,6 +176,8 @@ export default async function render(root) {
             }
           </div>
         </div>
+
+        ${ringCard()}
 
         <div class="card">
           <div class="card-head">
@@ -316,6 +322,15 @@ export default async function render(root) {
       return;
     }
 
+    const ringBuy = event.target.closest("[data-ring-apply]");
+    if (ringBuy) {
+      const design = RING_DESIGNS.find((d) => d.id === ringBuy.getAttribute("data-ring-apply"));
+      if (!design) return;
+      /* The server sets the ₹10 price for ring_apply:<id>; the amount here is for the dialog only. */
+      startPayment({ purpose: `ring_apply:${design.id}`, label: `Profile ring: ${design.name}`, amount: RING_PRICE_RUPEES * 100 });
+      return;
+    }
+
     const service = event.target.closest("[data-service]");
     if (service) {
       const item = SERVICES.find((s) => s.id === service.getAttribute("data-service"));
@@ -428,6 +443,33 @@ export default async function render(root) {
     }
   }
 
+
+  /* Profile rings (0069). One design is worn at a time; each application is a
+     ₹10 payment, and the ring changes only once that payment is verified. */
+  function ringCard() {
+    const worn = RING_DESIGNS.find((d) => d.id === ringChoice?.ring_id);
+    return `
+    <div class="card" id="ring-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Profile ring</div>
+          <div class="card-sub">Wear one of eight designs around your photo. ₹${RING_PRICE_RUPEES} each time you apply one. It appears once the payment is verified.</div>
+        </div>
+        ${worn ? `<span class="badge badge-neutral">Wearing ${esc(worn.name)}</span>` : ""}
+      </div>
+      <div class="card-body">
+        <div class="ring-picker">
+          ${RING_DESIGNS.map(
+            (d) => `<div class="ring-option" ${worn?.id === d.id ? 'aria-current="true"' : ""}>
+              <span class="ring-option-art" ${d.blend === "screen" ? 'data-blend="screen"' : ""}><img src="${esc(ringArtUrl(d.id))}" alt="" loading="lazy" decoding="async" /></span>
+              <strong>${esc(d.name)}</strong>
+              <button class="btn btn-primary btn-sm btn-block" type="button" data-ring-apply="${esc(d.id)}">Apply · ₹${RING_PRICE_RUPEES}</button>
+            </div>`
+          ).join("")}
+        </div>
+      </div>
+    </div>`;
+  }
 
   function showReceipt(row) {
     openModal({

@@ -48,6 +48,20 @@ const DECK_EXPERT_PRICE = { amount: 3000, label: "Written by Experts investor de
 const BUSINESS_FIELD_KEYS = ["name", "category", "location", "description", "target_audience", "website_url", "phone", "email"];
 const BUSINESS_FIELD_PAISE = 1000;
 
+/* Profile rings (0069): ₹10 each time a design is applied. The ids and names are
+   kept in step with public.ring_designs. The browser never sets the price. */
+const RING_APPLY_PAISE = 1000;
+const RING_DESIGNS: Record<string, string> = {
+  "kuromi-neon": "Kuromi neon",
+  "starlight-vine": "Starlight vine",
+  "sakura": "Sakura",
+  "thorn-rose": "Thorn and rose",
+  "gothic-skull": "Gothic skull",
+  "tiger-gold": "Tiger gold",
+  "diamond-wings": "Diamond wings",
+  "pink-gold": "Pink gold"
+};
+
 const SERVICE_PRICES: Record<string, { amount: number; label: string }> = {
   website_setup: { amount: 499900, label: "Managed website setup" },
   brand_kit: { amount: 249900, label: "Brand kit and copywriting" },
@@ -273,6 +287,19 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
 
   const data = created.data;
 
+  if (purpose.startsWith("ring_apply:")) {
+    const { error: ringError } = await admin().from("ring_orders").insert({
+      payment_id: data.id,
+      owner_id: userId,
+      ring_id: purpose.slice("ring_apply:".length),
+      amount_paise: resolved.amount
+    });
+    if (ringError) {
+      await admin().from("payments").update({ status: "cancelled" }).eq("id", data.id);
+      return fail(500, "payments_error", "Could not record the chosen ring.", { detail: ringError.message });
+    }
+  }
+
   if (purpose === "business_fields") {
     const { error: orderError } = await admin().from("business_field_orders").insert({
       payment_id: data.id,
@@ -323,6 +350,13 @@ async function resolveAmount(userId: string, purpose: string, fields?: string[])
       amount: fields.length * BUSINESS_FIELD_PAISE,
       label: `Business profile fields (${fields.length} × ₹10)`
     };
+  }
+
+  if (purpose.startsWith("ring_apply:")) {
+    const ringId = purpose.slice("ring_apply:".length);
+    const name = RING_DESIGNS[ringId];
+    if (!name) return null;
+    return { amount: RING_APPLY_PAISE, label: `Profile ring: ${name}` };
   }
 
   if (purpose.startsWith("subscription:")) {

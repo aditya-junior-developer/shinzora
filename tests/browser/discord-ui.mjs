@@ -52,8 +52,8 @@ const CHANNEL_MESSAGES = [
   { id: "m4", body: "A plain member", createdAt: new Date(Date.now() - TIMES[3]).toISOString(), authorId: PLAIN, authorName: "Pia Plain", username: "pia", avatarUrl: null }
 ];
 const RING_OF = {
-  [GLOW]: { member_id: GLOW, ring_tier: "glow", ring_accent: null },
-  [ELITE]: { member_id: ELITE, ring_tier: "elite", ring_accent: "rose" }
+  [GLOW]: { member_id: GLOW, ring_id: "sakura", ring_name: "Sakura" },
+  [ELITE]: { member_id: ELITE, ring_id: "tiger-gold", ring_name: "Tiger gold" }
 };
 
 const ringCalls = [];
@@ -121,14 +121,14 @@ for (const vp of VIEWPORTS) {
     ringCalls.length >= 1 && new Set(ids).size === ids.length && ids.every((id) => onScreen.has(id)) && [GLOW, ELITE, PLAIN].every((id) => ids.includes(id)),
     `calls=${ringCalls.length}, ids=${ids.length}`);
 
-  const glow = await page.$eval(`[data-ring-user="${GLOW}"]`, (el) => ({ tier: el.getAttribute("data-tier"), shadow: getComputedStyle(el).boxShadow })).catch(() => null);
-  ok("a Glow member wears the Glow ring", glow?.tier === "glow" && glow.shadow !== "none", JSON.stringify(glow));
+  const glow = await page.$eval(`[data-ring-user="${GLOW}"]`, (el) => ({ ring: el.getAttribute("data-ring"), art: el.style.getPropertyValue("--ring-art") })).catch(() => null);
+  ok("a member who applied a design wears it", glow?.ring === "sakura" && (glow.art || "").includes("/assets/rings/sakura.png"), JSON.stringify(glow));
 
-  const elite = await page.$eval(`[data-ring-user="${ELITE}"]`, (el) => ({ tier: el.getAttribute("data-tier"), accent: el.getAttribute("data-accent"), shadow: getComputedStyle(el).boxShadow })).catch(() => null);
-  ok("an Elite member wears their accent ring", elite?.tier === "elite" && elite.accent === "rose" && elite.shadow !== "none", JSON.stringify(elite));
+  const elite = await page.$eval(`[data-ring-user="${ELITE}"]`, (el) => ({ ring: el.getAttribute("data-ring"), art: el.style.getPropertyValue("--ring-art") })).catch(() => null);
+  ok("another member wears their own design", elite?.ring === "tiger-gold" && (elite.art || "").includes("tiger-gold.png"), JSON.stringify(elite));
 
-  const plain = await page.$eval(`[data-ring-user="${PLAIN}"]`, (el) => el.hasAttribute("data-tier")).catch(() => null);
-  ok("a member with no tier wears no ring", plain === false);
+  const plain = await page.$eval(`[data-ring-user="${PLAIN}"]`, (el) => el.hasAttribute("data-ring")).catch(() => null);
+  ok("a member with no ring wears none", plain === false);
 
   const layout = await page.evaluate(() => ({
     room: document.querySelector("#grp-messages")?.classList.contains("is-channel"),

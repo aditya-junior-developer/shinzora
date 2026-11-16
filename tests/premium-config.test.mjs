@@ -18,7 +18,6 @@ import {
   buyableTiers,
   pendingOrders,
   hoursUntilDue,
-  ringAttributes,
   statusLine
 } from "../public/js/lib/premium.js";
 
@@ -72,9 +71,6 @@ check("a Free member can buy both tiers", buyableTiers(null).map((t) => t.id).jo
 check("a Glow member can only buy Elite", buyableTiers({ tier: "glow" }).map((t) => t.id).join(",") === "elite");
 check("an Elite member has nothing to buy", buyableTiers({ tier: "elite" }).length === 0);
 check("an unknown tier counts as Free", activeTier({ tier: "platinum" }) === null);
-check("a Glow member gets no accent in the ring", ringAttributes({ tier: "glow", accent: "rose" }).tier === "glow" && ringAttributes({ tier: "glow", accent: "rose" }).accent === null);
-check("an Elite member's accent is in the ring", ringAttributes({ tier: "elite", accent: "rose" }).accent === "rose");
-check("a Free member gets no ring", ringAttributes(null).tier === null);
 
 const now = Date.parse("2026-11-04T06:00:00Z");
 const orders = [

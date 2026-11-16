@@ -15,7 +15,6 @@ import { markAllNotificationsRead, markNotificationRead, notifications as fetchN
 import { resolvePublishedSite, rememberPublishedSite } from "../../lib/site-url.js";
 import { createSidebar } from "../../ui/sidebar.js";
 import { paintAvatar } from "../../lib/avatar.js";
-import { ringAttributes } from "../../lib/premium.js";
 import { markRings } from "../../lib/rings.js";
 import { startPresence, runReferralTick } from "../../ui/heartbeat.js";
 import { initNotifications, presentNotification } from "../../ui/notify.js";
@@ -274,15 +273,7 @@ export function paintIdentity() {
       avatarUrl: state.profile?.avatar_url,
       alt: "Your profile photo"
     });
-    /* The premium ring (P6). The attributes only paint a ring; the tier itself
-       comes from the database through loadIdentity(). */
-    const ring = ringAttributes(state.entitlement);
-    if (ring.tier) accAvatar.setAttribute("data-tier", ring.tier);
-    else accAvatar.removeAttribute("data-tier");
-    if (ring.accent) accAvatar.setAttribute("data-accent", ring.accent);
-    else accAvatar.removeAttribute("data-accent");
-    /* Your own ring is painted from the database too, so a still ring stays still
-       here and a hidden ring still shows to you (0068). */
+    /* Your own ring is read from the database like everyone else's (0069). */
     if (state.user?.id) {
       accAvatar.setAttribute("data-ring-user", state.user.id);
       /* One page-wide pass, so the owner joins the lookup the page already makes. */
