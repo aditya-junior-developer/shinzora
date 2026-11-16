@@ -5156,3 +5156,73 @@ html {
   :has(> .team-chat.is-thread-open) { transform: none !important; animation: none !important; }
   .team-chat.is-thread-open .chat-thread-bar { padding-top: max(8px, env(safe-area-inset-top)); }
 }
+
+/* ==========================================================================
+   Call room on phones and tablets (brief 2, "Room")
+   --------------------------------------------------------------------------
+   The controls used to sit in one non-wrapping row, so on a 390px phone the
+   outer buttons were pushed off both edges. On a touch screen they now wrap
+   into equal columns, and each button is at least 44px tall. The header keeps
+   one line: the title truncates rather than pushing the timer and close button
+   onto new rows. Desktop with a mouse keeps its compact controls.
+   ========================================================================== */
+@media (max-width: 820px), (pointer: coarse) {
+  .call-head {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .call-head-id { flex: 1 1 auto; }
+  .call-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .call-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .call-timer { flex: 0 0 auto; }
+  .call-close { min-width: 44px; min-height: 44px; flex: 0 0 auto; }
+
+  .call-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .call-controls > .call-btn {
+    flex: 1 1 calc(33.333% - 8px);
+    min-width: 0;
+    min-height: 44px;
+    justify-content: center;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+  .call-controls > .call-btn.is-danger { flex-basis: 100%; }
+}
+
+@media (max-width: 640px) {
+  .call-controls > .call-btn { flex-basis: calc(50% - 8px); }
+  .call-controls > .call-btn.is-danger { flex-basis: 100%; }
+}
+
+/* Zoom-style meeting screens (brief 2): on a touch screen every button on the
+   start, join, lobby and scheduling screens is at least 44px tall, so the
+   small segmented toggles and text buttons can be tapped with a fingertip. */
+@media (max-width: 820px), (pointer: coarse) {
+  .meeting-start button,
+  .meeting-start .btn,
+  .meeting-join button,
+  .meeting-join .btn,
+  .meeting-lobby button,
+  .meeting-lobby .btn,
+  .meeting-live button,
+  .meeting-live .btn,
+  .meeting-schedule button,
+  .meeting-schedule .btn,
+  .meeting-row .btn,
+  .meeting-missing .btn {
+    min-height: 44px;
+  }
+}
