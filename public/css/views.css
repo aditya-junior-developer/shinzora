@@ -5107,3 +5107,52 @@ html {
   gap: var(--s-4);
   padding: var(--s-5);
 }
+
+/* ============================================================================
+   Messages on a phone — one screen at a time (brief 4)
+   ----------------------------------------------------------------------------
+   Phone only (760px and below). The list fills the screen; opening a
+   conversation covers it with the thread, which has a back arrow. Desktop keeps
+   the two panes and never shows the arrow. `.is-thread-open` is set by
+   team-chat.js and is removed by the arrow or by the phone's back gesture.
+   ========================================================================== */
+.chat-back { display: none; }
+.chat-thread-bar { display: contents; }
+
+@media (max-width: 760px) {
+  .team-chat {
+    grid-template-columns: minmax(0, 1fr);
+    height: calc(100dvh - 190px);
+    min-height: 0;
+    max-height: none;
+  }
+  .team-chat .chat-pane-thread { display: none; }
+  .team-chat.is-thread-open .chat-pane-list { display: none; }
+  .team-chat.is-thread-open .chat-pane-thread {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    border: 0;
+    border-radius: 0;
+  }
+  .team-chat.is-thread-open .chat-thread-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px 0;
+  }
+  .team-chat.is-thread-open .chat-back {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+  .team-chat.is-thread-open .chat-thread-bar > .chat-thread-head { flex: 1 1 auto; min-width: 0; }
+  /* The view's entrance animation leaves a transform on its mount, which would
+     pin the full-screen thread to the mount instead of the phone screen. */
+  :has(> .team-chat.is-thread-open) { transform: none !important; animation: none !important; }
+  .team-chat.is-thread-open .chat-thread-bar { padding-top: max(8px, env(safe-area-inset-top)); }
+}

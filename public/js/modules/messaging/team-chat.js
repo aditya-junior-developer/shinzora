@@ -86,6 +86,8 @@ export default async function mountInbox(root, options = {}) {
     </aside>
 
     <section class="chat-pane chat-pane-thread">
+      <div class="chat-thread-bar">
+      <button class="chat-back btn btn-ghost btn-sm" type="button" id="dm-back" aria-label="Back to conversations">${icon("arrow-left", { size: 18 })}</button>
       <div class="chat-thread-head" id="dm-head">
         <div class="dm-head-identity">
           <div class="chat-thread-title">Messages</div>
@@ -97,6 +99,7 @@ export default async function mountInbox(root, options = {}) {
           </button>
           <div class="dm-head-status" id="dm-head-status"></div>
         </div>
+      </div>
       </div>
 
       <div class="chat-messages" id="dm-messages">
@@ -126,6 +129,33 @@ export default async function mountInbox(root, options = {}) {
   const searchInput = qs("#dm-search-input", wrap);
   const searchResults = qs("#dm-search-results", wrap);
   const callButton = qs("#dm-call", wrap);
+
+  /* Phone: the conversation list and the open conversation are one screen at a
+     time, like WhatsApp. Opening a conversation records a history entry, so the
+     phone's back gesture returns to the list instead of leaving Messages.
+     Desktop keeps both panes and never records these entries. */
+  /* Older embedded shells and the test DOM may lack matchMedia; treat them as desktop. */
+  const phoneQuery =
+    typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 760px)")
+      : { matches: false };
+  const enterThread = () => {
+    if (wrap.classList.contains("is-thread-open")) return;
+    wrap.classList.add("is-thread-open");
+    if (phoneQuery.matches) history.pushState({ shinzoraOverlay: "dm-thread" }, "", location.href);
+  };
+  const leaveThread = ({ fromHistory = false } = {}) => {
+    if (!wrap.classList.contains("is-thread-open")) return;
+    wrap.classList.remove("is-thread-open");
+    if (!fromHistory && history.state?.shinzoraOverlay) history.back();
+    paintList();
+  };
+  const onPop = (event) => {
+    if (!wrap.isConnected) return window.removeEventListener("popstate", onPop);
+    if (!event.state?.shinzoraOverlay) leaveThread({ fromHistory: true });
+  };
+  window.addEventListener("popstate", onPop);
+  qs("#dm-back", wrap).addEventListener("click", () => leaveThread());
 
   /* One call per tab, and only for a one-to-one conversation: a "call" between
      five people in a team room is a meeting, and that lives in Groups. */
@@ -242,8 +272,9 @@ export default async function mountInbox(root, options = {}) {
   });
 
   /* ---------------------------------------------------------------- thread */
-  async function open(id) {
+  async function open(id, { show = true } = {}) {
     active = id;
+    if (show) enterThread();
     paintList();
     messagesEl.innerHTML = `<div class="chat-empty-line">Loading conversation…</div>`;
     try {
@@ -446,7 +477,7 @@ export default async function mountInbox(root, options = {}) {
   on(qs("#dm-refresh", wrap), "click", async () => {
     try {
       await loadList();
-      if (active) await open(active);
+      if (active) await open(active, { show: false });
     } catch (error) {
       toastError(error);
     }
@@ -509,7 +540,7 @@ export default async function mountInbox(root, options = {}) {
       await rpc("team_chat_send", { p_conversation: active, p_body: body, p_attachments: uploaded });
       field.value = "";
       fileInput.value = "";
-      await open(active);
+      await open(active, { show: false });
     } catch (error) {
       toastError(error);
     } finally {
@@ -523,7 +554,7 @@ export default async function mountInbox(root, options = {}) {
     me = data?.user?.id || state.user?.id || null;
     await loadList();
     if (active && conversations.some((row) => row.conversationId === active)) await open(active);
-    else if (conversations.length === 1) await open(conversations[0].conversationId);
+    else if (conversations.length === 1 && !phoneQuery.matches) await open(conversations[0].conversationId);
   } catch (error) {
     listEl.innerHTML = `<div class="chat-empty-line">${esc(error.message || "Messages could not be loaded.")}</div>`;
   }

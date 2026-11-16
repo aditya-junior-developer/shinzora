@@ -76,9 +76,15 @@ function parseParams() {
 }
 
 /** Render a view into the root element. */
+/* The URL the view was last rendered for. A history entry that only changes
+   the state (an open conversation on a phone, for example) keeps the URL, so
+   popping it must not rebuild the page and lose what the person was looking at. */
+let renderedKey = null;
+
 export async function render(requested, params, ctx) {
   const root = qs("#view-root");
   if (!root) return;
+  renderedKey = location.pathname + location.search;
   const view = allowedView(requested) ? requested : landingView();
   const myToken = ++token;
   current = view;
@@ -146,6 +152,7 @@ export async function start() {
   await render(view, params, {});
 
   window.addEventListener("popstate", () => {
+    if (location.pathname + location.search === renderedKey) return;
     const next = parseParams();
     render(next.view, next.params, {});
   });
