@@ -1,7 +1,7 @@
 /* ==========================================================================
    Shinzora — browser harness: profile rings and the channel room (brief 6)
    --------------------------------------------------------------------------
-     - a member's ring is asked for in one call, for the ids on screen only
+     - each member's ring is asked for once, for the ids on screen only (the viewer's own included)
      - a Glow member wears the Glow ring; an Elite member wears their accent
      - a member with no tier wears no ring
      - the channel room is flat: the first line of each run has the avatar and
@@ -113,9 +113,12 @@ for (const vp of VIEWPORTS) {
   await page.waitForSelector("#grp-messages .chan-line", { state: "visible", timeout: 20000 });
   await page.waitForTimeout(600);
 
+  /* Each member's ring is asked for once, for the members on screen. The viewer's
+     own avatar (UID) is on screen too, so it may be asked for, but never twice. */
   const ids = ringCalls.flat();
-  ok("the ring is asked for in one call, for the members on screen",
-    ringCalls.length >= 1 && new Set(ids).size === new Set([GLOW, ELITE, PLAIN]).size && ids.every((id) => /^[0-9a-f-]{36}$/.test(id)),
+  const onScreen = new Set([GLOW, ELITE, PLAIN, UID]);
+  ok("each ring is asked for once, only for the members on screen",
+    ringCalls.length >= 1 && new Set(ids).size === ids.length && ids.every((id) => onScreen.has(id)) && [GLOW, ELITE, PLAIN].every((id) => ids.includes(id)),
     `calls=${ringCalls.length}, ids=${ids.length}`);
 
   const glow = await page.$eval(`[data-ring-user="${GLOW}"]`, (el) => ({ tier: el.getAttribute("data-tier"), shadow: getComputedStyle(el).boxShadow })).catch(() => null);

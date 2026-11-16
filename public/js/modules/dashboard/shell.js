@@ -285,7 +285,8 @@ export function paintIdentity() {
        here and a hidden ring still shows to you (0068). */
     if (state.user?.id) {
       accAvatar.setAttribute("data-ring-user", state.user.id);
-      markRings(accAvatar).catch(() => {});
+      /* One page-wide pass, so the owner joins the lookup the page already makes. */
+      markRings(document).catch(() => {});
     }
   }
   if (accEmail) accEmail.textContent = state.user?.email || "";
