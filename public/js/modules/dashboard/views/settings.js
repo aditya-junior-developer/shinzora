@@ -33,6 +33,8 @@ import { applyWallpaper } from "../../../ui/theme.js";
 import { loadThemeCatalog, chooseWallpaper, clearWallpaper } from "../../../lib/wallpaper.js";
 import { resolveWallpaper, savedChoiceUnavailable, tierLabel } from "../../../config/wallpaper-rules.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
+import { BUSINESS_FIELDS, BUSINESS_FIELD_RUPEES, BUSINESS_FIELD_MAX, fieldsTotalRupees } from "../../../config/business-fields.js";
+import { openPaymentDialog } from "../payment-dialog.js";
 
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: "user" },
@@ -124,6 +126,7 @@ export default async function render(root) {
     if (section === "profile") bindProfile();
     if (section === "business") {
       bindBusiness();
+      bindAiFields();
       bindLogo();
     }
     if (section === "security") bindSecurity();
@@ -473,7 +476,110 @@ export default async function render(root) {
           </div>
         </form>
       </div>
+    </div>
+    ${aiFieldsCard()}`;
+  }
+
+  /* Brief item 8: each ticked field costs ₹10 and feeds the AI. Fields already
+     granted show as active and are not charged again. */
+  function aiFieldsCard() {
+    const business = state.business || {};
+    const granted = Array.isArray(business.ai_fields) ? business.ai_fields : [];
+    if (!business.id) {
+      return `<div class="card stack gap-3" id="ai-fields">
+        <div class="card-title">AI profile fields</div>
+        <p class="card-sub">Save your business profile first. Then you can choose the fields the AI should use.</p>
+      </div>`;
+    }
+    const rows = BUSINESS_FIELDS.map((field) => {
+      const isGranted = granted.includes(field.key);
+      return `<label class="row gap-3" style="align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span class="row gap-2" style="align-items:center">
+          <input type="checkbox" name="ai-field" value="${field.key}" ${isGranted ? "checked disabled" : ""} />
+          <span>${esc(field.label)}</span>
+        </span>
+        <span class="badge ${isGranted ? "badge-ok" : ""}">${isGranted ? "Active" : `₹${BUSINESS_FIELD_RUPEES} per field`}</span>
+      </label>`;
+    }).join("");
+    return `<div class="card stack gap-3" id="ai-fields">
+      <div>
+        <div class="card-title">AI profile fields</div>
+        <div class="card-sub">Tick the business fields the AI should use. ₹${BUSINESS_FIELD_RUPEES} per ticked field. Active fields are not charged again.</div>
+      </div>
+      <div id="ai-fields-list" role="group" aria-label="Business profile fields">${rows}</div>
+      <div class="stack gap-2" aria-live="polite">
+        <div class="row" style="justify-content:space-between"><span>Ticked fields</span><span id="ai-fields-count">0</span></div>
+        <div class="row" style="justify-content:space-between"><span>Running total</span><span id="ai-fields-total">₹0</span></div>
+        <div class="row" style="justify-content:space-between;font-weight:600"><span>You pay</span><span id="ai-fields-due">₹0</span></div>
+        <p class="field-hint" id="ai-fields-note">Only ticked fields that are not active yet are charged. The fields become active when the payment is verified.</p>
+      </div>
+      <div class="row gap-2">
+        <button class="btn btn-primary" type="button" id="ai-fields-pay" disabled>Pay for selected fields</button>
+      </div>
+      <div id="ai-fields-status" role="status"></div>
     </div>`;
+  }
+
+  function bindAiFields() {
+    const card = qs("#ai-fields");
+    if (!card || !qs("#ai-fields-list")) return;
+    const boxes = () => qsa('input[name="ai-field"]', card);
+    const paint = () => {
+      const ticked = boxes().filter((box) => box.checked && !box.disabled).map((box) => box.value);
+      const charged = ticked;
+      const total = fieldsTotalRupees(charged);
+      qs("#ai-fields-count", card).textContent = String(ticked.length);
+      qs("#ai-fields-total", card).textContent = `₹${total}`;
+      qs("#ai-fields-due", card).textContent = `₹${total}`;
+      const pay = qs("#ai-fields-pay", card);
+      pay.disabled = charged.length === 0;
+      pay.textContent = charged.length ? `Pay ₹${total} for ${charged.length} field${charged.length === 1 ? "" : "s"}` : "Pay for selected fields";
+    };
+    boxes().forEach((box) => box.addEventListener("change", () => {
+      const count = boxes().filter((input) => input.checked && !input.disabled).length;
+      if (count > BUSINESS_FIELD_MAX) box.checked = false;
+      paint();
+    }));
+    paint();
+
+    qs("#ai-fields-pay", card).addEventListener("click", async () => {
+      const status = qs("#ai-fields-status", card);
+      const pay = qs("#ai-fields-pay", card);
+      const keys = boxes().filter((box) => box.checked && !box.disabled).map((box) => box.value);
+      pay.disabled = true;
+      pay.setAttribute("aria-busy", "true");
+      status.innerHTML = "";
+      try {
+        /* Only the ticked keys are sent. The server computes the amount from them. */
+        const created = await api.payments.create({ purpose: "business_fields", fields: keys });
+        const payment = created?.payment;
+        if (!payment?.id) throw new Error("The payment could not be started. Please try again.");
+        openPaymentDialog({
+          payment,
+          upi: created?.upi ?? null,
+          label: `Business profile fields (${keys.length})`,
+          amount: fieldsTotalRupees(keys) * 100,
+          onDone: () => refreshBusinessFields()
+        });
+      } catch (err) {
+        status.innerHTML = `<div class="alert alert-warning"><span>${esc(err?.message || "The payment could not be started.")}</span></div>`;
+      } finally {
+        pay.removeAttribute("aria-busy");
+        paint();
+      }
+    });
+  }
+
+  /* Re-read which fields are active after the payment dialog closes. */
+  async function refreshBusinessFields() {
+    if (!state.business?.id) return;
+    const { data } = await sb.from("businesses").select("ai_fields").eq("id", state.business.id).maybeSingle();
+    if (data) {
+      state.business.ai_fields = data.ai_fields || [];
+      const host = qs("#ai-fields");
+      if (host) host.outerHTML = aiFieldsCard();
+      bindAiFields();
+    }
   }
 
   function bindLogo() {

@@ -42,6 +42,12 @@ const DECK_PDF_PRICE = { amount: 2000, label: "Investor deck PDF export" };
    Mirrors DECK_EXPERT_RUPEES in public/js/config/investor-deck.js. */
 const DECK_EXPERT_PRICE = { amount: 3000, label: "Written by Experts investor deck" };
 
+/* Business profile fields (0065): ₹10 per ticked field, recomputed here from the
+   ticked list. A client-sent amount is never read. Keys must match
+   business_field_catalog in the database. */
+const BUSINESS_FIELD_KEYS = ["name", "category", "location", "description", "target_audience", "website_url", "phone", "email"];
+const BUSINESS_FIELD_PAISE = 1000;
+
 const SERVICE_PRICES: Record<string, { amount: number; label: string }> = {
   website_setup: { amount: 499900, label: "Managed website setup" },
   brand_kit: { amount: 249900, label: "Brand kit and copywriting" },
@@ -136,7 +142,12 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   const purpose = clean(body.purpose, 80);
   if (!purpose) return fail(400, "invalid_input", "A payment purpose is required.");
 
-  const resolved = await resolveAmount(userId, purpose);
+  const fields = purpose === "business_fields" ? normaliseFields(body.fields) : null;
+  if (purpose === "business_fields" && !fields) {
+    return fail(400, "invalid_input", "Tick at least one business profile field, and no more than eight.");
+  }
+
+  const resolved = await resolveAmount(userId, purpose, fields ?? undefined);
   if (!resolved) return fail(400, "invalid_input", "That payment purpose is not recognised.");
 
   /* Investors hold no payments at all. A deck export belongs to a business
@@ -151,6 +162,23 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   }
   if (purpose === "deck_expert" && accountType !== "owner") {
     return fail(403, "owner_only", "Only business owners can order a written investor deck.");
+  }
+
+  /* The ticked fields belong to one of the owner's own businesses. */
+  let fieldBusiness: string | null = null;
+  if (purpose === "business_fields") {
+    if (accountType !== "owner") {
+      return fail(403, "owner_only", "Only business owners can buy business profile fields.");
+    }
+    const { data: mine } = await admin()
+      .from("businesses")
+      .select("id")
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!mine) return fail(400, "no_business", "Create your business profile before you tick fields.");
+    fieldBusiness = mine.id as string;
   }
 
   /* A premium tier the member already holds (or a higher one) is refused on the
@@ -194,6 +222,28 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
      The read is not the guarantee — the index is. If two requests race past the
      read, exactly one insert wins and the loser gets 23505, which is caught
      below and turned into the winner's record. */
+  if (purpose === "business_fields") {
+    /* One open field payment at a time. The same ticks reuse it; different ticks
+       replace it only while nothing has been paid or sent for verification. */
+    const pending = await findOpenPayment(userId, purpose);
+    if (pending) {
+      const { data: prior } = await admin()
+        .from("business_field_orders")
+        .select("fields")
+        .eq("payment_id", pending.id)
+        .maybeSingle();
+      if (prior && sameFields(prior.fields as string[], fields!)) {
+        return paymentResponse(pending, { upiId, payee, razorpayReady, reused: true });
+      }
+      if (pending.status !== "pending") {
+        return fail(409, "payment_open", "Finish the open field payment before choosing different fields.", {
+          hint: "Your last selection is waiting for verification."
+        });
+      }
+      await admin().from("payments").update({ status: "cancelled" }).eq("id", pending.id);
+    }
+  }
+
   const open = await findOpenPayment(userId, purpose);
   if (open) return paymentResponse(open, { upiId, payee, razorpayReady, reused: true });
 
@@ -223,6 +273,20 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
 
   const data = created.data;
 
+  if (purpose === "business_fields") {
+    const { error: orderError } = await admin().from("business_field_orders").insert({
+      payment_id: data.id,
+      owner_id: userId,
+      business_id: fieldBusiness,
+      fields,
+      amount_paise: resolved.amount
+    });
+    if (orderError) {
+      await admin().from("payments").update({ status: "cancelled" }).eq("id", data.id);
+      return fail(500, "payments_error", "Could not record the selected fields.", { detail: orderError.message });
+    }
+  }
+
   await admin()
     .from("customer_activity")
     .insert({
@@ -237,7 +301,30 @@ async function createPayment(userId: string, body: Record<string, unknown>) {
   return paymentResponse(data, { upiId, payee, razorpayReady, reused: false });
 }
 
-async function resolveAmount(userId: string, purpose: string): Promise<{ amount: number; label: string; plan?: string } | null> {
+/* A clean, sorted, de-duplicated list of catalogue keys, or null. */
+function normaliseFields(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const keys = [...new Set(value.map((entry) => (typeof entry === "string" ? entry.trim() : "")))];
+  if (keys.length < 1 || keys.length > BUSINESS_FIELD_KEYS.length) return null;
+  if (!keys.every((key) => BUSINESS_FIELD_KEYS.includes(key))) return null;
+  return keys.sort();
+}
+
+function sameFields(a: string[], b: string[]): boolean {
+  const x = [...a].sort();
+  const y = [...b].sort();
+  return x.length === y.length && x.every((key, i) => key === y[i]);
+}
+
+async function resolveAmount(userId: string, purpose: string, fields?: string[]): Promise<{ amount: number; label: string; plan?: string } | null> {
+  if (purpose === "business_fields") {
+    if (!fields || !fields.length) return null;
+    return {
+      amount: fields.length * BUSINESS_FIELD_PAISE,
+      label: `Business profile fields (${fields.length} × ₹10)`
+    };
+  }
+
   if (purpose.startsWith("subscription:")) {
     const plan = purpose.split(":")[1];
     if (!PLAN_PRICES[plan]) return null;
