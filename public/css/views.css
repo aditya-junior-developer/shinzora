@@ -5351,3 +5351,20 @@ html {
 }
 /* The open row is marked with a violet bar on its left edge, as in the sidebar. */
 .hub-rail .chat-item.is-active { box-shadow: inset 3px 0 0 var(--violet); }
+
+/* ---------------------------------------------------------------------------
+   R7 — a member's own PNG or GIF wallpapers (Settings → Wallpaper). Only the
+   owner sees these; the tiles use short-lived signed addresses.
+   --------------------------------------------------------------------------- */
+.wallpaper-collection-head { flex-wrap: wrap; }
+.wallpaper-collection-head > label.btn { flex: none; cursor: pointer; }
+.wallpaper-collection-head > label.btn.is-disabled { opacity: 0.5; pointer-events: none; }
+.own-wallpaper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+.own-wallpaper-tile { display: grid; gap: var(--s-1); min-width: 0; }
+.own-wallpaper-tile .wallpaper-tile { width: 100%; min-height: 84px; }
+.own-wallpaper-remove { justify-self: start; }

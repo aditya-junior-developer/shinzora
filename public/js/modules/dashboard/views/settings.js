@@ -31,7 +31,9 @@ import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
 import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
 import { applyWallpaper } from "../../../ui/theme.js";
 import { loadThemeCatalog, chooseWallpaper, clearWallpaper } from "../../../lib/wallpaper.js";
-import { resolveWallpaper, savedChoiceUnavailable, tierLabel } from "../../../config/wallpaper-rules.js";
+import { resolveWallpaper, savedChoiceUnavailable, tierLabel, isSafeWallpaperUrl } from "../../../config/wallpaper-rules.js";
+import { loadMemberWallpapers, uploadMemberWallpaper, useMemberWallpaper, removeMemberWallpaper, memberWallpaperUrl } from "../../../lib/member-wallpaper.js";
+import { MEMBER_WALLPAPER_MAX_COUNT, formatSize } from "../../../config/member-wallpaper.js";
 import { avatarMarkup } from "../../../lib/avatar.js";
 import { BUSINESS_FIELDS, BUSINESS_FIELD_RUPEES, BUSINESS_FIELD_MAX, fieldsTotalRupees } from "../../../config/business-fields.js";
 import { openPaymentDialog } from "../payment-dialog.js";
@@ -848,18 +850,80 @@ export default async function render(root) {
   /* The picker. Every tile is built from the server's catalog; a locked tile has
      no image address at all, and choosing one still goes through the database. */
   let wallpaperCatalog = null;
+  /* The member's own PNG or GIF uploads (R7), with signed addresses for the tiles. */
+  let ownState = null;
+
+  async function withOwnUrls(state) {
+    const uploads = await Promise.all(
+      state.uploads.map(async (upload) => {
+        const url = await memberWallpaperUrl(upload.path).catch(() => null);
+        return { ...upload, url: isSafeWallpaperUrl(url) ? url : null };
+      })
+    );
+    return { ...state, uploads };
+  }
 
   async function loadWallpaperPicker() {
     const body = qs("#wallpaper-body");
     if (!body) return;
-    const { catalog, error } = await loadThemeCatalog();
+    const [{ catalog, error }, own] = await Promise.all([loadThemeCatalog(), loadMemberWallpapers()]);
     if (!qs("#wallpaper-body")) return;
+    ownState = own.state ? await withOwnUrls(own.state) : null;
     if (error || !catalog) {
       body.innerHTML = `<div class="alert alert-info" style="font-size:var(--fs-2xs)">${icon("info", { size: 14 })}<span>Wallpapers could not be loaded just now. The default background is showing.</span></div>`;
       return;
     }
     wallpaperCatalog = catalog;
     paintWallpapers();
+  }
+
+  /* The upload block: locked for a free member, the upload button and the
+     member's own tiles for Glow and Elite. A file is checked again by the
+     database; the check here only saves a pointless upload. */
+  function ownBlock() {
+    if (!ownState) return "";
+    const uploads = ownState.uploads || [];
+    const full = uploads.length >= (ownState.limit || MEMBER_WALLPAPER_MAX_COUNT);
+    if (!ownState.tierOk) {
+      return `<section class="wallpaper-collection is-locked" aria-labelledby="wown-title">
+        <div class="wallpaper-collection-head"><div>
+          <div class="card-title" id="wown-title" style="font-size:var(--fs-sm)">Your own PNG or GIF</div>
+          <div class="card-sub" style="font-size:var(--fs-2xs)">Only you can see these. Upload with a Glow or Elite profile.</div>
+        </div></div>
+        <div class="wallpaper-unlock">
+          <span>${icon("lock", { size: 13 })} Part of the Glow or Elite profile</span>
+          <a class="btn btn-ghost btn-sm" href="/app/?view=billing">Unlock in Billing</a>
+        </div>
+      </section>`;
+    }
+    const tiles = uploads
+      .map((upload) => {
+        const selected = upload.chosen;
+        const face = upload.url ? `style="background-image:url('${upload.url}')"` : "";
+        return `<div class="own-wallpaper-tile ${selected ? "is-selected" : ""}">
+          <button type="button" class="wallpaper-tile ${selected ? "is-selected" : ""}" data-own-use="${esc(upload.id)}" aria-pressed="${selected}"
+            aria-label="Use your upload from ${esc(new Date(upload.createdAt).toLocaleDateString())}, ${esc(formatSize(upload.byteSize))}" ${face}>
+            <span class="wallpaper-tile-name">${esc(upload.mimeType === "image/gif" ? "GIF" : "PNG")} · ${esc(formatSize(upload.byteSize))}</span>
+            ${selected ? `<span class="wallpaper-tile-tick" aria-hidden="true">${icon("check", { size: 14 })}</span>` : ""}
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm own-wallpaper-remove" data-own-remove="${esc(upload.id)}" aria-label="Remove this upload">Remove</button>
+        </div>`;
+      })
+      .join("");
+    return `<section class="wallpaper-collection" aria-labelledby="wown-title">
+      <div class="wallpaper-collection-head">
+        <div>
+          <div class="card-title" id="wown-title" style="font-size:var(--fs-sm)">Your own PNG or GIF</div>
+          <div class="card-sub" style="font-size:var(--fs-2xs)">Only you can see these. PNG or GIF, up to ${esc(formatSize(5 * 1024 * 1024))} each, ${MEMBER_WALLPAPER_MAX_COUNT} at a time.</div>
+        </div>
+        <label class="btn btn-ghost btn-sm ${full ? "is-disabled" : ""}" for="own-wallpaper-input">${icon("upload", { size: 13 })} Upload</label>
+        <input id="own-wallpaper-input" type="file" accept="image/png,image/gif" hidden ${full ? "disabled" : ""} />
+      </div>
+      <div class="dim" id="own-wallpaper-status" role="status" style="font-size:var(--fs-2xs)">${
+        full ? `You have ${uploads.length} of ${MEMBER_WALLPAPER_MAX_COUNT}. Remove one to add another.` : uploads.length ? "" : "You have no uploads yet."
+      }</div>
+      ${tiles ? `<div class="own-wallpaper-grid">${tiles}</div>` : ""}
+    </section>`;
   }
 
   function paintWallpapers() {
@@ -869,7 +933,7 @@ export default async function render(root) {
     const chosen = resolveWallpaper(catalog, catalog.chosenWallpaperId);
     const unavailable = savedChoiceUnavailable(catalog);
     const clear = qs("#wallpaper-clear");
-    if (clear) clear.hidden = !catalog.chosenWallpaperId;
+    if (clear) clear.hidden = !(catalog.chosenWallpaperId || ownState?.chosenId);
 
     const notice = unavailable
       ? `<div class="alert alert-info" style="margin-bottom:var(--s-4);font-size:var(--fs-2xs)">${icon("info", { size: 14 })}<span>Your saved wallpaper belongs to a profile that is not active on this account, so the default background is showing. Your choice is kept.</span></div>`
@@ -913,8 +977,9 @@ export default async function render(root) {
       })
       .join("");
 
-    body.innerHTML = `${notice}${collections || '<div class="dim" style="font-size:var(--fs-sm)">No wallpapers are available yet.</div>'}`;
-    applyWallpaper(chosen?.imageUrl ?? null);
+    body.innerHTML = `${notice}${ownBlock()}${collections || '<div class="dim" style="font-size:var(--fs-sm)">No wallpapers are available yet.</div>'}`;
+    /* A member's own upload is already on the page; do not replace it with the default. */
+    if (!ownState?.chosenId) applyWallpaper(chosen?.imageUrl ?? null);
   }
 
   function bindWallpapers() {
@@ -935,6 +1000,48 @@ export default async function render(root) {
       applyWallpaper(tile?.imageUrl ?? null);
       paintWallpapers();
       toast({ title: "Wallpaper saved" }, { tone: "success", duration: 2000 });
+    });
+    /* Upload: check, store, record, then use the new file straight away. */
+    body.addEventListener("change", async (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || input.id !== "own-wallpaper-input") return;
+      const file = input.files?.[0];
+      input.value = "";
+      if (!file) return;
+      const status = qs("#own-wallpaper-status");
+      if (status) status.textContent = "Uploading…";
+      const result = await uploadMemberWallpaper(file);
+      if (result.error) {
+        toastError(result.error);
+        await loadWallpaperPicker();
+        return;
+      }
+      const used = await useMemberWallpaper(result.id);
+      if (used.error) toastError(used.error);
+      const url = await memberWallpaperUrl(result.path).catch(() => null);
+      if (!used.error && isSafeWallpaperUrl(url)) applyWallpaper(url);
+      await loadWallpaperPicker();
+      toast({ title: "Wallpaper uploaded and in use" }, { tone: "success", duration: 2500 });
+    });
+    delegate(body, "click", "[data-own-use]", async (_event, button) => {
+      const result = await useMemberWallpaper(button.getAttribute("data-own-use"));
+      if (result.error) {
+        toastError(result.error);
+        return;
+      }
+      const upload = (ownState?.uploads || []).find((row) => row.id === button.getAttribute("data-own-use"));
+      if (upload?.url) applyWallpaper(upload.url);
+      await loadWallpaperPicker();
+      toast({ title: "Wallpaper saved" }, { tone: "success", duration: 2000 });
+    });
+    delegate(body, "click", "[data-own-remove]", async (_event, button) => {
+      const result = await removeMemberWallpaper(button.getAttribute("data-own-remove"));
+      if (result.error) {
+        toastError(result.error);
+        return;
+      }
+      await loadWallpaperPicker();
+      toast({ title: "Upload removed" }, { tone: "success", duration: 2000 });
     });
     on(qs("#wallpaper-clear"), "click", async () => {
       const result = await clearWallpaper();

@@ -9,6 +9,7 @@
 import { sb, normalizeError } from "./supabase.js";
 import { applyWallpaper } from "../ui/theme.js";
 import { resolveWallpaper } from "../config/wallpaper-rules.js";
+import { currentMemberWallpaperUrl } from "./member-wallpaper.js";
 
 export async function loadThemeCatalog() {
   if (!sb) return { error: normalizeError(new Error("Offline")) };
@@ -23,6 +24,13 @@ export async function loadThemeCatalog() {
  * in place; they never block the dashboard.
  */
 export async function syncWallpaper() {
+  /* A member's own upload wins: the database clears the catalogue choice when
+     an upload is used, so the two never both apply. */
+  const own = await currentMemberWallpaperUrl().catch(() => null);
+  if (own) {
+    applyWallpaper(own);
+    return { own: true };
+  }
   const { catalog } = await loadThemeCatalog();
   if (!catalog) {
     applyWallpaper(null);

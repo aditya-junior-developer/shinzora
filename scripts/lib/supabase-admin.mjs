@@ -142,6 +142,7 @@ export const APPLICATION_TABLES = [
      their notification settings. */
   "community_groups", "community_group_members", "community_mentions",
   "business_field_catalog", "business_field_orders",
+  "member_wallpapers",
   "group_polls", "group_poll_votes",
   "notification_preferences", "push_subscriptions", "call_invites",
   "call_responses", "meetings", "meeting_attendees",
