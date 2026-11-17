@@ -29,6 +29,7 @@ import {
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
 import { applyWallpaper, applyPreset, currentPreset } from "../../../ui/theme.js";
 import { PRESETS, presetById } from "../../../config/theme-presets.js";
+import { WALLPAPER_FEATURE_ENABLED } from "../../../config/wallpaper-rules.js";
 import { loadThemeCatalog, chooseWallpaper, clearWallpaper } from "../../../lib/wallpaper.js";
 import { resolveWallpaper, savedChoiceUnavailable, tierLabel, isSafeWallpaperUrl } from "../../../config/wallpaper-rules.js";
 import { loadMemberWallpapers, uploadMemberWallpaper, useMemberWallpaper, removeMemberWallpaper, memberWallpaperUrl } from "../../../lib/member-wallpaper.js";
@@ -113,7 +114,7 @@ export default async function render(root) {
     paint();
     /* A new profile unlocks wallpapers the catalog marked locked, so reload it
        from the server rather than repaint the old answer. No-op off that section. */
-    if (WALLPAPER_ENABLED) loadWallpaperPicker();
+    if (WALLPAPER_FEATURE_ENABLED) loadWallpaperPicker();
   };
   document.addEventListener(PREMIUM_EVENT, onPremiumChange);
 
@@ -864,11 +865,10 @@ export default async function render(root) {
 
   /* ----------------------------------------------------------- appearance */
   /* Appearance is the theme. The wallpaper card is parked (not deleted) until the
-     new wallpaper artwork is supplied; set WALLPAPER_ENABLED to bring it back. */
-  const WALLPAPER_ENABLED = false;
+     new wallpaper artwork is supplied; set WALLPAPER_FEATURE_ENABLED to bring it back. */
 
   function appearanceSection() {
-    return `${themeCardHtml()}${WALLPAPER_ENABLED ? wallpaperCardHtml() : ""}`;
+    return `${themeCardHtml()}${WALLPAPER_FEATURE_ENABLED ? wallpaperCardHtml() : ""}`;
   }
 
   function wallpaperCardHtml() {
@@ -1172,7 +1172,7 @@ export default async function render(root) {
 
   function bindAppearance() {
     bindLooks();
-    if (WALLPAPER_ENABLED) bindWallpapers();
+    if (WALLPAPER_FEATURE_ENABLED) bindWallpapers();
   }
 
   /* ------------------------------------------------------------ theme looks */

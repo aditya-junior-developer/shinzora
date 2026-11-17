@@ -217,7 +217,8 @@ test("an agent lands on the freelancer dashboard and sees its own numbers", asyn
   await view.default(root);
 
   assert.match(root.textContent, /Welcome back, Asha/, "the page greets the agent");
-  assert.match(root.textContent, /@asha/, "their handle is shown");
+  /* No badges on the Freelancers dashboard: the handle chip was removed. */
+  assert.doesNotMatch(root.textContent, /@asha/, "the handle chip is not shown");
   assert.match(root.textContent, /Open projects[\s\S]*2/, "open projects counted from the board");
   assert.match(root.textContent, /Pitches sent[\s\S]*1/, "only submitted pitches count as 'sent'");
   assert.match(root.textContent, /Active contracts[\s\S]*1/, "active contracts counted");

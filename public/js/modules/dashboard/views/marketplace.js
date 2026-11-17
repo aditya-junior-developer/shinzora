@@ -16,7 +16,6 @@
    never decides who may accept a pitch — it only reflects the answer.
    ========================================================================== */
 
-import { stageBadge } from "../../../lib/business-stage.js";
 import { qs, delegate, esc } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { timeAgo, initials } from "../../../lib/format.js";
@@ -783,7 +782,6 @@ function businessPanel(profile) {
             stats.openProjects === 1 ? "role" : "roles"
           }</span>
           ${stats.completedContracts ? `<span class="mk-status mk-positive">${stats.completedContracts} completed</span>` : ""}
-          ${profile.stage ? stageBadge(profile.stage, { size: "sm" }) : ""}
         </div>
       </div>
       <button class="mk-dialog-x" type="button" data-mk-close-dialog aria-label="Close">${icon("x", { size: 16 })}</button>

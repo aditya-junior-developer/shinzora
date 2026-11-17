@@ -12,6 +12,10 @@
 const THEME_PATH = /^\/assets\/themes\/[a-z0-9._-]+$/;
 const HTTPS_ADDRESS = /^https:\/\/[^\s"'()\\<>\[\]{}]+$/;
 
+/* Wallpaper is hidden from members for now. The catalogue and uploads stay in
+   the database; set this to true to bring the feature back. */
+export const WALLPAPER_FEATURE_ENABLED = false;
+
 export function isSafeWallpaperUrl(url) {
   return typeof url === "string" && url.length <= 500 && (THEME_PATH.test(url) || HTTPS_ADDRESS.test(url));
 }

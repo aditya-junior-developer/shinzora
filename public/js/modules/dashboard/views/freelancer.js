@@ -77,7 +77,6 @@ export default async function render(root) {
 
 function paint(root) {
   const profile = workspace?.profile || {};
-  const handle = workspace?.username ? `@${workspace.username}` : "";
   const name = state.profile?.full_name || workspace?.username || "there";
 
   const pitches = Array.isArray(workspace?.myProposals) ? workspace.myProposals : [];
@@ -93,7 +92,6 @@ function paint(root) {
     ${pageHead({
       title: `Welcome back, ${name}`,
       desc: "Your work, your pitches and what is waiting on you.",
-      badge: handle ? `<span class="mk-status mk-info">${esc(handle)}</span>` : "",
       actions: `<a class="btn btn-primary btn-sm" href="/app/?view=marketplace&tab=browse">${icon("search", { size: 14 })}Find projects</a>`
     })}
 
