@@ -1,8 +1,7 @@
 /* ==========================================================================
    Shinzora — browser harness: every theme and every wallpaper (brief 3)
    --------------------------------------------------------------------------
-     - each theme, chosen through the real Settings control, changes the page
-       (data-theme, data-tone, body background) and survives a reload
+     - the six palettes are gone: no picker, and the default design is what shows
      - each Glow and Elite wallpaper, chosen by an Elite member, is painted:
        its image is fetched with status 200 and the layer is visible on the page
    - a Glow member sees Elite as previews only: they open, and they cannot be applied
@@ -132,30 +131,24 @@ for (const vp of VIEWPORTS) {
   page.on("console", (m) => { if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) errors.push(m.text()); });
   page.on("response", (r) => { if (r.url().includes("/assets/themes/")) served.set(new URL(r.url()).pathname, r.status()); });
 
-  /* 1. Every theme, chosen through Settings. */
+  /* 1. The six palettes and their picker are gone: Settings offers no colour
+     choice, and the page keeps the purple-and-black default. */
   await page.goto(`${BASE}/app/?view=settings`, { waitUntil: "load" });
   await page.locator('[data-section="appearance"]').first().click();
-  await page.waitForSelector("[data-theme-choice]", { timeout: 20000 });
-  const before = await page.evaluate(probe);
-  const themeIds = ["midnight", "blossom", "daylight", "nebula", "grove", "porcelain"];
-  const bodies = new Set([before.body]);
-  for (const id of themeIds) {
-    await page.locator(`[data-theme-choice="${id}"]`).first().click();
-    await page.waitForTimeout(250);
-    const p = await page.evaluate(probe);
-    bodies.add(p.body);
-    ok(`theme ${id} applies`, p.theme === id, `data-theme=${p.theme} tone=${p.tone}`);
-    results.push({ viewport: vp.name, kind: "theme", id, ...p });
-  }
-  ok("the six themes give six different page colours", bodies.size >= 6, `distinct=${bodies.size}`);
-  await page.reload({ waitUntil: "load" });
-  await page.locator('[data-section="appearance"]').first().click();
-  await page.waitForSelector("[data-theme-choice]", { timeout: 20000 });
-  await page.locator('[data-theme-choice="grove"]').first().click();
-  await page.reload({ waitUntil: "load" });
-  const kept = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  ok("the chosen theme survives a reload", kept === "grove", `data-theme=${kept}`);
-  await page.locator('[data-theme-choice="midnight"]').first().click().catch(() => {});
+  await page.waitForSelector("#wallpaper-body", { timeout: 20000 });
+  const picker = await page.evaluate(() => ({
+    choices: document.querySelectorAll("[data-theme-choice]").length,
+    palettesText: /Midnight|Blossom|Daylight|Nebula|Grove|Porcelain/.test(document.querySelector("#settings-body")?.textContent || "")
+  }));
+  ok("no palette picker in Settings", picker.choices === 0, `choices=${picker.choices}`);
+  ok("no palette names shown in Settings", picker.palettesText === false);
+  const defaultLook = await page.evaluate(probe);
+  ok("the page keeps the default design (no palette attribute)", defaultLook.theme === "midnight" && defaultLook.tone === null, `theme=${defaultLook.theme} tone=${defaultLook.tone}`);
+  ok("the default page background is dark purple-black", /rgb\((\d+), (\d+), (\d+)\)/.test(defaultLook.body) && (() => {
+    const [r, g, b] = defaultLook.body.match(/\d+/g).map(Number);
+    return r + g + b < 120;
+  })(), `body=${defaultLook.body}`);
+  results.push({ viewport: vp.name, kind: "default", ...defaultLook });
 
   /* 2. An Elite member applies every design; each one is painted on the dashboard. */
   tier = "elite";

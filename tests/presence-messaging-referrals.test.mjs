@@ -177,28 +177,23 @@ test("the dashboard beats a heartbeat and stops when the tab is hidden", () => {
   assert.match(beat, /typeof sb\?\.rpc !== "function"/);
 });
 
-test("three themes, one preference, applied before paint", () => {
+test("one colour design: the palettes and their picker are gone", () => {
   const app = read("public/app/index.html");
-  assert.match(app, /localStorage\.getItem\("shinzora:theme"\)/);
-  assert.match(app, /theme-light\.css/);
-  assert.match(app, /data-tone/, "the pre-paint script sets the tone as well as the theme");
+  const admin = read("public/admin/index.html");
+  for (const page of [app, admin]) {
+    assert.doesNotMatch(page, /shinzora:theme/, "no pre-paint palette script");
+    assert.doesNotMatch(page, /themes = \{/, "no palette map in the pre-paint script");
+  }
+  /* Shared styling the app still needs stays in the stylesheet. */
+  const light = read("public/css/theme-light.css");
+  assert.match(light, /\.bubble-mine/, "chat bubbles keep their shared rule");
+  assert.doesNotMatch(light, /:root\[data-theme="/, "no palette blocks remain");
 
   const theme = read("public/js/ui/theme.js");
-  assert.match(theme, /export function applyTheme/);
-  for (const id of ["midnight", "blossom", "daylight"]) {
-    assert.match(theme, new RegExp(`id: "${id}"`), `${id} is offered`);
-  }
-
-  /* Each theme is a token override, not a second stylesheet of components. */
-  const light = read("public/css/theme-light.css");
-  assert.match(light, /:root\[data-theme="blossom"\]/);
-  assert.match(light, /:root\[data-theme="daylight"\]/);
-  assert.match(light, /--base:\s*#fbf7f4/, "daylight is warm paper");
-  assert.match(light, /--base:\s*#fdfbff/, "blossom is white, with a rose-violet cast");
-  /* Neither light theme paints body text on pure white. */
-  assert.doesNotMatch(light, /--base:\s*#ffffff/);
-  /* Two light themes share one set of corrections. */
-  assert.match(light, /:root\[data-tone="light"\] \.card/);
+  assert.doesNotMatch(theme, /export const THEMES/);
+  assert.doesNotMatch(theme, /export function applyTheme/);
+  assert.match(theme, /export function clearRetiredPalette/);
+  assert.match(theme, /export function applyWallpaper/);
 });
 
 test("admin splits business accounts from freelancers, both with presence", () => {

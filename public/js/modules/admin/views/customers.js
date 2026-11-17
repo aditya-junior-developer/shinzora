@@ -2,6 +2,7 @@
    Admin · Customers — list, filter, inspect, and act on one account
    ========================================================================== */
 
+import { stageById } from "../../../lib/business-stage.js";
 import { qs, esc, on, delegate, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { money, date, dateTime, timeAgo, statusLabel } from "../../../lib/format.js";
@@ -212,7 +213,7 @@ export default async function render(root, { state }) {
                     <dt>Category</dt><dd>${esc(business.category || "—")}</dd>
                     <dt>Location</dt><dd>${esc(business.location || "—")}</dd>
                     <dt>Audience</dt><dd>${esc(business.target_audience || "—")}</dd>
-                    <dt>Stage</dt><dd>${esc(business.stage || "—")}</dd>
+                    <dt>Stage</dt><dd>${esc(stageById(business.stage)?.label || business.stage || "—")}</dd>
                     <dt>Goals</dt><dd>${esc((business.goals || []).join(", ") || "—")}</dd>
                     <dt>Description</dt><dd>${esc(business.description || "—")}</dd>
                   </dl>`

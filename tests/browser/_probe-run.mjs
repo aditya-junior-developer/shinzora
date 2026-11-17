@@ -245,7 +245,7 @@ const CSS = ["tokens", "components", "app", "views", "theme-light"].map((name) =
 }));
 
 /* The shell markup the views actually live in. */
-const SHELL = `<!doctype html><html lang="en" data-theme="midnight"><head>
+const SHELL = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${CSS.map((sheet) => `<style>${sheet.text}</style>`).join("\n")}
 </head><body>

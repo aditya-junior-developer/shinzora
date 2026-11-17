@@ -230,26 +230,10 @@
             </div>
           </div>
 
-          <div class="field" data-field="stage">
-            <label class="field-label">Where are you now?</label>
-            <div class="ob-grid-2" style="gap:var(--s-2)">
-              <button class="choice" type="button" data-stage="idea" aria-checked="false">
-                <span class="choice-mark"><i data-icon="compass" data-size="16"></i></span>
-                <span><span class="choice-title">Idea stage</span><span class="choice-desc">Exploring the concept.</span></span>
-              </button>
-              <button class="choice" type="button" data-stage="starting" aria-checked="false">
-                <span class="choice-mark"><i data-icon="feather" data-size="16"></i></span>
-                <span><span class="choice-title">Just starting</span><span class="choice-desc">Building the first version.</span></span>
-              </button>
-              <button class="choice" type="button" data-stage="operating" aria-checked="false">
-                <span class="choice-mark"><i data-icon="store" data-size="16"></i></span>
-                <span><span class="choice-title">Operating</span><span class="choice-desc">Selling or serving customers.</span></span>
-              </button>
-              <button class="choice" type="button" data-stage="growing" aria-checked="false">
-                <span class="choice-mark"><i data-icon="trending-up" data-size="16"></i></span>
-                <span><span class="choice-title">Growing</span><span class="choice-desc">Established, ready to scale.</span></span>
-              </button>
-            </div>
+          <div class="field" data-field="stage" id="ob-stage-field">
+            <h2 class="field-label stage-heading" id="ob-stage-title">What stage is your business currently in?</h2>
+            <p class="field-hint stage-sub" id="ob-stage-sub">Tell us where you are today so SHINZORA can help you move forward.</p>
+            <div class="stage-options" id="ob-stage-options" role="radiogroup" aria-labelledby="ob-stage-title"></div>
             <div class="field-error"></div>
           </div>
         </div>

@@ -229,12 +229,41 @@ export const BUSINESS_CATEGORIES = [
   "Other"
 ];
 
-export const BUSINESS_STAGES = [
-  { id: "idea", label: "Idea stage", desc: "Exploring the concept, nothing launched yet." },
-  { id: "starting", label: "Just starting", desc: "Building the first version right now." },
-  { id: "operating", label: "Operating", desc: "Selling or serving customers already." },
-  { id: "growing", label: "Growing", desc: "Established, looking to scale." }
-];
+/* The four business stages. `id` is the value stored in businesses.stage and
+   checked by migration 0079; `label` and `desc` are what members read. The
+   badge tone maps to the .stage-badge--<tone> rules in components.css. */
+export const BUSINESS_STAGES = Object.freeze([
+  {
+    id: "ideation",
+    label: "Ideation",
+    tone: "ideation",
+    desc: "You have an idea and are checking whether it is worth building. Nothing is being sold yet.",
+    focus: "Test the problem before you spend on the build."
+  },
+  {
+    id: "mvp",
+    label: "MVP",
+    tone: "mvp",
+    desc: "You have a first working version and a small group of early users. You are learning from real use.",
+    focus: "Get the first version in front of real users and listen to what they do."
+  },
+  {
+    id: "scaling",
+    label: "Scaling",
+    tone: "scaling",
+    desc: "Customers buy regularly. You are ready to add products, channels or staff to meet demand.",
+    focus: "Keep orders, stock and service steady while you widen reach."
+  },
+  {
+    id: "established",
+    label: "Established Business",
+    tone: "established",
+    desc: "The business has a steady record of sales, clear processes and a plan for long-term growth.",
+    focus: "Protect what works and plan the next stage of growth on evidence."
+  }
+]);
+
+export const BUSINESS_STAGE_IDS = Object.freeze(BUSINESS_STAGES.map((stage) => stage.id));
 
 export const GOAL_OPTIONS = [
   { id: "website", label: "Create a website", icon: "panels-top-left" },

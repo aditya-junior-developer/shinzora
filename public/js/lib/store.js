@@ -8,7 +8,7 @@
 
 import { sb, getSession, normalizeError } from "./supabase.js";
 import { PLAN_LIMITS, planById } from "../config/env.js";
-import { adoptProfileTheme } from "../ui/theme.js";
+import { clearRetiredPalette } from "../ui/theme.js";
 import { syncWallpaper } from "./wallpaper.js";
 
 export const state = {
@@ -120,10 +120,9 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
   }
 
   state.profile = one(result.profile?.data);
-  /* The account's saved theme seeds a device that has never chosen one. The
-     inline pre-paint script has already painted the local preference, so this
-     only ever changes anything on a fresh browser. */
-  if (state.profile?.theme) adoptProfileTheme(state.profile.theme);
+  /* The colour palettes were removed. A stored palette on this device is
+     dropped; the profile's old `theme` value is kept in the database, unread. */
+  clearRetiredPalette();
   /* The saved wallpaper is painted once identity is known. It never blocks the
      dashboard: a failure leaves the default background in place. */
   if (state.profile) syncWallpaper().catch(() => undefined);

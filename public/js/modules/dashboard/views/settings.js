@@ -27,7 +27,6 @@ import {
   bindReminderSettings
 } from "../../../ui/notify-reminders.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
-import { applyTheme, saveThemeToProfile, currentTheme, themePicker } from "../../../ui/theme.js";
 import { applyWallpaper } from "../../../ui/theme.js";
 import { loadThemeCatalog, chooseWallpaper, clearWallpaper } from "../../../lib/wallpaper.js";
 import { resolveWallpaper, savedChoiceUnavailable, tierLabel, isSafeWallpaperUrl } from "../../../config/wallpaper-rules.js";
@@ -38,6 +37,7 @@ import { mountRingPicker } from "../ring-picker.js";
 import { ringLabel, ringPriceRupees, ringPurpose } from "../../../config/rings.js";
 import { BUSINESS_FIELDS, BUSINESS_FIELD_RUPEES, BUSINESS_FIELD_MAX, fieldsTotalRupees } from "../../../config/business-fields.js";
 import { openPaymentDialog } from "../payment-dialog.js";
+import { stageById, stageBadge, stageOptionsHtml, paintStageOptions, saveBusinessStage } from "../../../lib/business-stage.js";
 
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: "user" },
@@ -368,7 +368,7 @@ export default async function render(root) {
   /* ------------------------------------------------------------ business */
   function businessSection() {
     const business = state.business || {};
-    return `<div class="card">
+    return `${stageCard(business)}<div class="card">
       <div class="card-head">
         <div><div class="card-title">Business logo</div>
           <div class="card-sub">Used on generated sites, invoices and your storefront.</div></div>
@@ -647,7 +647,62 @@ export default async function render(root) {
     });
   }
 
+  /* Business stage: one of four cards. The badge and roadmap read the saved
+     value, so a change here shows on every page after it saves. */
+  function stageCard(business) {
+    const saved = stageById(business.stage);
+    return `<div class="card" id="stage-card">
+      <div class="card-head">
+        <div><div class="card-title">Business stage</div>
+          <div class="card-sub">Sets your roadmap, recommendations and the badge shown across SHINZORA.</div></div>
+        <span id="stage-card-badge">${stageBadge(saved?.id || "", { size: "md" })}</span>
+      </div>
+      <div class="card-body stack gap-4">
+        <div class="stage-options" id="settings-stage-options" role="radiogroup" aria-label="Business stage">
+          ${stageOptionsHtml({ selected: saved?.id || "", prefix: "set-stage" })}
+        </div>
+        <div class="row gap-2 wrap" style="align-items:center">
+          <button class="btn btn-primary btn-sm" type="button" id="save-stage" disabled>Save stage</button>
+          <span class="field-hint" id="stage-status" role="status">${business.id ? "" : "Save your business profile below first."}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function bindStage() {
+    const group = qs("#settings-stage-options");
+    if (!group) return;
+    const save = qs("#save-stage");
+    const status = qs("#stage-status");
+    let chosen = state.business?.stage || "";
+    group.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-stage-option]");
+      if (!button) return;
+      chosen = button.dataset.stageOption;
+      paintStageOptions(group, chosen);
+      save.disabled = !state.business?.id || chosen === (state.business?.stage || "");
+      status.textContent = "";
+    });
+    save.addEventListener("click", async () => {
+      if (!chosen || !state.business?.id) return;
+      save.disabled = true;
+      status.textContent = "Saving…";
+      try {
+        await saveBusinessStage(state.business.id, chosen);
+        state.business.stage = chosen;
+        qs("#stage-card-badge").innerHTML = stageBadge(chosen, { size: "md" });
+        status.textContent = `Saved. Your roadmap now follows ${stageById(chosen).label}.`;
+        toast({ title: "Business stage saved", message: `Shown across SHINZORA as ${stageById(chosen).label}.` }, { tone: "success" });
+      } catch (error) {
+        status.textContent = "";
+        save.disabled = false;
+        toastError(normalizeError(error));
+      }
+    });
+  }
+
   function bindBusiness() {
+    bindStage();
     qs("#business-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -808,23 +863,7 @@ export default async function render(root) {
 
   /* ----------------------------------------------------------- appearance */
   function appearanceSection() {
-    const active = currentTheme();
-    return `<div class="card">
-      <div class="card-head">
-        <div>
-          <div class="card-title">Theme</div>
-          <div class="card-sub">Applies immediately, on this device and the next one you sign in on.</div>
-        </div>
-      </div>
-      <div class="card-body">
-        ${themePicker(active)}
-        <div class="alert alert-info" style="margin-top:var(--s-4);font-size:var(--fs-2xs)">
-          ${icon("info", { size: 14 })}
-          <span>Six themes, three dark and three light. Midnight is black-purple, Nebula is blue-black, Grove is green-black; Blossom is a clean white page with pink in the rules, Daylight is warm paper with no pure white anywhere, and Porcelain is cool grey-blue. They are the same components with different tokens, every text step is checked against the surface behind it, and your choice follows the account to other devices.</span>
-        </div>
-      </div>
-    </div>
-    <div class="card wallpaper-card">
+    return `<div class="card wallpaper-card">
       <div class="card-head">
         <div>
           <div class="card-title">Wallpaper</div>
@@ -1124,23 +1163,6 @@ export default async function render(root) {
 
   function bindAppearance() {
     bindWallpapers();
-    delegate(qs("#settings-body"), "click", "[data-theme-choice]", async (event, button) => {
-      const id = button.getAttribute("data-theme-choice");
-      applyTheme(id);
-      qsa("[data-theme-choice]").forEach((node) =>
-        node.setAttribute("aria-pressed", String(node.getAttribute("data-theme-choice") === id))
-      );
-      const saved = await saveThemeToProfile(id);
-      if (saved?.error) {
-        toast({
-          title: "Theme applied here",
-          message: "It could not be saved to your account, so other devices will keep the old one.",
-          tone: "warning"
-        });
-        return;
-      }
-      toast({ title: "Theme saved" }, { tone: "success", duration: 2000 });
-    });
   }
 
   /* -------------------------------------------------------------- referrals */

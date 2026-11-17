@@ -54,26 +54,17 @@ function tokens(css) {
   return found;
 }
 
-/** Every palette the app can paint: the default plus each [data-theme] block. */
+/** The one colour design the app paints: the default in tokens.css. The six
+    selectable palettes were removed, so there is nothing else to check. */
 async function palettes() {
-  const theme = await import("../public/js/ui/theme.js");
-  const css = (await read("public/css/tokens.css")) + (await read("public/css/theme-light.css"));
-  const blocks = {};
-  for (const match of css.matchAll(/:root\[data-theme="([a-z]+)"\]\s*\{([\s\S]*?)\n\}/g)) {
-    blocks[match[1]] = tokens(match[2]);
-  }
+  const css = await read("public/css/tokens.css");
   const baseStart = css.indexOf(":root {");
   const defaults = tokens(css.slice(baseStart, css.indexOf("\n}", baseStart)));
-  const out = [];
-  for (const entry of theme.THEMES) {
-    const palette = entry.id === "midnight" ? defaults : blocks[entry.id];
-    assert.ok(palette && palette["--base"], `${entry.id} has a palette`);
-    out.push({ id: entry.id, tone: theme.toneOf(entry.id), palette });
-  }
-  return out;
+  assert.ok(defaults["--base"], "the default design defines --base");
+  return [{ id: "default", tone: "dark", palette: defaults }];
 }
 
-test("the strongest ink is readable on its own page, in all six themes", async () => {
+test("the strongest ink is readable on its own page, in the default design", async () => {
   for (const { id, tone, palette } of await palettes()) {
     assert.ok(palette["--white"], `${id} defines --white`);
     const ratio = contrast(palette["--white"], palette["--base"]);
@@ -183,7 +174,10 @@ test("status colours come from the theme, not from a dark-theme literal", async 
     "grp-head-avatar", ".call-avatar", "obs-marker", "gc-check", "pp-badge", ".check .box svg",
     "track-dot", ".cm-send", ".skip-link",
     /* solid fills in every tone: --violet, --grad-brand */
-    "dot-badge", "admin-avatar", "pp-flag"];
+    "dot-badge", "admin-avatar", "pp-flag",
+    /* business stage badges: fixed brand fills (brown, gold, purple-and-black,
+       platinum). Each text colour is chosen for its own fill, in every design. */
+    "stage-badge--"];
   const offenders = [];
   for (const name of themed) {
     const css = await readFile(path.join(repo, "public/css", name), "utf8");

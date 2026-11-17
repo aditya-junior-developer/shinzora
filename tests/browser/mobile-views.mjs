@@ -47,7 +47,7 @@ const WIDTHS = (() => {
 
 const THEME = (() => {
   const index = process.argv.indexOf("--theme");
-  return index > 0 ? process.argv[index + 1] : "midnight";
+  return index > 0 ? process.argv[index + 1] : "default";
 })();
 
 /* Every view that is reachable from the sidebar. */
@@ -180,13 +180,24 @@ const STUB_PLUGIN = {
             contents: `export const api = new Proxy({}, { get: () => async () => ({ data: {}, error: null }) });
               export const runtimeConfig = () => ({ upiReady: false, razorpayReady: false });
               export const actionPendingDeploy = () => false;
-              export const invokeEdge = async () => ({ data: null, error: null });`,
+              export const invokeEdge = async () => ({ data: null, error: null });
+              export const invoke = async () => ({ data: null, error: null });`,
             loader: "js"
           };
         case "env-stub":
           return {
             contents: `export const env = { appName: "Shinzora", supportEmail: "x@y.z", supabaseUrl: "", supabaseKey: "", siteUrl: "" };
               export const BUSINESS_CATEGORIES = ["Creative agency", "Retail", "Services"];
+              export const BUSINESS_STAGES = [
+                { id: "ideation", label: "Ideation", tone: "ideation", desc: "Checking the idea.", focus: "Test the problem." },
+                { id: "mvp", label: "MVP", tone: "mvp", desc: "First working version.", focus: "Learn from users." },
+                { id: "scaling", label: "Scaling", tone: "scaling", desc: "Customers buy regularly.", focus: "Keep steady." },
+                { id: "established", label: "Established Business", tone: "established", desc: "Steady record of sales.", focus: "Protect growth." }
+              ];
+              export const BUSINESS_STAGE_IDS = ["ideation", "mvp", "scaling", "established"];
+              export const PREMIUM_TIERS = [];
+              export const PREMIUM_ACCENTS = [];
+              export const PLAN_LIMITS = {};
               export const PLANS = [
                 { id: "free", name: "Free", priceMonthly: 0, blurb: "Validate an idea and ship a first page.",
                   features: ["1 project (website, app or store)", "AI assistant — 30 generations / month",
@@ -261,7 +272,7 @@ const CSS = ["tokens", "components", "app", "views", "theme-light"].map((name) =
 }));
 
 /* The shell markup the views actually live in. */
-const SHELL = `<!doctype html><html lang="en" data-theme="midnight"><head>
+const SHELL = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${CSS.map((sheet) => `<style>${sheet.text}</style>`).join("\n")}
 </head><body>
@@ -373,7 +384,7 @@ const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 await page.goto("http://127.0.0.1:4316/", { waitUntil: "load" });
-await page.evaluate((theme) => document.documentElement.setAttribute("data-theme", theme), THEME);
+await page.evaluate((theme) => { if (theme && theme !== "default") document.documentElement.setAttribute("data-theme", theme); }, THEME);
 await page.waitForFunction(() => window.__ready);
 
 for (const view of VIEWS) {

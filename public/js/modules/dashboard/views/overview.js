@@ -7,7 +7,10 @@
 import { qs, esc } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { money, timeAgo, date, statusLabel, compact } from "../../../lib/format.js";
-import { state, plan, aiCredits, hasCompletedOnboarding, displayName } from "../../../lib/store.js";
+import { state, plan, aiCredits, hasCompletedOnboarding, displayName, loadIdentity } from "../../../lib/store.js";
+import { stageById, stageBadge, stageOptionsHtml, paintStageOptions, stageChecklist, nextStep, saveBusinessStage } from "../../../lib/business-stage.js";
+import { toast, toastError } from "../../../ui/toast.js";
+import { normalizeError } from "../../../lib/supabase.js";
 import { overview, isSchemaMissing } from "../data.js";
 import { pageHead, statCard, statusBadge, emptyState, setupNotice, dataTable, skeletonView } from "../components.js";
 
@@ -54,9 +57,14 @@ export default async function render(root) {
     { label: "Add a product", desc: "Stock and pricing live", href: "/app/?view=inventory", icon: "boxes" }
   ];
 
+  const stage = stageById(state.business?.stage);
+  const checklist = stage ? stageChecklist(stage.id, data, state.business || {}) : [];
+  const upcoming = nextStep(checklist);
+
   root.innerHTML = `
     ${pageHead({
       title: `${greeting}, ${firstName}`,
+      badge: state.business ? stageBadge(stage?.id || "", { size: "md", link: true }) : "",
       desc: hasCompletedOnboarding()
         ? `${state.business?.name || "Your business"} · ${plan().name} plan · ${credits.used} of ${credits.limit} AI generations used this month`
         : "Finish setting up your business profile so the AI has context to work with.",
@@ -96,6 +104,8 @@ export default async function render(root) {
             : `<span class="trend-flat">${icon("circle-check", { size: 12 })}Nothing waiting</span>`
       })}
     </div>
+
+    ${stageSection({ stage, checklist, upcoming, hasBusiness: Boolean(state.business?.id) })}
 
     <div class="grid-main-side">
       <div class="stack gap-4">
@@ -260,6 +270,7 @@ export default async function render(root) {
             <dl>
               <div class="kv"><dt>Business</dt><dd>${esc(state.business?.name || "Not set")}</dd></div>
               <div class="kv"><dt>Category</dt><dd>${esc(state.business?.category || "—")}</dd></div>
+              <div class="kv"><dt>Stage</dt><dd>${stage ? stageBadge(stage.id, { size: "sm" }) : `<a href="/app/?view=settings">Choose a stage</a>`}</dd></div>
               <div class="kv"><dt>Plan</dt><dd>${esc(plan().name)}</dd></div>
               <div class="kv"><dt>Member since</dt><dd>${esc(date(state.profile?.created_at))}</dd></div>
             </dl>
@@ -268,4 +279,99 @@ export default async function render(root) {
         </div>
       </div>
     </div>`;
+  bindOverviewStage(root);
+}
+
+/* ----------------------------------------------------------- business stage */
+
+/* Shown to members who have not chosen a stage yet (for example, accounts made
+   before the stage question existed). They are asked here, not sent back
+   through onboarding. */
+function stageSection({ stage, checklist, upcoming, hasBusiness }) {
+  if (!hasBusiness) return "";
+  if (!stage) {
+    return `<div class="card stage-card stage-card--ask" id="stage-ask">
+      <div class="card-head">
+        <div>
+          <div class="card-title">What stage is your business currently in?</div>
+          <div class="card-sub">Tell us where you are today so SHINZORA can help you move forward. You can change this any time in Settings.</div>
+        </div>
+      </div>
+      <div class="card-body stack gap-4">
+        <div class="stage-options" id="stage-ask-options" role="radiogroup" aria-labelledby="stage-ask-title">${stageOptionsHtml({ selected: "", prefix: "ask-stage" })}</div>
+        <div class="row gap-2 wrap" style="align-items:center">
+          <button class="btn btn-primary btn-sm" type="button" id="stage-ask-save" disabled>Continue</button>
+          <span class="field-hint" id="stage-ask-status" role="status"></span>
+        </div>
+      </div>
+    </div>`;
+  }
+  const done = checklist.filter((item) => item.done).length;
+  return `<div class="card stage-card stage-card--${esc(stage.tone)}">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Your roadmap · ${esc(stage.label)}</div>
+        <div class="card-sub">${esc(stage.desc)}</div>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="/app/?view=settings">Change stage</a>
+    </div>
+    <div class="card-body">
+      <div class="stage-roadmap">
+        <ol class="stage-checklist" aria-label="Steps for the ${esc(stage.label)} stage">
+          ${checklist
+            .map(
+              (item) => `<li class="${item.done ? "is-done" : ""}${item === upcoming ? " is-next" : ""}">
+                <span class="sc-mark" aria-hidden="true">${icon(item.done ? "circle-check" : "circle-dot", { size: 16 })}</span>
+                <a href="${esc(item.href)}">${esc(item.label)}</a>
+                ${item === upcoming ? '<span class="sc-next">Next</span>' : ""}
+              </li>`
+            )
+            .join("")}
+        </ol>
+        <div class="stage-side">
+          <div class="stage-focus-label">Focus for this stage</div>
+          <p class="stage-focus">${esc(stage.focus || "")}</p>
+          ${
+            upcoming
+              ? `<a class="btn btn-primary btn-sm btn-block" href="${esc(upcoming.href)}">${icon("arrow-right", { size: 13 })}Next: ${esc(upcoming.label)}</a>`
+              : `<p class="field-hint">Every step for this stage is done. Review Insights to choose what comes next.</p>`
+          }
+          <p class="field-hint">${done} of ${checklist.length} steps confirmed by your records.</p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* Wires the stage prompt on the overview. The save goes through the owner-only
+   database function, and the view repaints from the saved row. */
+export function bindOverviewStage(root) {
+  const options = root.querySelector("#stage-ask-options");
+  if (!options) return;
+  const save = root.querySelector("#stage-ask-save");
+  const status = root.querySelector("#stage-ask-status");
+  let chosen = "";
+  options.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-stage-option]");
+    if (!button) return;
+    chosen = button.dataset.stageOption;
+    paintStageOptions(options, chosen);
+    save.disabled = false;
+    status.textContent = "";
+  });
+  save.addEventListener("click", async () => {
+    if (!chosen) return;
+    save.disabled = true;
+    status.textContent = "Saving…";
+    try {
+      await saveBusinessStage(state.business?.id, chosen);
+      await loadIdentity({ force: true });
+      toast({ title: "Stage saved", message: `Your roadmap now follows the ${stageById(chosen).label} stage.` }, { tone: "success" });
+      render(root);
+    } catch (error) {
+      status.textContent = "";
+      save.disabled = false;
+      toastError(normalizeError(error));
+    }
+  });
 }

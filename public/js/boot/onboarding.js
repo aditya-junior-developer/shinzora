@@ -14,6 +14,7 @@ import { validateForm, rules } from "../lib/validate.js";
 import { setBusy, setAlert, showError, fieldError } from "../ui/form.js";
 import { toast } from "../ui/toast.js";
 import { PLANS, planById } from "../config/env.js";
+import { stageById, stageOptionsHtml, paintStageOptions, normalizeStage } from "../lib/business-stage.js";
 import { safeNextPath } from "../lib/invite.js";
 
 hydrateIcons();
@@ -60,6 +61,7 @@ let submitting = false;
 })();
 
 function hydrateFromState() {
+  qs("#ob-stage-options").innerHTML = stageOptionsHtml({ selected: "", prefix: "ob-stage" });
   const emailInput = qs("#ob-email");
   if (emailInput) emailInput.value = state.user?.email || "";
   draft.profile.fullName = state.profile?.full_name || state.user?.user_metadata?.full_name || "";
@@ -104,7 +106,7 @@ async function loadSavedProgress() {
       logoUrl: state.business.logo_url || "",
       location: state.business.location || "",
       website: state.business.website_url || "",
-      stage: state.business.stage || ""
+      stage: normalizeStage(state.business.stage)
     };
   }
 }
@@ -114,6 +116,7 @@ function applyDraft(data = {}) {
   Object.assign(draft.agent, data.agent || {});
   Object.assign(draft.profile, data.profile || {});
   Object.assign(draft.business, data.business || {});
+  draft.business.stage = normalizeStage(draft.business.stage);
   if (Array.isArray(data.goals)) draft.goals = data.goals;
   draft.goalNote = data.goalNote || draft.goalNote;
   Object.assign(draft.preferences, data.preferences || {});
@@ -135,7 +138,7 @@ function applyDraft(data = {}) {
   qs("#ob-audience").value = draft.preferences.audience || "";
   updateDescCount();
 
-  qsa("[data-stage]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.stage === draft.business.stage)));
+  paintStageOptions(qs("#ob-stage-options"), draft.business.stage);
   qsa("[data-goal]").forEach((b) => b.setAttribute("aria-pressed", String(draft.goals.includes(b.dataset.goal))));
   qsa("[data-tld]").forEach((b) => b.classList.toggle("is-active", b.dataset.tld === draft.preferences.tld));
   qsa("[data-color]").forEach((b) => b.setAttribute("aria-pressed", String(draft.preferences.colors.includes(b.dataset.color))));
@@ -342,13 +345,28 @@ function bindEvents() {
     queueSave();
   });
 
-  qsa("[data-stage]").forEach((button) =>
-    button.addEventListener("click", () => {
-      draft.business.stage = button.dataset.stage;
-      qsa("[data-stage]").forEach((b) => b.setAttribute("aria-checked", String(b === button)));
-      queueSave();
-    })
-  );
+  /* Stage cards: one radio group. Click or arrow keys choose a card; the
+     choice is saved with the rest of the draft, and checked again on Continue. */
+  const stageGroup = qs("#ob-stage-options");
+  stageGroup.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-stage-option]");
+    if (!button) return;
+    draft.business.stage = button.dataset.stageOption;
+    paintStageOptions(stageGroup, draft.business.stage);
+    qs('[data-field="stage"] .field-error').textContent = "";
+    queueSave();
+  });
+  stageGroup.addEventListener("keydown", (event) => {
+    const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const options = [...stageGroup.querySelectorAll("[data-stage-option]")];
+    const current = Math.max(0, options.findIndex((el) => el.dataset.stageOption === draft.business.stage));
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+    const next = options[(current + step + options.length) % options.length];
+    next.focus();
+    next.click();
+  });
 
   qsa("[data-goal]").forEach((button) =>
     button.addEventListener("click", () => {
@@ -675,7 +693,7 @@ function validateStep() {
         website: [rules.url]
       }
     );
-    if (!draft.business.stage) errors.stage = "Choose the stage that fits best.";
+    if (!stageById(draft.business.stage)) errors.stage = "Choose the stage that fits your business today.";
     paintFields(errors);
     return Object.keys(errors).length === 0;
   }
@@ -733,7 +751,7 @@ function renderReview() {
     ["Business", draft.business.name || "—"],
     ["Category", draft.business.category || "—"],
     ["Location", draft.business.location || "—"],
-    ["Stage", draft.business.stage || "—"],
+    ["Stage", stageById(draft.business.stage)?.label || "—"],
     ["Goals", draft.goals.length ? draft.goals.join(", ") : "—"],
     ["Brand colours", draft.preferences.colors.join(", ")],
     ["Style", draft.preferences.style || "Let AI decide"],

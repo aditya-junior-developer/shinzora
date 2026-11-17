@@ -63,7 +63,7 @@ for (const [key, type, username] of seed) {
 // Businesses: the owner has one, the busy owner has one (so investor_join must refuse them).
 await db.query(
   `insert into public.businesses (id, owner_id, name, category, location, stage, description, target_audience, goals)
-   values ('00000000-0000-4000-8000-0000000009b1', $1, 'Olive Roasters', 'Food', 'Faridabad', 'growing', 'Small batch coffee', 'Office workers', '["growth"]'::jsonb)`,
+   values ('00000000-0000-4000-8000-0000000009b1', $1, 'Olive Roasters', 'Food', 'Faridabad', 'established', 'Small batch coffee', 'Office workers', '["growth"]'::jsonb)`,
   [ids.owner]
 );
 await db.query(

@@ -11,6 +11,7 @@
    manual deck, and only an owner can do any of it).
    ========================================================================== */
 
+import { stageById } from "../../../lib/business-stage.js";
 import { qs, qsa, esc, on, delegate } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
@@ -87,7 +88,7 @@ function bulletsFor(section, data) {
     const b = data.business;
     return [
       [b.name, b.category, b.location].filter(Boolean).join(" · "),
-      b.stage ? `Stage: ${b.stage}` : "",
+      b.stage ? `Stage: ${stageById(b.stage)?.label || b.stage}` : "",
       b.targetAudience ? `Audience: ${b.targetAudience}` : "",
       b.description ? String(b.description).slice(0, DECK_MAX_BULLET_CHARS) : ""
     ].filter(Boolean);
