@@ -56,10 +56,10 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("the fifteen looks: four presets, five restored palettes, six new designs; Violet is the default", () => {
-  assert.deepEqual(PRESETS.map((p) => p.id), ["violet", "cocoa", "ember", "plum", "nebula", "grove", "blossom", "daylight", "porcelain", "aurora", "orchid", "gilt", "rose-dusk", "sand", "mint"]);
+test("the sixteen looks: four presets, five restored palettes, seven new designs; Violet is the default", () => {
+  assert.deepEqual(PRESETS.map((p) => p.id), ["violet", "cocoa", "ember", "plum", "nebula", "grove", "blossom", "daylight", "porcelain", "aurora", "orchid", "gilt", "rose-dusk", "sand", "mint", "bloom"]);
   const light = PRESETS.filter((p) => p.tone === "light").map((p) => p.id);
-  assert.deepEqual(light, ["blossom", "daylight", "porcelain", "sand", "mint"], "light looks are marked");
+  assert.deepEqual(light, ["blossom", "daylight", "porcelain", "sand", "mint", "bloom"], "light looks are marked");
   assert.equal(DEFAULT_PRESET, "violet");
   for (const preset of PRESETS) {
     assert.ok(preset.name && preset.blurb, `${preset.id} has a name and a blurb`);
@@ -73,7 +73,7 @@ test("retired names resolve to Violet, and restored palettes are selectable", ()
     assert.equal(normalizePreset(id), "violet", `${id} resolves to the default`);
     assert.equal(presetById(id).id, "violet", `${id} is not a preset`);
   }
-  for (const id of ["nebula", "grove", "blossom", "daylight", "porcelain", "aurora", "orchid", "gilt", "rose-dusk", "sand", "mint"]) {
+  for (const id of ["nebula", "grove", "blossom", "daylight", "porcelain", "aurora", "orchid", "gilt", "rose-dusk", "sand", "mint", "bloom"]) {
     assert.equal(normalizePreset(id), id, `${id} is a look again`);
   }
   assert.equal(normalizePreset(undefined), "violet");

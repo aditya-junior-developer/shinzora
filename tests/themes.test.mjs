@@ -43,7 +43,7 @@ test("the pre-paint script reads the look key, and sets the tone only for light 
   }
   const app = read("public/app/index.html");
   assert.match(app, /shinzora:look/, "the app reads the look key");
-  assert.match(app, /"blossom", "daylight", "porcelain", "sand", "mint"/, "the app sets the tone for the light looks");
+  assert.match(app, /"blossom", "daylight", "porcelain", "sand", "mint", "bloom"/, "the app sets the tone for the light looks");
   assert.doesNotMatch(read("public/admin/index.html"), /data-tone/, "admin keeps its own styling");
 });
 
