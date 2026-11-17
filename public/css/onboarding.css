@@ -7,7 +7,7 @@
   display: grid;
   grid-template-columns: 1fr;
   background:
-    radial-gradient(60% 40% at 15% -5%, rgba(124, 58, 237, 0.26), transparent 62%),
+    radial-gradient(60% 40% at 15% -5%, rgba(var(--accent-rgb), 0.26), transparent 62%),
     radial-gradient(50% 40% at 95% 10%, rgba(75, 29, 146, 0.22), transparent 68%),
     var(--void);
 }
@@ -107,7 +107,7 @@
   background: var(--grad-brand);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.16);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16);
 }
 .ob-step.is-active .obs-label {
   color: var(--white);
@@ -301,7 +301,7 @@
 }
 .goal-chip:hover {
   border-color: var(--line-violet);
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
   color: var(--white);
 }
 .goal-chip .ico {
@@ -326,8 +326,8 @@
   stroke-width: 3;
 }
 .goal-chip[aria-pressed="true"] {
-  border-color: rgba(168, 85, 247, 0.55);
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.06));
+  border-color: rgba(var(--violet-rgb), 0.55);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.22), rgba(var(--accent-rgb), 0.06));
   color: var(--white);
 }
 .goal-chip[aria-pressed="true"] .ico {
@@ -359,7 +359,7 @@
   transform: scale(1.08);
 }
 .swatch[aria-pressed="true"] {
-  box-shadow: 0 0 0 2px #0a0812, 0 0 0 4px rgba(168, 85, 247, 0.85);
+  box-shadow: 0 0 0 2px #0a0812, 0 0 0 4px rgba(var(--violet-rgb), 0.85);
 }
 .swatch-custom {
   display: inline-flex;
@@ -405,9 +405,9 @@
   border-color: var(--line-violet);
 }
 .plan-pick[aria-checked="true"] {
-  border-color: rgba(168, 85, 247, 0.6);
-  background: linear-gradient(160deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.05));
-  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.2);
+  border-color: rgba(var(--violet-rgb), 0.6);
+  background: linear-gradient(160deg, rgba(var(--accent-rgb), 0.22), rgba(var(--accent-rgb), 0.05));
+  box-shadow: 0 0 0 1px rgba(var(--violet-rgb), 0.2);
 }
 .plan-pick .pp-name {
   font-size: var(--fs-sm);
@@ -528,7 +528,7 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(46% 52% at 26% 12%, rgba(124, 58, 237, 0.3), transparent 68%),
+    radial-gradient(46% 52% at 26% 12%, rgba(var(--accent-rgb), 0.3), transparent 68%),
     radial-gradient(40% 46% at 78% 6%, rgba(196, 181, 253, 0.16), transparent 70%);
   animation: ob-ambient 24s var(--ease) infinite alternate;
 }
@@ -541,10 +541,10 @@
 .ob-card {
   position: relative;
   border-radius: var(--r-xl);
-  border: 1px solid rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(var(--violet-rgb), 0.18);
   background:
     linear-gradient(168deg, rgba(30, 24, 47, 0.7), rgba(11, 9, 19, 0.84)),
-    radial-gradient(120% 80% at 12% 0%, rgba(124, 58, 237, 0.14), transparent 60%);
+    radial-gradient(120% 80% at 12% 0%, rgba(var(--accent-rgb), 0.14), transparent 60%);
   box-shadow: 0 26px 70px rgba(3, 1, 8, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(22px) saturate(140%);
   -webkit-backdrop-filter: blur(22px) saturate(140%);
@@ -564,7 +564,7 @@
   position: relative;
   overflow: hidden;
   background: linear-gradient(90deg, var(--purple-600), var(--violet), var(--lavender));
-  box-shadow: 0 0 18px rgba(168, 85, 247, 0.55);
+  box-shadow: 0 0 18px rgba(var(--violet-rgb), 0.55);
   transition: width 0.5s var(--ease-spring);
 }
 .progress-thin > span::after {
@@ -590,7 +590,7 @@
 }
 .ob-step.is-active {
   border-color: rgba(196, 181, 253, 0.55);
-  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.22), 0 8px 24px rgba(76, 29, 149, 0.34);
+  box-shadow: 0 0 0 1px rgba(var(--violet-rgb), 0.22), 0 8px 24px rgba(76, 29, 149, 0.34);
 }
 
 /* Choice tiles and goal chips get the same hover language as the dashboard. */
@@ -601,14 +601,14 @@
 }
 .choice:hover,
 .goal-chip:hover {
-  border-color: rgba(168, 85, 247, 0.42);
+  border-color: rgba(var(--violet-rgb), 0.42);
   transform: translateY(-1px);
 }
 .choice.is-selected,
 .goal-chip.is-selected,
 .goal-chip[aria-pressed="true"] {
   border-color: rgba(196, 181, 253, 0.62);
-  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.24), 0 12px 30px rgba(76, 29, 149, 0.3);
+  box-shadow: 0 0 0 1px rgba(var(--violet-rgb), 0.24), 0 12px 30px rgba(76, 29, 149, 0.3);
 }
 
 @media (max-width: 640px) {
@@ -645,8 +645,8 @@
 .ob-choice-row .choice strong { display: block; margin-bottom: 3px; }
 .ob-choice-row .choice span { color: var(--text-dim); font-size: var(--fs-sm, 13px); }
 .ob-choice-row .choice.is-selected {
-  border-color: var(--accent, #7c3aed);
-  box-shadow: 0 0 0 1px var(--accent, #7c3aed) inset;
+  border-color: var(--accent, var(--purple-500));
+  box-shadow: 0 0 0 1px var(--accent, var(--purple-500)) inset;
 }
 
 /* The handle field: an @ sits inside the input's left edge. */

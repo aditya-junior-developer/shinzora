@@ -42,8 +42,8 @@
   font-size: var(--fs-xs);
   font-weight: 600;
   color: #efe4ff;
-  background: linear-gradient(150deg, rgba(168, 85, 247, 0.3), rgba(76, 29, 149, 0.2));
-  border: 1px solid rgba(168, 85, 247, 0.32);
+  background: linear-gradient(150deg, rgba(var(--violet-rgb), 0.3), rgba(76, 29, 149, 0.2));
+  border: 1px solid rgba(var(--violet-rgb), 0.32);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 .step-card h3 {
@@ -103,7 +103,7 @@
 .billing-toggle button[aria-pressed="true"] {
   background: var(--grad-brand);
   color: #fff;
-  box-shadow: 0 6px 16px -8px rgba(124, 58, 237, 0.9);
+  box-shadow: 0 6px 16px -8px rgba(var(--accent-rgb), 0.9);
 }
 .billing-save {
   font-size: var(--fs-2xs);
@@ -130,14 +130,14 @@
 }
 .price-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(168, 85, 247, 0.28);
+  border-color: rgba(var(--violet-rgb), 0.28);
 }
 .price-card.is-featured {
-  border-color: rgba(168, 85, 247, 0.45);
+  border-color: rgba(var(--violet-rgb), 0.45);
   background:
-    radial-gradient(120% 80% at 50% -20%, rgba(124, 58, 237, 0.28), transparent 62%),
+    radial-gradient(120% 80% at 50% -20%, rgba(var(--accent-rgb), 0.28), transparent 62%),
     linear-gradient(172deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012));
-  box-shadow: 0 30px 70px -40px rgba(124, 58, 237, 0.85), var(--shadow-inset-top);
+  box-shadow: 0 30px 70px -40px rgba(var(--accent-rgb), 0.85), var(--shadow-inset-top);
 }
 .price-flag {
   position: absolute;
@@ -152,7 +152,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: 0 8px 20px -10px rgba(124, 58, 237, 0.9);
+  box-shadow: 0 8px 20px -10px rgba(var(--accent-rgb), 0.9);
   white-space: nowrap;
 }
 .price-name {
@@ -285,8 +285,8 @@
 }
 .faq-item.is-open .faq-icon {
   transform: rotate(45deg);
-  background: rgba(124, 58, 237, 0.28);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(var(--accent-rgb), 0.28);
+  border-color: rgba(var(--violet-rgb), 0.5);
   color: #fff;
 }
 .faq-panel {
@@ -317,7 +317,7 @@
   padding: var(--s-5);
   border-radius: var(--r-lg);
   border: 1px solid var(--line-violet);
-  background: linear-gradient(168deg, rgba(124, 58, 237, 0.14), rgba(255, 255, 255, 0.012));
+  background: linear-gradient(168deg, rgba(var(--accent-rgb), 0.14), rgba(255, 255, 255, 0.012));
 }
 .faq-aside h3 {
   font-size: 1rem;
@@ -361,7 +361,7 @@
 }
 .contact-channel:hover {
   border-color: var(--line-violet);
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .contact-channel .ico {
   width: 17px;
@@ -406,13 +406,13 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--r-xl);
-  border: 1px solid rgba(168, 85, 247, 0.28);
+  border: 1px solid rgba(var(--violet-rgb), 0.28);
   background:
-    radial-gradient(80% 130% at 50% -30%, rgba(124, 58, 237, 0.42), transparent 64%),
+    radial-gradient(80% 130% at 50% -30%, rgba(var(--accent-rgb), 0.42), transparent 64%),
     linear-gradient(168deg, rgba(24, 18, 40, 0.96), rgba(9, 7, 15, 0.98));
   padding: clamp(2rem, 1rem + 4vw, 4rem);
   text-align: center;
-  box-shadow: 0 40px 90px -60px rgba(124, 58, 237, 0.9);
+  box-shadow: 0 40px 90px -60px rgba(var(--accent-rgb), 0.9);
 }
 .cta-band::after {
   content: "";
@@ -506,7 +506,7 @@
 }
 .legal-strip .legal-motion[aria-pressed="true"] {
   color: var(--violet-soft, #ddd0ff);
-  border-color: rgba(168, 85, 247, 0.42);
+  border-color: rgba(var(--violet-rgb), 0.42);
 }
 .legal-strip span[aria-hidden="true"] {
   color: var(--text-4);

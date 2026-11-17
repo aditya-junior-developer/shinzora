@@ -45,6 +45,10 @@
   --violet-soft: #b98cff;
   --lavender: #c9b8f5;
   --lavender-dim: #a394c9;
+  /* RGB triplets of the accent and the violet, so a translucent literal can
+     follow the active theme preset: rgba(var(--accent-rgb), 0.4). */
+  --accent-rgb: 124, 58, 237;
+  --violet-rgb: 168, 85, 247;
 
   /* ---- Text ------------------------------------------------------------- */
   --white: #fbfaff;

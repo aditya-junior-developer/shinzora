@@ -27,7 +27,8 @@ import {
   bindReminderSettings
 } from "../../../ui/notify-reminders.js";
 import { validateForm, paintErrors, rules } from "../../../lib/validate.js";
-import { applyWallpaper } from "../../../ui/theme.js";
+import { applyWallpaper, applyPreset, currentPreset } from "../../../ui/theme.js";
+import { PRESETS, presetById } from "../../../config/theme-presets.js";
 import { loadThemeCatalog, chooseWallpaper, clearWallpaper } from "../../../lib/wallpaper.js";
 import { resolveWallpaper, savedChoiceUnavailable, tierLabel, isSafeWallpaperUrl } from "../../../config/wallpaper-rules.js";
 import { loadMemberWallpapers, uploadMemberWallpaper, useMemberWallpaper, removeMemberWallpaper, memberWallpaperUrl } from "../../../lib/member-wallpaper.js";
@@ -863,7 +864,7 @@ export default async function render(root) {
 
   /* ----------------------------------------------------------- appearance */
   function appearanceSection() {
-    return `<div class="card wallpaper-card">
+    return `${themeCardHtml()}<div class="card wallpaper-card">
       <div class="card-head">
         <div>
           <div class="card-title">Wallpaper</div>
@@ -1162,7 +1163,82 @@ export default async function render(root) {
   }
 
   function bindAppearance() {
+    bindLooks();
     bindWallpapers();
+  }
+
+  /* ------------------------------------------------------------ theme looks */
+  /* The four looks. Each tile is a small dashboard drawn in its own colours
+     (data-preset scopes the tokens to the tile), so the choice is seen before it
+     is applied. Violet is the default. */
+  function themeCardHtml() {
+    const active = currentPreset();
+    const tiles = PRESETS.map((preset) => {
+      const selected = preset.id === active;
+      return `<button type="button" class="look-tile ${selected ? "is-selected" : ""}" data-preset="${esc(preset.id)}"
+          data-look="${esc(preset.id)}" aria-pressed="${selected}" aria-label="${esc(preset.name)} theme. ${esc(preset.blurb)}">
+        <span class="look-preview" aria-hidden="true">
+          <span class="look-preview-side"></span>
+          <span class="look-preview-main">
+            <span class="look-preview-bar"></span>
+            <span class="look-preview-row"><span class="look-preview-card"></span><span class="look-preview-card"></span></span>
+            <span class="look-preview-chart"></span>
+          </span>
+        </span>
+        <span class="look-name">${esc(preset.name)}${selected ? ` <span class="look-current">Current</span>` : ""}</span>
+        <span class="look-blurb">${esc(preset.blurb)}</span>
+      </button>`;
+    }).join("");
+    return `<div class="card look-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Theme</div>
+          <div class="card-sub">Changes the colours of the whole dashboard: surfaces, accent, text and charts. Saved to your account and used on every device.</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="look-grid" role="group" aria-label="Theme">${tiles}</div>
+        <div class="field-hint" id="look-status" role="status" aria-live="polite"></div>
+      </div>
+    </div>`;
+  }
+
+  function paintLookSelection() {
+    const active = currentPreset();
+    qsa("[data-look]").forEach((tile) => {
+      const selected = tile.dataset.look === active;
+      tile.classList.toggle("is-selected", selected);
+      tile.setAttribute("aria-pressed", String(selected));
+      const name = tile.querySelector(".look-name");
+      if (name) name.innerHTML = `${esc(presetById(tile.dataset.look).name)}${selected ? ` <span class="look-current">Current</span>` : ""}`;
+    });
+  }
+
+  function bindLooks() {
+    const body = qs("#settings-body");
+    delegate(body, "click", "[data-look]", async (_event, tile) => {
+      const id = presetById(tile.dataset.look).id;
+      const previous = currentPreset();
+      if (id === previous) return;
+      const status = qs("#look-status");
+      applyPreset(id);
+      paintLookSelection();
+      if (!state.profile) {
+        if (status) status.textContent = `${presetById(id).name} is used on this device. Sign in to a profile to save it to your account.`;
+        return;
+      }
+      try {
+        await updateProfile({ theme: id });
+        state.profile = { ...state.profile, theme: id };
+        if (status) status.textContent = `${presetById(id).name} saved to your account.`;
+        toast(`${presetById(id).name} theme applied.`);
+      } catch (error) {
+        applyPreset(previous);
+        paintLookSelection();
+        if (status) status.textContent = "The theme could not be saved. The previous one is showing.";
+        toastError(normalizeError(error));
+      }
+    });
   }
 
   /* -------------------------------------------------------------- referrals */

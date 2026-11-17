@@ -19,6 +19,7 @@
 <link rel="modulepreload" href="/js/lib/supabase.js" />
 <link rel="modulepreload" href="/js/modules/dashboard/shell.js" />
 <link rel="stylesheet" href="/css/tokens.css?v=20261108d" />
+<link rel="stylesheet" href="/css/themes.css?v=20261108d" />
 <link rel="stylesheet" href="/css/components.css?v=20261108d" />
 <link rel="stylesheet" href="/css/app.css?v=20261108d" />
 <link rel="stylesheet" href="/css/views.css?v=20261108d" />
@@ -33,6 +34,14 @@
       localStorage.getItem("shinzora:sidebar") === "rail" ? "rail" : "expanded"
     );
   } catch (error) { document.documentElement.setAttribute("data-sidebar", "expanded"); }
+})();
+/* The look chosen on this device is applied before the first frame. The
+   account's saved choice replaces it once the profile loads (store.js). */
+(function () {
+  try {
+    var look = localStorage.getItem("shinzora:look");
+    if (look) document.documentElement.setAttribute("data-preset", look);
+  } catch (error) { /* Storage blocked: the default look is shown. */ }
 })();
 </script>
 <script src="/js/config/runtime.js" defer></script>

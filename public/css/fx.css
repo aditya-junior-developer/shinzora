@@ -59,7 +59,7 @@
   height: 130%;
   background:
     radial-gradient(120% 78% at 18% -6%, rgba(76, 29, 149, 0.45), transparent 62%),
-    radial-gradient(92% 68% at 76% 10%, rgba(124, 58, 237, 0.30), transparent 66%),
+    radial-gradient(92% 68% at 76% 10%, rgba(var(--accent-rgb), 0.30), transparent 66%),
     radial-gradient(80% 62% at 48% 66%, rgba(88, 28, 135, 0.26), transparent 72%);
   pointer-events: none;
 }
@@ -108,8 +108,8 @@ html:not(.has-aurora) canvas[data-aurora] {
   inset: auto 0 -6% 0;
   height: 62%;
   background-image:
-    linear-gradient(to right, rgba(168, 85, 247, 0.14) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(168, 85, 247, 0.11) 1px, transparent 1px);
+    linear-gradient(to right, rgba(var(--violet-rgb), 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(var(--violet-rgb), 0.11) 1px, transparent 1px);
   background-size: 74px 54px;
   transform: perspective(680px) rotateX(63deg) scale(1.5);
   transform-origin: 50% 100%;
@@ -136,7 +136,7 @@ html:not(.has-aurora) canvas[data-aurora] {
    Hero content polish
    -------------------------------------------------------------------------- */
 .hero-title {
-  text-shadow: 0 1px 40px rgba(124, 58, 237, 0.28);
+  text-shadow: 0 1px 40px rgba(var(--accent-rgb), 0.28);
 }
 .hero-badge {
   position: relative;
@@ -163,7 +163,7 @@ html:not(.has-aurora) canvas[data-aurora] {
 .btn-primary {
   position: relative;
   overflow: hidden;
-  background-image: linear-gradient(115deg, #6d28d9, #a855f7 40%, #7c3aed 68%, #4c1d95);
+  background-image: linear-gradient(115deg, #6d28d9, var(--violet) 40%, var(--purple-500) 68%, #4c1d95);
   background-size: 215% 215%;
   animation: fx-cta-flow 9s ease infinite;
 }
@@ -194,7 +194,7 @@ html:not(.has-aurora) canvas[data-aurora] {
    a glow that breathes behind the frame. Opacity only, no transform stacking. */
 .hero-visual .device {
   position: relative;
-  box-shadow: 0 40px 120px rgba(76, 29, 149, 0.42), 0 0 0 1px rgba(168, 85, 247, 0.16);
+  box-shadow: 0 40px 120px rgba(76, 29, 149, 0.42), 0 0 0 1px rgba(var(--violet-rgb), 0.16);
 }
 .hero-visual .device::after {
   content: "";
@@ -224,7 +224,7 @@ html:not(.has-aurora) canvas[data-aurora] {
   position: absolute;
   inset: auto 0 -1px 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.55), rgba(196, 181, 253, 0.75), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--violet-rgb), 0.55), rgba(196, 181, 253, 0.75), transparent);
   opacity: 0;
   transition: opacity var(--t-base) var(--ease);
 }
@@ -232,7 +232,7 @@ html:not(.has-aurora) canvas[data-aurora] {
   background: rgba(9, 7, 15, 0.72);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
-  border-bottom-color: rgba(168, 85, 247, 0.22);
+  border-bottom-color: rgba(var(--violet-rgb), 0.22);
   box-shadow: 0 14px 44px rgba(4, 2, 10, 0.55);
 }
 .site-nav.is-scrolled::after {
@@ -251,7 +251,7 @@ html:not(.has-aurora) canvas[data-aurora] {
   bottom: 4px;
   height: 1.5px;
   border-radius: 2px;
-  background: linear-gradient(90deg, rgba(196, 181, 253, 0.2), var(--lavender), rgba(168, 85, 247, 0.2));
+  background: linear-gradient(90deg, rgba(196, 181, 253, 0.2), var(--lavender), rgba(var(--violet-rgb), 0.2));
   transform: scaleX(0);
   transform-origin: 50% 50%;
   transition: transform var(--t-base) var(--ease-spring);
@@ -278,7 +278,7 @@ html:not(.has-aurora) canvas[data-aurora] {
   gap: 7px;
   padding: 8px 14px;
   border-radius: var(--r-pill);
-  border: 1px solid rgba(168, 85, 247, 0.34);
+  border: 1px solid rgba(var(--violet-rgb), 0.34);
   background: linear-gradient(180deg, rgba(139, 92, 246, 0.16), rgba(76, 29, 149, 0.08));
   color: var(--lavender);
   font-size: var(--fs-xs);
@@ -291,7 +291,7 @@ html:not(.has-aurora) canvas[data-aurora] {
 .btn-getapp:hover {
   border-color: rgba(196, 181, 253, 0.6);
   color: var(--white);
-  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.18), 0 10px 30px rgba(124, 58, 237, 0.28);
+  box-shadow: 0 0 0 1px rgba(var(--violet-rgb), 0.18), 0 10px 30px rgba(var(--accent-rgb), 0.28);
   transform: translateY(-1px);
 }
 .btn-getapp .ico {

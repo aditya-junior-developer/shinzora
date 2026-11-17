@@ -8,7 +8,7 @@
 
 import { sb, getSession, normalizeError } from "./supabase.js";
 import { PLAN_LIMITS, planById } from "../config/env.js";
-import { clearRetiredPalette } from "../ui/theme.js";
+import { clearRetiredPalette, applyPreset, presetFromProfile } from "../ui/theme.js";
 import { syncWallpaper } from "./wallpaper.js";
 
 export const state = {
@@ -123,6 +123,9 @@ export async function loadIdentity({ force = false, maxAge = 30000 } = {}) {
   /* The colour palettes were removed. A stored palette on this device is
      dropped; the profile's old `theme` value is kept in the database, unread. */
   clearRetiredPalette();
+  /* The account's saved look, applied as soon as the profile is known. A
+     profile without a saved look (or a retired value) shows Violet. */
+  if (state.profile) applyPreset(presetFromProfile(state.profile));
   /* The saved wallpaper is painted once identity is known. It never blocks the
      dashboard: a failure leaves the default background in place. */
   if (state.profile) syncWallpaper().catch(() => undefined);
