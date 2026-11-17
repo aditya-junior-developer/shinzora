@@ -156,7 +156,7 @@ export default async function render(root) {
       </div>
       <div class="card-body">
         <form class="stack gap-4" id="profile-form" novalidate>
-          <div class="row gap-4 wrap" style="align-items:center">
+          <div class="row gap-4 wrap" style="align-items:flex-start">
             <span id="avatar-slot">${avatarMarkup({ name: profile.full_name, email: state.user?.email, avatarUrl: profile.avatar_url, size: "xl", userId: state.user?.id })}</span>
             <div class="grow">
               <label class="field-label" for="avatar">Profile photo</label>

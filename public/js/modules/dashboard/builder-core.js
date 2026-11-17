@@ -71,6 +71,10 @@ const TYPES = {
 
 const ASSET_LIMIT_BYTES = 900 * 1024;
 
+/* Each open builder gets its own id, so a background build knows whether the
+   page it started on is still the one on screen. */
+let builderMountSeq = 0;
+
 export function createBuilder(type) {
   const config = TYPES[type];
   const stages = stagesFor(type);
@@ -80,6 +84,10 @@ export function createBuilder(type) {
   const pageNoun = isApp ? "screen" : "page";
 
   return async function render(root, ctx) {
+    const mountId = ++builderMountSeq;
+    /* True while this builder's page is still on screen. The router replaces the
+       whole view root when the person goes to another page, which removes the marker. */
+    const isWatching = () => Boolean(document.querySelector(`[data-builder-mount="${mountId}"]`));
     const runtime = await runtimeConfig();
     const aiReady = Boolean(runtime?.ai?.configured);
     const projectId = ctx.params.get("id");
@@ -105,6 +113,7 @@ export function createBuilder(type) {
     };
 
     root.innerHTML = `
+      <span data-builder-mount="${mountId}" hidden></span>
       ${pageHead({
         title: config.title,
         desc: config.desc,
@@ -312,6 +321,7 @@ export function createBuilder(type) {
               toast({ title: "Your build finished", message: "Review the pages, then confirm to save the version." }, { tone: "success" });
             }
           } catch (error) {
+            if (error?.code === "left_view") return;
             S.busy = false;
             S.lastError = describeFailure(normalizeError(error));
             paintStage();
@@ -1004,6 +1014,8 @@ export function createBuilder(type) {
           toast({ title: "Build finished", message: "Walk through the pages, then confirm to save a version." }, { tone: "success" });
         }
       } catch (error) {
+        /* Left the builder mid-build: the result was announced, nothing to paint here. */
+        if (error?.code === "left_view") return;
         S.busy = false;
         const normalized = normalizeError(error);
         S.lastError = describeFailure(normalized);
@@ -1134,10 +1146,32 @@ export function createBuilder(type) {
       while (Date.now() < deadline) {
         if (cancelRequested) throw Object.assign(new Error("Build cancelled"), { code: "cancelled" });
 
+        /* Someone who has moved to another page must not pay for this loop: no page
+           work, a slower check, and the result is announced instead of painted. */
+        const watching = isWatching();
         const { job } = await api.ai.buildStatus({ jobId, type });
         if (!job) throw new Error("The build record disappeared.");
 
-        applyBuildProgress(job, { quiet });
+        if (watching) applyBuildProgress(job, { quiet });
+
+        if (job.status === "succeeded" || job.status === "failed") {
+          if (!watching) {
+            notifyBuildResult(
+              job.status === "succeeded"
+                ? {
+                    title: isApp ? "Your app is ready" : "Your website is ready",
+                    body: "Open the builder to review it.",
+                    tag: `shinzora-build-${S.project?.id || "new"}`
+                  }
+                : {
+                    title: isApp ? "The app build stopped" : "The website build stopped",
+                    body: job.error || "Open the builder to see what happened.",
+                    tag: `shinzora-build-${S.project?.id || "new"}`
+                  }
+            );
+            throw Object.assign(new Error("The builder was left before the build finished."), { code: "left_view" });
+          }
+        }
 
         if (job.status === "succeeded") return job.files || {};
         if (job.status === "failed") {
@@ -1158,7 +1192,7 @@ export function createBuilder(type) {
           }
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 2200));
+        await new Promise((resolve) => setTimeout(resolve, watching ? 2200 : 12000));
       }
 
       throw Object.assign(new Error("The build is taking unusually long. It is saved on the server — reopen the builder to continue."), {
@@ -1872,6 +1906,8 @@ export function createBuilder(type) {
             <div class="row gap-1">
               <button class="btn-icon" data-download-version="${esc(version.id)}" aria-label="Download version ${version.version_number}">${icon("download", { size: 12 })}</button>
               <button class="btn-icon" data-restore-version="${esc(version.id)}" aria-label="Restore version ${version.version_number}">${icon("rotate-cw", { size: 12 })}</button>
+              <button class="btn-icon" data-delete-version="${esc(version.id)}" aria-label="Delete version ${version.version_number}"
+                ${S.project?.published_version_id === version.id ? `disabled title="This version is live. Publish another version before deleting it."` : `title="Delete this version"`}>${icon("trash-2", { size: 12 })}</button>
             </div>
           </div>`
         )
@@ -1896,6 +1932,44 @@ export function createBuilder(type) {
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
       toast({ title: "Downloaded", message: `${filename} contains the whole site and opens in any browser.` }, { tone: "success" });
+    }
+
+    /* Deleting a version is final for that version only. The live version cannot
+       be deleted: the published site would have nothing to show. */
+    async function deleteVersion(version) {
+      if (S.project?.published_version_id === version.id) {
+        toast({ title: "This version is live", message: "Publish another version before deleting it." }, { tone: "warning" });
+        return;
+      }
+      const ok = await confirmDialog({
+        title: `Delete version ${version.version_number}?`,
+        desc: "This version is removed for good. Your other versions stay exactly as they are.",
+        confirmLabel: "Delete version",
+        tone: "danger"
+      });
+      if (!ok) return;
+      const { data, error } = await sb
+        .from("project_versions")
+        .delete()
+        .eq("id", version.id)
+        .eq("project_id", S.project.id)
+        .select("id");
+      if (error) {
+        toastError(normalizeError(error));
+        return;
+      }
+      if (!data?.length) {
+        toast({ title: "That version was already gone" }, { tone: "warning" });
+      }
+      S.versions = S.versions.filter((row) => row.id !== version.id);
+      qs("#versions-card").hidden = S.versions.length === 0;
+      qs("#version-count").textContent = S.versions.length ? `${S.versions.length} saved` : "";
+      if (S.activeVersion?.id === version.id) {
+        if (S.versions.length) showVersion(S.versions[0]);
+        else S.activeVersion = null;
+      }
+      paintVersions();
+      toast({ title: `Version ${version.version_number} deleted` }, { tone: "success" });
     }
 
     async function restoreVersion(version) {
@@ -2065,6 +2139,7 @@ export function createBuilder(type) {
       const show = event.target.closest("[data-version]");
       const download = event.target.closest("[data-download-version]");
       const restore = event.target.closest("[data-restore-version]");
+      const remove = event.target.closest("[data-delete-version]");
       if (show) {
         const version = S.versions.find((row) => row.id === show.getAttribute("data-version"));
         if (version) showVersion(version);
@@ -2087,6 +2162,10 @@ export function createBuilder(type) {
       if (restore) {
         const version = S.versions.find((row) => row.id === restore.getAttribute("data-restore-version"));
         if (version) restoreVersion(version);
+      }
+      if (remove) {
+        const version = S.versions.find((row) => row.id === remove.getAttribute("data-delete-version"));
+        if (version) deleteVersion(version);
       }
     });
 
