@@ -167,6 +167,7 @@ export const PREMIUM_TIERS = Object.freeze([
     features: [
       "Glowing ring around your profile photo",
       "Glow badge on your profile",
+      "Glow wallpaper collection: four designs, applied from Settings",
       "Activated by our team within 24 hours of verified payment"
     ]
   },
@@ -179,6 +180,7 @@ export const PREMIUM_TIERS = Object.freeze([
       "Everything in Glow",
       "Elite badge on your profile",
       "Choose one accent colour for your profile ring",
+      "Elite wallpaper collection: four designs, applied from Settings",
       "Activated by our team within 24 hours of verified payment"
     ]
   }

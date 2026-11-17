@@ -942,7 +942,16 @@ export default async function render(root) {
         const tiles = (collection.wallpapers || [])
           .map((wallpaper) => {
             const selected = chosen?.id === wallpaper.id;
-            if (collection.locked || !wallpaper.imageUrl) {
+            /* A locked design still shows its artwork, as a preview. It opens a
+               dialog and never applies: theme_set_wallpaper refuses it anyway. */
+            if (collection.locked && isSafeWallpaperUrl(wallpaper.imageUrl)) {
+              return `<button type="button" class="wallpaper-tile is-locked is-previewable" data-wallpaper-preview="${esc(wallpaper.id)}"
+                aria-label="Preview ${esc(wallpaper.title)}. Locked: part of the ${esc(tierLabel(collection.requiredTier))} profile." style="background-image:url('${esc(wallpaper.imageUrl)}')">
+                <span class="wallpaper-tile-lock" aria-hidden="true">${icon("lock", { size: 16 })}</span>
+                <span class="wallpaper-tile-name">${esc(wallpaper.title)}</span>
+              </button>`;
+            }
+            if (collection.locked || !isSafeWallpaperUrl(wallpaper.imageUrl)) {
               return `<div class="wallpaper-tile is-locked" aria-label="${esc(wallpaper.title)} — locked">
                 <span class="wallpaper-tile-lock" aria-hidden="true">${icon("lock", { size: 16 })}</span>
                 <span class="wallpaper-tile-name">${esc(wallpaper.title)}</span>
@@ -973,6 +982,57 @@ export default async function render(root) {
     if (!ownState?.chosenId) applyWallpaper(chosen?.imageUrl ?? null);
   }
 
+  /* Full-size look at a locked design. Built with DOM calls so the title and
+     address are text, never markup. Escape and the close button both dismiss it. */
+  function openWallpaperPreview(wallpaper, collection) {
+    document.querySelector("dialog.wallpaper-preview")?.remove();
+    const dialog = document.createElement("dialog");
+    dialog.className = "wallpaper-preview";
+    dialog.setAttribute("aria-labelledby", "wallpaper-preview-title");
+
+    const frame = document.createElement("div");
+    frame.className = "wallpaper-preview-frame";
+    const image = document.createElement("img");
+    image.src = wallpaper.imageUrl;
+    image.alt = `${wallpaper.title}, ${collection.name} collection`;
+    image.decoding = "async";
+    frame.append(image);
+
+    const head = document.createElement("div");
+    head.className = "wallpaper-preview-head";
+    const title = document.createElement("div");
+    title.id = "wallpaper-preview-title";
+    title.className = "card-title";
+    title.style.fontSize = "var(--fs-sm)";
+    title.textContent = wallpaper.title;
+    const note = document.createElement("div");
+    note.className = "card-sub";
+    note.style.fontSize = "var(--fs-2xs)";
+    note.textContent = `Preview only. Part of the ${tierLabel(collection.requiredTier)} profile, so it cannot be applied yet.`;
+    head.append(title, note);
+
+    const actions = document.createElement("div");
+    actions.className = "wallpaper-preview-actions";
+    const unlock = document.createElement("a");
+    unlock.className = "btn btn-primary btn-sm";
+    unlock.href = "/app/?view=billing";
+    unlock.textContent = `Unlock ${tierLabel(collection.requiredTier)} in Billing`;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn btn-ghost btn-sm";
+    close.textContent = "Close";
+    close.addEventListener("click", () => dialog.close());
+    actions.append(unlock, close);
+
+    dialog.append(frame, head, actions);
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+
   function bindWallpapers() {
     const body = qs("#wallpaper-body");
     if (!body) return;
@@ -991,6 +1051,20 @@ export default async function render(root) {
       applyWallpaper(tile?.imageUrl ?? null);
       paintWallpapers();
       toast({ title: "Wallpaper saved" }, { tone: "success", duration: 2000 });
+    });
+    /* A locked design opens here, full size, for looking only. Nothing is saved. */
+    delegate(body, "click", "[data-wallpaper-preview]", (_event, button) => {
+      const id = button.getAttribute("data-wallpaper-preview");
+      let found = null;
+      for (const collection of wallpaperCatalog?.collections || []) {
+        const wallpaper = (collection.wallpapers || []).find((item) => item.id === id);
+        if (wallpaper) {
+          found = { wallpaper, collection };
+          break;
+        }
+      }
+      if (!found || !isSafeWallpaperUrl(found.wallpaper.imageUrl)) return;
+      openWallpaperPreview(found.wallpaper, found.collection);
     });
     /* Upload: check, store, record, then use the new file straight away. */
     body.addEventListener("change", async (event) => {

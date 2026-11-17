@@ -3,8 +3,11 @@
    --------------------------------------------------------------------------
      - each theme, chosen through the real Settings control, changes the page
        (data-theme, data-tone, body background) and survives a reload
-     - each catalogue wallpaper, chosen through the real catalogue, is painted:
+     - each Glow and Elite wallpaper, chosen by an Elite member, is painted:
        its image is fetched with status 200 and the layer is visible on the page
+   - a Glow member sees Elite as previews only: they open, and they cannot be applied
+   - a free member sees both collections locked, with previews and no applied design
+   - a saved choice on a retired design falls back to the default background
      - no page errors at 390, 820 and 1440 px
 
      BASE=http://127.0.0.1:4173 node tests/browser/themes-wallpapers.mjs
@@ -14,7 +17,7 @@ import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 
 const BASE = process.env.BASE || "http://127.0.0.1:4173";
-const SHOTS = process.env.SHOTS || "/home/user/shots-r10";
+const SHOTS = process.env.SHOTS || "/home/user/shots-themes";
 mkdirSync(SHOTS, { recursive: true });
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -36,26 +39,32 @@ const ROWS = {
   onboarding_progress: [{ id: "cccccccc-1111-2222-3333-444444444444", user_id: UID, status: "completed", current_step: 6, draft: {} }]
 };
 
-/* The real catalogue (0059): four collections, two wallpapers each, all open to an Elite member. */
+/* The real catalogue (0078): two collections, four designs each. The tier of the
+   signed-in member decides what is locked; locked designs keep their preview URL,
+   as theme_catalog() returns them. */
 const WALLPAPERS = [
-  ["anime", "Anime", "Glow", "Petal sky", "/assets/themes/anime-petal-sky.svg"],
-  ["anime", "Anime", "Glow", "Speed lines", "/assets/themes/anime-speed-lines.svg"],
-  ["ghibli-inspired", "Ghibli-inspired", "Glow", "Meadow wind", "/assets/themes/ghibli-meadow-wind.svg"],
-  ["ghibli-inspired", "Ghibli-inspired", "Glow", "Lantern hills", "/assets/themes/ghibli-lantern-hills.svg"],
-  ["cyberpunk", "Cyberpunk", "Elite", "Neon grid", "/assets/themes/cyber-neon-grid.svg"],
-  ["cyberpunk", "Cyberpunk", "Elite", "Rain towers", "/assets/themes/cyber-rain-towers.svg"],
-  ["trending-2026", "Trending 2026", "Elite", "Glass mesh", "/assets/themes/trend-glass-mesh.svg"],
-  ["trending-2026", "Trending 2026", "Elite", "Quiet gradient", "/assets/themes/trend-quiet-gradient.svg"]
+  ["glow", "Glow", "glow", "Glow I · Glass home", "/assets/themes/glow-01.jpg"],
+  ["glow", "Glow", "glow", "Glow II · Smart home", "/assets/themes/glow-02.jpg"],
+  ["glow", "Glow", "glow", "Glow III · Stormy skies", "/assets/themes/glow-03.jpg"],
+  ["glow", "Glow", "glow", "Glow IV · Golden weather", "/assets/themes/glow-04.jpg"],
+  ["elite", "Elite", "elite", "Elite I · Violet analytics", "/assets/themes/elite-01.jpg"],
+  ["elite", "Elite", "elite", "Elite II · Ember games", "/assets/themes/elite-02.jpg"],
+  ["elite", "Elite", "elite", "Elite III · Amber finance", "/assets/themes/elite-03.jpg"],
+  ["elite", "Elite", "elite", "Elite IV · Plum investing", "/assets/themes/elite-04.jpg"]
 ];
+const RANK = { glow: 1, elite: 2 };
 const wid = (i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
 let chosen = null;
+let tier = "elite"; // the signed-in member's tier: "elite", "glow" or null
+let retiredChoice = null; // a saved id that no longer exists in the catalogue
 function catalog() {
+  const rank = tier === "elite" ? 2 : tier === "glow" ? 1 : 0;
   const map = new Map();
-  WALLPAPERS.forEach(([cid, cname, tier, title, url], i) => {
-    if (!map.has(cid)) map.set(cid, { id: cid, name: cname, description: "", requiredTier: tier === "Glow" ? "glow" : "elite", locked: false, wallpapers: [] });
-    map.get(cid).wallpapers.push({ id: wid(i), title, imageUrl: url });
+  WALLPAPERS.forEach(([cid, cname, required, title, url], i) => {
+    if (!map.has(cid)) map.set(cid, { id: cid, name: cname, description: "", requiredTier: required, locked: RANK[required] > rank, wallpapers: [] });
+    map.get(cid).wallpapers.push({ id: wid(i), title, imageUrl: url, previewOnly: RANK[required] > rank });
   });
-  return { collections: [...map.values()], chosenWallpaperId: chosen, tier: "elite" };
+  return { collections: [...map.values()], chosenWallpaperId: chosen ?? retiredChoice, tier };
 }
 
 const served = new Map();
@@ -148,10 +157,12 @@ for (const vp of VIEWPORTS) {
   ok("the chosen theme survives a reload", kept === "grove", `data-theme=${kept}`);
   await page.locator('[data-theme-choice="midnight"]').first().click().catch(() => {});
 
-  /* 2. Every wallpaper, chosen through the catalogue, shown on the dashboard. */
+  /* 2. An Elite member applies every design; each one is painted on the dashboard. */
+  tier = "elite";
   for (let i = 0; i < WALLPAPERS.length; i++) {
     const [, , , title, url] = WALLPAPERS[i];
     chosen = wid(i);
+    retiredChoice = null;
     served.delete(url);
     await page.goto(`${BASE}/app/?view=overview`, { waitUntil: "load" });
     await page.waitForFunction(() => document.getElementById("theme-wallpaper") !== null, null, { timeout: 20000 }).catch(() => {});
@@ -159,13 +170,80 @@ for (const vp of VIEWPORTS) {
     const p = await page.evaluate(probe);
     const fetched = served.get(url);
     const painted = p.layerImage.includes(url) && p.layerOpacity > 0 && (p.layerBox?.[0] || 0) > 0;
-    ok(`wallpaper ${title} is painted`, painted, `image=${p.layerImage.slice(0, 60)} opacity=${p.layerOpacity} box=${p.layerBox}`);
-    ok(`wallpaper ${title} image loads`, fetched === 200, `status=${fetched}`);
+    ok(`Elite applies ${title}: painted`, painted, `image=${p.layerImage.slice(0, 60)} opacity=${p.layerOpacity} box=${p.layerBox}`);
+    ok(`Elite applies ${title}: image loads`, fetched === 200, `status=${fetched}`);
     await page.screenshot({ path: `${SHOTS}/wp-${vp.name}-${i}.png` });
     results.push({ viewport: vp.name, kind: "wallpaper", id: title, fetched, ...p });
   }
 
-  /* 3. Without a wallpaper the layer is removed. */
+  /* 3. A Glow member: Glow applies, Elite is preview-only. */
+  tier = "glow";
+  chosen = null;
+  await page.goto(`${BASE}/app/?view=settings`, { waitUntil: "load" });
+  await page.locator('[data-section="appearance"]').first().click();
+  await page.waitForSelector("#wallpaper-body .wallpaper-collection", { timeout: 20000 });
+  const glowState = await page.evaluate(() => {
+    const sections = [...document.querySelectorAll("#wallpaper-body .wallpaper-collection")];
+    const elite = sections.find((s) => s.querySelector("#wc-elite"));
+    const glow = sections.find((s) => s.querySelector("#wc-glow"));
+    return {
+      eliteLocked: elite?.classList.contains("is-locked") === true,
+      glowOpen: glow ? !glow.classList.contains("is-locked") : false,
+      eliteApplyButtons: elite ? elite.querySelectorAll("[data-wallpaper-choice]").length : -1,
+      elitePreviews: elite ? elite.querySelectorAll("[data-wallpaper-preview]").length : -1,
+      glowApplyButtons: glow ? glow.querySelectorAll("[data-wallpaper-choice]").length : -1
+    };
+  });
+  ok("Glow: the Elite section is locked", glowState.eliteLocked);
+  ok("Glow: the Glow section is open", glowState.glowOpen);
+  ok("Glow: no Elite design can be applied", glowState.eliteApplyButtons === 0, `buttons=${glowState.eliteApplyButtons}`);
+  ok("Glow: all four Elite designs have a preview", glowState.elitePreviews === 4, `previews=${glowState.elitePreviews}`);
+  ok("Glow: all four Glow designs can be applied", glowState.glowApplyButtons === 4, `buttons=${glowState.glowApplyButtons}`);
+  await page.locator('[data-wallpaper-preview]').first().click();
+  await page.waitForSelector("dialog.wallpaper-preview[open]", { timeout: 5000 });
+  const dialogInfo = await page.evaluate(() => {
+    const d = document.querySelector("dialog.wallpaper-preview");
+    const img = d?.querySelector("img");
+    return {
+      src: img?.getAttribute("src") || "",
+      loaded: img ? img.complete && img.naturalWidth > 0 : false,
+      unlockHref: d?.querySelector("a")?.getAttribute("href") || "",
+      sameProportion: img ? Math.abs(img.getBoundingClientRect().width / img.getBoundingClientRect().height - img.naturalWidth / img.naturalHeight) < 0.02 : false
+    };
+  });
+  ok("Glow: the Elite preview opens with its artwork", dialogInfo.src.startsWith("/assets/themes/elite-") && dialogInfo.loaded, JSON.stringify(dialogInfo));
+  ok("Glow: the preview keeps the artwork's proportions", dialogInfo.sameProportion);
+  ok("Glow: the preview offers the Billing route", dialogInfo.unlockHref === "/app/?view=billing");
+  await page.screenshot({ path: `${SHOTS}/wp-${vp.name}-preview.png` });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  ok("Glow: Escape closes the preview", (await page.locator("dialog.wallpaper-preview[open]").count()) === 0);
+  ok("Glow: a preview does not apply a design", (await page.evaluate(probe)).wallpaperAttr === null);
+
+  /* 4. A free member: both sections locked, previews only, nothing applied. */
+  tier = null;
+  await page.goto(`${BASE}/app/?view=settings`, { waitUntil: "load" });
+  await page.locator('[data-section="appearance"]').first().click();
+  await page.waitForSelector("#wallpaper-body .wallpaper-collection", { timeout: 20000 });
+  const freeState = await page.evaluate(() => ({
+    locked: [...document.querySelectorAll("#wallpaper-body .wallpaper-collection:has([id^=\"wc-\"])")].length === 2 && [...document.querySelectorAll("#wallpaper-body .wallpaper-collection:has([id^=\"wc-\"])")].every((s) => s.classList.contains("is-locked")),
+    applies: document.querySelectorAll("#wallpaper-body [data-wallpaper-choice]").length,
+    previews: document.querySelectorAll("#wallpaper-body [data-wallpaper-preview]").length
+  }));
+  ok("free member: both collections locked", freeState.locked);
+  ok("free member: no design can be applied", freeState.applies === 0, `applies=${freeState.applies}`);
+  ok("free member: all eight designs have a preview", freeState.previews === 8, `previews=${freeState.previews}`);
+
+  /* 5. A saved choice on a design that no longer exists falls back to the default. */
+  tier = "elite";
+  retiredChoice = "00000000-0000-4000-8000-0000000000ff";
+  chosen = null;
+  await page.goto(`${BASE}/app/?view=overview`, { waitUntil: "load" });
+  await page.waitForTimeout(700);
+  ok("a retired saved choice shows the default background", (await page.evaluate(probe)).wallpaperAttr === null);
+  retiredChoice = null;
+
+  /* 6. No wallpaper: the layer is removed and the page stays usable. */
   chosen = null;
   await page.goto(`${BASE}/app/?view=overview`, { waitUntil: "load" });
   await page.waitForTimeout(600);

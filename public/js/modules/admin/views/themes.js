@@ -175,7 +175,7 @@ export default async function render(root) {
     const isNew = !existing;
     const values = await formDialog({
       title: isNew ? "New wallpaper" : `Edit ${existing.title}`,
-      desc: "Use original artwork. The image path must be /assets/themes/<file>.svg, or an https address.",
+      desc: "Use original artwork. The image path must be /assets/themes/<file>.jpg (or .png), or an https address.",
       fields: [
         { name: "collectionId", label: "Collection", type: "select", options: data.collections.map((c) => ({ value: c.id, label: c.name })), value: existing?.collection_id ?? data.collections[0]?.id ?? "" },
         { name: "title", label: "Title", required: true, maxlength: 60, value: existing?.title ?? "" },
