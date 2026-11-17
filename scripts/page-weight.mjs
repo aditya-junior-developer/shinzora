@@ -77,8 +77,10 @@ const PAGES = [
     boot: "/js/boot/dashboard.js",
     vendor: "/js/vendor/supabase-js.js",
     /* Gzipped budget: what a first visit actually pays for. Measured at 258 KB
-       after the logo and the deferred client were dealt with. */
-    budget: 320 * 1024
+       after the logo and the deferred client were dealt with. Raised to 340 KB
+       when the dashboard typeface became Outfit (self-hosted, 32 KB, not
+       compressible). */
+    budget: 340 * 1024
   },
   {
     name: "admin console",
