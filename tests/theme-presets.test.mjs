@@ -156,9 +156,10 @@ test("the boot path applies the saved look, after the retired-palette clean-up",
 
 test("Settings shows the four looks and saves the choice to the profile", async () => {
   const settings = await read("public/js/modules/dashboard/views/settings.js");
-  assert.match(settings, /themeCardHtml\(\)/, "the Theme card is rendered");
+  const picker = await read("public/js/ui/look-picker.js");
+  assert.match(settings, /lookPickerHtml\(\)/, "the Theme card is rendered by the shared picker");
   assert.match(settings, /updateProfile\(\{ theme: id \}\)/, "the choice is saved to profiles.theme");
-  assert.match(settings, /data-preset="\$\{esc\(preset\.id\)\}"/, "each tile is drawn in its own look");
+  assert.match(picker, /data-preset="\$\{esc\(preset\.id\)\}"/, "each tile is drawn in its own look");
   assert.match(settings, /wallpaper-card/, "the wallpaper card is still there, separate from the theme");
   assert.doesNotMatch(settings, /themePicker|data-theme-choice|Six themes/);
 });

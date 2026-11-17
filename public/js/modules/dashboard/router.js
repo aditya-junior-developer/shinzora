@@ -5,12 +5,13 @@
    /app/?view=orders&id=… so any view is linkable and reload-safe.
    ========================================================================== */
 
+import { INVESTOR_VIEWS, OWNER_ONLY_VIEWS } from "../../config/investor-deck.js";
+import { MEETINGS_ENABLED } from "../../config/env.js";
 import { skeletonView, setupNotice, pageHead } from "./components.js";
 import { normalizeError } from "../../lib/supabase.js";
 import { state, loadIdentity, hasCompletedOnboarding } from "../../lib/store.js";
 import { qs } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
-import { INVESTOR_VIEWS, OWNER_ONLY_VIEWS } from "../../config/investor-deck.js";
 
 const LOADERS = {
   overview: () => import("./views/overview.js"),
@@ -57,6 +58,8 @@ export function landingView() {
    and the Edge Functions refuse the data either way. Before the profile loads
    there is nothing to check against, so the view opens and the server decides. */
 export function allowedView(view) {
+  /* Meetings are hidden: the view is refused the same way as one the account may not open. */
+  if (view === "meeting" && !MEETINGS_ENABLED) return false;
   const type = state.profile?.account_type;
   if (!type) return true;
   if (type === "investor") return INVESTOR_VIEWS.includes(view);

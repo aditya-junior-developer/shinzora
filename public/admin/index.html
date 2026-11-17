@@ -12,11 +12,24 @@
 <link rel="preconnect" href="https://zmkgfmlcpzjfgxdmbtvi.supabase.co" crossorigin />
 <link rel="dns-prefetch" href="https://zmkgfmlcpzjfgxdmbtvi.supabase.co" />
   <link rel="stylesheet" href="/css/tokens.css?v=20261104c" />
+  <link rel="stylesheet" href="/css/themes.css?v=20261104c" />
   <link rel="stylesheet" href="/css/components.css?v=20261104c" />
   <link rel="stylesheet" href="/css/app.css?v=20261104c" />
   <link rel="stylesheet" href="/css/views.css?v=20261104c" />
+  <link rel="stylesheet" href="/css/look-dashboard.css?v=20261104c" />
   <link rel="stylesheet" href="/css/admin.css?v=20261104c" />
 <link rel="stylesheet" href="/css/theme-light.css?v=20261104c" />
+<script>
+/* The look chosen on this device is applied before the first frame. The
+   account's saved choice replaces it once the profile loads (boot/admin.js). */
+(function () {
+  try {
+    var look = localStorage.getItem("shinzora:look");
+    if (look) document.documentElement.setAttribute("data-preset", look);
+    if (look && ["blossom", "daylight", "porcelain", "sand", "mint", "bloom"].indexOf(look) !== -1) document.documentElement.setAttribute("data-tone", "light");
+  } catch (error) { /* Storage blocked: the default look is shown. */ }
+})();
+</script>
 <script>
 /* The navigation keeps its width between visits, the same preference the
    dashboard uses. Set before the first frame so a remembered icon-rail does not

@@ -44,7 +44,11 @@ test("the pre-paint script reads the look key, and sets the tone only for light 
   const app = read("public/app/index.html");
   assert.match(app, /shinzora:look/, "the app reads the look key");
   assert.match(app, /"blossom", "daylight", "porcelain", "sand", "mint", "bloom"/, "the app sets the tone for the light looks");
-  assert.doesNotMatch(read("public/admin/index.html"), /data-tone/, "admin keeps its own styling");
+  /* The admin panel follows the administrator's own look, so it needs the same
+     light-tone rule as the app: theme-light.css keys .admin-sidebar on it. */
+  const admin = read("public/admin/index.html");
+  assert.match(admin, /shinzora:look/, "the admin reads the look key before first paint");
+  assert.match(admin, /"blossom", "daylight", "porcelain", "sand", "mint", "bloom"/, "the admin sets the tone for the light looks");
 });
 
 test("the Settings appearance section is the wallpaper card, with no palette picker", () => {

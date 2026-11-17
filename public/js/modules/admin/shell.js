@@ -18,6 +18,10 @@ export const closeAdminDrawer = () => adminDrawer?.close();
 
 export const NAV = [
   {
+    group: "Account",
+    items: [{ id: "appearance", label: "Appearance", icon: "palette" }]
+  },
+  {
     group: "Operations",
     items: [
       { id: "overview", label: "Overview", icon: "layout-dashboard" },
@@ -62,6 +66,7 @@ const LOADERS = {
   payments: () => import("./views/payments.js"),
   premium: () => import("./views/premium.js"),
   themes: () => import("./views/themes.js"),
+  appearance: () => import("./views/appearance.js"),
   services: () => import("./views/payments.js"),
   subscriptions: () => import("./views/operations.js"),
   projects: () => import("./views/operations.js"),
@@ -80,7 +85,7 @@ const LOADERS = {
 /** True when a view id has a loader. The boot screen used to keep its own copy
     of this list, so a new view (Messages, Businesses) fell back to Overview for
     anyone arriving by link. One source of truth now. */
-export const viewExists = (id) => Boolean(id && LOADERS[id]);
+export const viewExists = (id) => Boolean(id && LOADERS[id] && (id !== "meetings" || MEETINGS_ENABLED));
 
 export const adminState = {
   view: "overview",

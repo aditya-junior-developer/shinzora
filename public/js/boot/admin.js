@@ -10,6 +10,7 @@
    every admin action is re-authorised inside the function that performs it.
    ========================================================================== */
 
+import { applyPreset, presetFromProfile } from "../ui/theme.js";
 import { sb, getSession, normalizeError } from "../lib/supabase.js";
 import { qs } from "../lib/dom.js";
 import { hydrateIcons } from "../lib/icons.js";
@@ -137,6 +138,14 @@ async function enterApp(user, role) {
   adminState.identity = { user, role };
 
   bindShell({ user, role });
+
+  /* The administrator's own saved look, applied before the first view paints. */
+  try {
+    const { data } = await sb.from("profiles").select("theme").eq("id", user.id).maybeSingle();
+    if (data) applyPreset(presetFromProfile(data));
+  } catch {
+    /* Keep the look already on this device. */
+  }
 
   /* The console registers the service worker itself. It used to be wired only on
      the marketing site and the dashboard, so a browser that went straight to
