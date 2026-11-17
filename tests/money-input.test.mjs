@@ -57,7 +57,7 @@ const assistant = strip(readFileSync("supabase/functions/ai/index.ts", "utf8"));
 console.log("\nthe forms");
 check("the product price field no longer asks for paise", !/in paise/i.test(inventory));
 check("it is labelled in rupees", /label: "Price \(₹\)"/.test(inventory));
-check("it accepts a paisa decimal", /step: "0\.01"/.test(inventory));
+check("it takes whole rupees, not paise", /step: "1"/.test(inventory) && !/step: "0\.01"/.test(inventory));
 check("an existing price is converted back for the box", /fromMinor\(existing\?\.price/.test(inventory));
 check("the insert converts to paise", /price: toMinor\(values\.price\)/.test(inventory));
 check("the update converts to paise", /price: toMinor\(values\.price\)/.test(inventory));

@@ -401,16 +401,13 @@ test("a file-only message uploads under the group and sends its path", async () 
   assert.equal(args.p_attachments[0].mime, "image/jpeg");
 });
 
-test("the group header offers a meeting button once a group is open", async () => {
+test("the group header offers no meeting buttons while calls are hidden", async () => {
+  /* CALLS_ENABLED is false: no media provider carries calls yet. The meeting
+     code stays in group-chat.js and comes back by flipping the flag. */
   const world = makeWorld();
   await openGroupsTab(world);
-  const meet = world.root.querySelector("#grp-call");
-  assert.ok(meet, "the Meet button exists");
-  assert.equal(meet.hidden, false, "and is visible with a group open");
-  assert.equal(meet.getAttribute("aria-label"), "Start a video meeting", "and is named for a screen reader");
-  const voice = world.root.querySelector("#grp-call-voice");
-  assert.equal(voice.hidden, false, "the voice-meeting button is there too");
-  assert.equal(voice.getAttribute("aria-label"), "Start a voice meeting");
+  assert.equal(world.root.querySelector("#grp-call"), null, "no video-meeting button");
+  assert.equal(world.root.querySelector("#grp-call-voice"), null, "no voice-meeting button");
 });
 
 test("an account with no groups gets a real empty state with a create button", async () => {
@@ -561,16 +558,16 @@ test("search asks the database for this group's messages", async () => {
   assert.match(hits[0].textContent, /the banner is ready/);
 });
 
-test("the header carries search, voice, video and more — and no group means no controls", async () => {
+test("the header carries search and more — and no group means no controls", async () => {
   const world = makeWorld();
   await openGroupsTab(world);
-  for (const id of ["#grp-search", "#grp-call-voice", "#grp-call", "#grp-more"]) {
+  for (const id of ["#grp-search", "#grp-more"]) {
     assert.equal(world.root.querySelector(id).hidden, false, `${id} is visible with a group open`);
   }
 
   const empty = makeWorld({ groups: [] });
   await openGroupsTab(empty);
-  for (const id of ["#grp-call-voice", "#grp-call", "#grp-more"]) {
+  for (const id of ["#grp-more"]) {
     assert.equal(empty.root.querySelector(id).hidden, true, `${id} is hidden with nothing open`);
   }
   assert.equal(empty.root.querySelector("#grp-pin").hidden, true, "and there is no pin bar");
