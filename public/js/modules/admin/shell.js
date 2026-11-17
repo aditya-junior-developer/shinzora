@@ -2,6 +2,7 @@
    Shinzora Admin — shell: navigation, view loading, shared state
    ========================================================================== */
 
+import { MEETINGS_ENABLED } from "../../config/env.js";
 import { qs, qsa, esc, on, debounce } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { toast, toastError } from "../../ui/toast.js";
@@ -45,7 +46,7 @@ export const NAV = [
     items: [
       { id: "chat", label: "Messages", icon: "message-square" },
       { id: "messaging", label: "Announcements", icon: "megaphone" },
-      { id: "meetings", label: "Meetings", icon: "video" },
+      ...(MEETINGS_ENABLED ? [{ id: "meetings", label: "Meetings", icon: "video" }] : []),
       { id: "activity", label: "Activity", icon: "activity" },
       { id: "monitoring", label: "Monitoring", icon: "gauge" },
       { id: "access", label: "Administrators", icon: "shield-check" }

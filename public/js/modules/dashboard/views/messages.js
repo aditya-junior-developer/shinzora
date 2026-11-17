@@ -16,6 +16,7 @@
    notification, and it opens that group with that message in view.
    ========================================================================== */
 
+import { CALLS_ENABLED } from "../../../config/env.js";
 import { qs, esc, on, delegate } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { pageHead } from "../components.js";
@@ -48,7 +49,7 @@ export default async function render(root, ctx = {}) {
     })}
     <div id="messages-mount"></div>`;
 
-  if (answerTopic) {
+  if (answerTopic && CALLS_ENABLED) {
     import("../../messaging/incoming-call.js")
       .then(({ answerCall }) => answerCall(answerTopic, { kind: params.get("kind") || "voice" }))
       .catch(() => {});

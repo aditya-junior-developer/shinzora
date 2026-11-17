@@ -19,6 +19,7 @@
    shown — the browser never grants itself access to a call.
    ========================================================================== */
 
+import { CALLS_ENABLED } from "../../config/env.js";
 import { sb, normalizeError } from "../../lib/supabase.js";
 import { state } from "../../lib/store.js";
 import { toast, toastError } from "../../ui/toast.js";
@@ -138,6 +139,8 @@ export async function declineCall(topic, { name = "They" } = {}) {
 
 /** Tell the notification layer how to answer, once per page. */
 export function registerIncomingCalls() {
+  /* Calls are hidden (CALLS_ENABLED is false): no ring is answered on any page. */
+  if (!CALLS_ENABLED) return;
   setCallAnswerer({
     answer: (row) => {
       const meta = row?.meta || {};
