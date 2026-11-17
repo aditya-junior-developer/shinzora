@@ -147,7 +147,7 @@ export const APPLICATION_TABLES = [
   "support_requests", "support_request_messages", "support_ai_messages", "support_settings",
   "group_polls", "group_poll_votes",
   "notification_preferences", "push_subscriptions", "call_invites",
-  "call_responses", "meetings", "meeting_attendees",
+  "call_responses", "meetings", "meeting_attendees", "meeting_managers", "meeting_events", "meeting_chat_messages",
   /* 0053: which four-hour reminders were already sent. Without it a restore
      could send the same reminder twice. */
   "notification_reminder_log",

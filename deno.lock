@@ -49,5 +49,17 @@
     "https://esm.sh/whatwg-url@5.0.0?target=denonext": "f001a2cadf81312d214ca330033f474e74d81a003e21e8c5d70a1f46dc97b02d",
     "https://esm.sh/ws@8.22.1/denonext/ws.mjs": "ba6048d7b77a1288e1160a174b4ba006f5196596864167157dad49b04d5607af",
     "https://esm.sh/ws@8.22.1?target=denonext": "99e1eed45ef7ae58c070219547368b748eab40544280307d7a97246089fed278"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@daily-co/daily-js@0.87",
+        "npm:@electric-sql/pglite@~0.5.15",
+        "npm:@supabase/supabase-js@^2.109.0",
+        "npm:esbuild@0.24",
+        "npm:linkedom@~0.18.15",
+        "npm:playwright-core@^1.65.0"
+      ]
+    }
   }
 }

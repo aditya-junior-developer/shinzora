@@ -70,6 +70,8 @@ const config = {
   SITE_URL: firstOf("SHINZORA_SITE_URL", "VITE_SITE_URL", "VITE_PUBLIC_SITE_URL"),
   SUPPORT_EMAIL: get("SHINZORA_SUPPORT_EMAIL", "official.shinzora@proton.me"),
   APP_NAME: get("SHINZORA_APP_NAME", "Shinzora"),
+  /* Where "Return to website / application" on the after-call screen goes. Public. */
+  APP_URL: get("SHINZORA_APP_URL", "https://shinzora.vercel.app"),
   ENVIRONMENT: get("SHINZORA_ENVIRONMENT", "production"),
   RAZORPAY_KEY_ID: get("SHINZORA_RAZORPAY_KEY_ID"),
   /* True only when a deployment actually mounts the pre-launch router.

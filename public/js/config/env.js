@@ -17,6 +17,7 @@ const FALLBACK = {
   SITE_URL: "",
   SUPPORT_EMAIL: "official.shinzora@proton.me",
   APP_NAME: "Shinzora",
+  APP_URL: "https://shinzora.vercel.app",
   ENVIRONMENT: "production",
   /* A static host has no /api/prelaunch route; only a server that mounts it
      (scripts/dev-server.mjs) sets this true. */
@@ -42,6 +43,8 @@ export const env = Object.freeze({
 
   /* --- Brand ------------------------------------------------------------- */
   appName: merged.APP_NAME,
+  /* The public site or app the after-call screen returns people to. */
+  appUrl: trimSlash(merged.APP_URL),
   supportEmail: merged.SUPPORT_EMAIL,
   environment: merged.ENVIRONMENT,
   prelaunchApi: merged.PRELAUNCH_API === true,

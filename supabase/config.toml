@@ -81,3 +81,8 @@ verify_jwt = true
 # Website Builder AI or the Gemini assistant. Signed-in users only.
 [functions.support-ai]
 verify_jwt = true
+
+# SHINZORA CONNECT: Daily.co meetings. Every request needs a signed-in user;
+# the function itself checks host, manager and admin rights per action.
+[functions.daily]
+verify_jwt = true

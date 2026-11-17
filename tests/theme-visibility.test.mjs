@@ -153,8 +153,11 @@ test("app code never paints text with an inline literal white", async () => {
     const out = [];
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) out.push(...(await walk(full)));
-      else if (entry.name.endsWith(".js")) out.push(full);
+      /* Third-party bundles (public/js/vendor) are not app code and cannot be
+         restyled: the rule covers the app's own modules only. */
+      if (entry.isDirectory()) {
+        if (entry.name !== "vendor") out.push(...(await walk(full)));
+      } else if (entry.name.endsWith(".js")) out.push(full);
     }
     return out;
   };
@@ -213,8 +216,11 @@ test("no view links to a hash route the router cannot serve", async () => {
     const out = [];
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) out.push(...(await walk(full)));
-      else if (entry.name.endsWith(".js")) out.push(full);
+      /* Third-party bundles (public/js/vendor) are not app code and cannot be
+         restyled: the rule covers the app's own modules only. */
+      if (entry.isDirectory()) {
+        if (entry.name !== "vendor") out.push(...(await walk(full)));
+      } else if (entry.name.endsWith(".js")) out.push(full);
     }
     return out;
   };

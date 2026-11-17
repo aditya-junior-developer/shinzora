@@ -45,6 +45,7 @@ export const NAV = [
     items: [
       { id: "chat", label: "Messages", icon: "message-square" },
       { id: "messaging", label: "Announcements", icon: "megaphone" },
+      { id: "meetings", label: "Meetings", icon: "video" },
       { id: "activity", label: "Activity", icon: "activity" },
       { id: "monitoring", label: "Monitoring", icon: "gauge" },
       { id: "access", label: "Administrators", icon: "shield-check" }
@@ -67,6 +68,7 @@ const LOADERS = {
   "support-requests": () => import("./views/support-requests.js"),
   contacts: () => import("./views/operations.js"),
   chat: () => import("./views/chat.js"),
+  meetings: () => import("./views/meetings.js"),
   messaging: () => import("./views/messaging.js"),
   activity: () => import("./views/messaging.js"),
   monitoring: () => import("./views/monitoring.js"),

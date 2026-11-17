@@ -29,6 +29,8 @@ import { createCall, turnConfigured } from "../../messaging/webrtc.js";
 import { openCallSurface } from "../../messaging/call-ui.js";
 import { listCallDevices, canChooseSpeaker } from "../../messaging/call-devices.js";
 import { normaliseMeetingCode, meetingPath } from "../../../lib/invite.js";
+import { connect, explain, newRequestId } from "../connect/api.js";
+import { joinRoom, leaveActiveRoom } from "../connect/room.js";
 
 /* Devices chosen in the lobby. They apply when the call is created, and are
    kept for the rest of the page session so a rejoin does not ask again. */
@@ -114,7 +116,7 @@ async function paintSchedule(host) {
           </div>
           <div class="schedule-actions">
             <button class="btn btn-secondary btn-sm" type="button" data-copy-link="${esc(link)}">${icon("copy", { size: 13 })} Copy link</button>
-            <a class="btn btn-ghost btn-sm" href="?view=meeting&code=${esc(row.code)}">Open</a>
+            <a class="btn btn-ghost btn-sm" href="${esc(meetingPath(row.code))}">Open</a>
           </div>
         </li>`;
       })
@@ -151,13 +153,18 @@ async function paintSchedule(host) {
     const submit = qs("#schedule-form button[type=submit]", host);
     submit.disabled = true;
     try {
-      const booked = await rpc("meeting_schedule", { p_title: title || "Meeting", p_kind: kind, p_at: at.toISOString() });
+      const { meeting: booked } = await connect("create", {
+        title: title || "Meeting",
+        kind,
+        scheduledFor: at.toISOString(),
+        requestId: newRequestId()
+      });
       toast({ title: "Meeting booked", message: `${booked.title} · ${whenLabel(booked.scheduledFor)}` }, { tone: "success" });
       form.reset();
       when.min = localInputValue(new Date(Date.now() + SCHEDULE_MIN_MS));
       await paintUpcoming();
     } catch (err) {
-      error.textContent = err?.message || "The meeting could not be booked.";
+      error.textContent = explain(err, "The meeting could not be booked.");
     } finally {
       submit.disabled = false;
     }
@@ -247,6 +254,7 @@ function installRouteGuard() {
   window.__shinzoraMeetingRouteGuard = true;
   window.addEventListener("shinzora:view", (event) => {
     if (event?.detail?.view === "meeting") return;
+    leaveActiveRoom();
     if (current?.call) current.call.leave("You left the meeting.");
     const meeting = current?.meeting;
     current = null;
@@ -274,27 +282,38 @@ export default async function render(root, { params } = {}) {
 
 /* -------------------------------------------------------------- start screen */
 
+/* -------------------------------------------------------------- start screen */
+
+/** The meeting's status as one line of plain words. */
+function statusLine(row) {
+  const status = row.status || "";
+  if (status === "live") return "Live now";
+  if (status === "waiting") return row.scheduledFor ? `Booked for ${whenLabel(row.scheduledFor)}` : "Not started";
+  if (status === "ended") return `Ended · link valid until ${row.expiresAt ? whenLabel(row.expiresAt) : "24 hours after the end"}`;
+  if (status === "expired") return "Expired · this link no longer opens the meeting";
+  return row.endedAt ? "Ended" : "Meeting";
+}
+
 async function paintStart(host) {
   let mine = [];
   try {
-    const { data, error } = await sb.rpc("meeting_mine", { p_limit: 10 });
-    if (error) throw normalizeError(error);
-    mine = data || [];
+    const answer = await connect("history");
+    mine = answer?.meetings || [];
   } catch {
     /* the list is a convenience; creating still works without it */
   }
 
   host.innerHTML = `
-    <form class="card meeting-start" id="meeting-create">
+    <form class="card meeting-start" id="meeting-create" novalidate>
       <div class="card-head">
         <div>
           <h2 class="card-title">${icon("video", { size: 16 })} Start a meeting</h2>
-          <p class="card-sub">You will get a short code and a link. Only signed-in people with the code can join.</p>
+          <p class="card-sub">Create a link to share, or start now and be in the room straight away. Anyone with the link can join.</p>
         </div>
       </div>
       <div class="field">
         <label for="meeting-title">Meeting name</label>
-        <input class="input" id="meeting-title" name="title" type="text" maxlength="120" required placeholder="Weekly design review" autocomplete="off" />
+        <input class="input" id="meeting-title" name="title" type="text" maxlength="120" placeholder="Weekly design review" autocomplete="off" />
       </div>
       <div class="field">
         <label>Type</label>
@@ -303,8 +322,10 @@ async function paintStart(host) {
           <button type="button" data-kind="voice" aria-pressed="false">${icon("mic", { size: 14 })} Voice only</button>
         </div>
       </div>
-      <div class="card-actions">
-        <button class="btn btn-primary" type="submit">${icon("plus", { size: 14 })} Create meeting</button>
+      <div class="field-error" id="meeting-create-error" role="alert"></div>
+      <div class="card-actions connect-actions">
+        <button class="btn btn-secondary" type="submit" data-create-mode="create">${icon("plus", { size: 14 })} Create link</button>
+        <button class="btn btn-primary" type="button" data-create-mode="instant">${icon("video", { size: 14 })} Start now</button>
       </div>
     </form>
 
@@ -312,7 +333,7 @@ async function paintStart(host) {
       <div class="card-head">
         <div>
           <h2 class="card-title">${icon("key", { size: 16 })} Join with a code</h2>
-          <p class="card-sub">Enter the nine-character code the host sent you.</p>
+          <p class="card-sub">Enter the nine-character code, or open the link the host sent you.</p>
         </div>
       </div>
       <div class="field" id="meeting-join-field">
@@ -325,33 +346,34 @@ async function paintStart(host) {
       </div>
     </form>
 
-    ${
-      mine.length
-        ? `<section class="card">
-             <div class="card-head"><h2 class="card-title">${icon("calendar", { size: 16 })} Your recent meetings</h2></div>
-             <ul class="meeting-list">
+    <section class="card" id="meeting-history">
+      <div class="card-head"><div><h2 class="card-title">${icon("history", { size: 16 })} Meeting history</h2><p class="card-sub">Meetings you host or have joined. Links stay valid for 24 hours after a meeting ends.</p></div></div>
+      ${
+        mine.length
+          ? `<ul class="meeting-list">
                ${mine
-                 .map(
-                   (row) => `<li class="meeting-row">
-                     <div>
-                       <div class="meeting-row-title">${esc(row.title || "Meeting")}</div>
-                       <div class="meeting-row-sub">${esc(row.status || "")} · code ${esc(row.code || "")}</div>
+                 .map((row) => {
+                   const link = `${location.origin}${meetingPath(row.code)}`;
+                   const open = row.status === "live" || row.status === "waiting" || row.status === "ended";
+                   return `<li class="meeting-row connect-row">
+                     <div class="connect-row-main">
+                       <div class="meeting-row-title">${esc(row.title || "Meeting")}${row.youAreHost ? ` <span class="badge">Host</span>` : ""}</div>
+                       <div class="meeting-row-sub">${esc(statusLine(row))} · code ${esc(row.code || "")}</div>
                      </div>
-                     ${
-                       row.ended
-                         ? `<span class="badge">ended</span>`
-                         : `<a class="btn btn-secondary btn-sm" href="?view=meeting&code=${esc(row.code)}">Open</a>`
-                     }
-                   </li>`
-                 )
+                     <div class="connect-row-actions">
+                       ${open ? `<button class="btn btn-ghost btn-sm" type="button" data-copy-link="${esc(link)}">${icon("copy", { size: 13 })} Copy link</button>` : ""}
+                       ${open ? `<a class="btn btn-secondary btn-sm" href="${esc(meetingPath(row.code))}">${row.status === "ended" ? "Return" : "Open"}</a>` : `<span class="badge">${row.status === "expired" ? "Expired" : "Ended"}</span>`}
+                     </div>
+                   </li>`;
+                 })
                  .join("")}
-             </ul>
-           </section>`
-        : ""
-    }`;
+             </ul>`
+          : `<p class="card-sub">No meetings yet. Start one above.</p>`
+      }
+    </section>`;
 
   /* Join with a code. The format is checked here so a typo is caught before a
-     round trip; the database decides whether the meeting exists and is open. */
+     round trip; the server decides whether the meeting exists and is open. */
   on(qs("#meeting-join-form", host), "submit", async (event) => {
     event.preventDefault();
     const input = qs("#meeting-join-code", host);
@@ -381,23 +403,48 @@ async function paintStart(host) {
     }
   });
 
-  on(qs("#meeting-create", host), "submit", async (event) => {
-    event.preventDefault();
+  /* Create or start. One request identity per attempt: a double tap, or a
+     retry after a slow network, returns the same meeting instead of a second. */
+  const form = qs("#meeting-create", host);
+  const createButtons = Array.from(host.querySelectorAll("[data-create-mode]"));
+  const createError = qs("#meeting-create-error", host);
+  const submitCreate = async (mode) => {
     const title = String(qs("#meeting-title", host)?.value || "").trim();
-    const submit = qs("#meeting-create button[type=submit]", host);
-    submit.disabled = true;
-    submit.textContent = "Creating…";
+    createError.textContent = "";
+    createButtons.forEach((button) => (button.disabled = true));
+    const label = mode === "instant" ? "Starting…" : "Creating…";
+    const pressed = createButtons.find((button) => button.getAttribute("data-create-mode") === mode);
+    const before = pressed?.innerHTML;
+    if (pressed) pressed.textContent = label;
     try {
-      const meeting = await rpc("meeting_create", { p_title: title || "Meeting", p_kind: kind });
-      /* Straight into the room: creating a meeting you then have to click into
-         is a needless extra step, and the host's own join is what makes the
-         lobby honest for the people arriving. */
-      history.replaceState({}, "", `?view=meeting&code=${meeting.code}`);
+      const answer = await connect("create", { title: title || "Meeting", kind, requestId: newRequestId(), instant: mode === "instant" });
+      const meeting = answer.meeting;
+      if (mode === "instant" && answer.url) {
+        history.replaceState({}, "", meetingPath(meeting.code));
+        await joinRoom(host, meeting.code, { devices: { ...devicePrefs }, subtitle: meeting.title, answer });
+        return;
+      }
+      history.replaceState({}, "", meetingPath(meeting.code));
       await paintLobby(host, meeting.code);
     } catch (error) {
+      createError.textContent = explain(error, "The meeting could not be created. Try again.");
       toastError(error);
-      submit.disabled = false;
-      submit.textContent = "Create meeting";
+      createButtons.forEach((button) => (button.disabled = false));
+      if (pressed && before) pressed.innerHTML = before;
+    }
+  };
+  on(form, "submit", (event) => {
+    event.preventDefault();
+    submitCreate("create");
+  });
+  on(qs('[data-create-mode="instant"]', host), "click", () => submitCreate("instant"));
+
+  delegate(host, "click", "[data-copy-link]", async (_event, node) => {
+    try {
+      await navigator.clipboard.writeText(node.getAttribute("data-copy-link"));
+      toast({ title: "Link copied", message: "Send it to whoever should join." });
+    } catch {
+      toastError(new Error("The clipboard is blocked in this browser. Open the meeting and copy the link there."));
     }
   });
 
@@ -406,7 +453,148 @@ async function paintStart(host) {
 
 /* -------------------------------------------------------------------- lobby */
 
+/* Which lobby to show. Daily meetings are checked by the server first, so the
+   lobby is honest about whether the link can open the room. Older meetings
+   still use the in-app call screen and keep their existing lobby. */
 async function paintLobby(host, code) {
+  let answer;
+  try {
+    answer = await connect("open", { code });
+  } catch (error) {
+    if (error?.code === "not_found") {
+      host.innerHTML = `
+        <div class="card meeting-missing">
+          <h2 class="card-title">${icon("search-x", { size: 16 })} No meeting with that code</h2>
+          <p class="card-sub">Codes are nine characters. Ask the host to send the link again.</p>
+          <div class="card-actions"><a class="btn btn-secondary btn-sm" href="?view=meeting">Start a meeting instead</a></div>
+        </div>`;
+      return;
+    }
+    host.innerHTML = `<div class="card"><p class="card-sub">${esc(explain(error, "Could not read that meeting."))}</p>
+      <div class="card-actions"><button class="btn btn-secondary btn-sm" type="button" data-connect-retry>${icon("refresh-cw", { size: 13 })} Try again</button></div></div>`;
+    on(qs("[data-connect-retry]", host), "click", () => paintLobby(host, code));
+    return;
+  }
+  if (answer?.provider === "daily") {
+    await paintDailyLobby(host, code, answer);
+    return;
+  }
+  await paintMeshLobby(host, code);
+}
+
+async function paintDailyLobby(host, code, answer) {
+  const meeting = answer.meeting;
+  const link = `${location.origin}${meetingPath(code)}`;
+  const status = meeting.status;
+  const canJoin = Boolean(answer.canJoin);
+  const badge =
+    status === "live"
+      ? `<span class="badge is-good">Live · ${Number(answer.liveCount) || 0} inside</span>`
+      : status === "waiting"
+        ? `<span class="badge">Not started</span>`
+        : status === "ended"
+          ? `<span class="badge">Ended</span>`
+          : `<span class="badge is-bad">Expired</span>`;
+  const joinLabel =
+    answer.canReturn && status === "ended"
+      ? `${icon("video", { size: 14 })} Return to call`
+      : `${icon(meeting.kind === "voice" ? "phone" : "video", { size: 14 })} Join ${meeting.kind === "voice" ? "voice call" : "with video"}`;
+
+  host.innerHTML = `
+    <section class="card meeting-lobby connect-lobby glass">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">${esc(meeting.title || "Meeting")}</h2>
+          <p class="card-sub">Hosted by ${esc(answer.hostName || "someone")} · ${badge}</p>
+          ${meeting.scheduledFor && status === "waiting" ? `<p class="card-sub">Booked for ${esc(whenLabel(meeting.scheduledFor))}</p>` : ""}
+          ${answer.expiresAt && status === "ended" ? `<p class="card-sub">The link works until ${esc(whenLabel(answer.expiresAt))}.</p>` : ""}
+        </div>
+        ${answer.youAreHost ? `<span class="badge is-good">You are the host</span>` : ""}
+      </div>
+
+      ${
+        status === "expired" || !canJoin
+          ? `<p class="connect-notice ${status === "expired" ? "connect-notice-danger" : "connect-notice-warn"}" role="status">${esc(answer.reason || "This meeting cannot be joined right now.")}</p>`
+          : ""
+      }
+
+      <div class="meeting-linkbox">
+        <label for="meeting-link">Invite link</label>
+        <div class="meeting-linkrow">
+          <input id="meeting-link" type="text" readonly value="${esc(link)}" />
+          <button class="btn btn-secondary btn-sm" type="button" data-meeting-copy>${icon("copy", { size: 13 })} Copy</button>
+          <button class="btn btn-secondary btn-sm" type="button" data-meeting-share hidden>${icon("share-2", { size: 13 })} Share</button>
+        </div>
+        <p class="card-sub">The code is <code>${esc(code)}</code>. Anyone with this link can join, without waiting for approval, unless the host locks the room.</p>
+      </div>
+
+      <div class="meeting-devices" id="meeting-devices" aria-label="Devices for this call">
+        <label class="field"><span>Microphone</span><select class="input" data-device="microphoneId"></select></label>
+        <label class="field"><span>Camera</span><select class="input" data-device="cameraId"></select></label>
+        <label class="field" data-speaker-field><span>Speaker</span><select class="input" data-device="speakerId"></select></label>
+      </div>
+
+      <div class="card-actions connect-actions">
+        <button class="btn btn-primary" type="button" data-meeting-join ${canJoin ? "" : "disabled"}>${joinLabel}</button>
+        ${
+          answer.canManage && status !== "expired"
+            ? `<button class="btn btn-secondary btn-sm" type="button" data-meeting-lock="${meeting.locked ? "false" : "true"}">${icon(meeting.locked ? "unlock" : "lock", { size: 13 })} ${meeting.locked ? "Unlock" : "Lock"} the room</button>`
+            : ""
+        }
+      </div>
+      <p class="card-sub meeting-hint" id="meeting-hint" hidden></p>
+    </section>`;
+
+  on(qs("[data-meeting-copy]", host), "click", async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Link copied", message: "Send it to whoever should join." });
+    } catch {
+      qs("#meeting-link", host)?.select();
+      toastError(new Error("The clipboard is blocked in this browser, so the link is selected for you to copy."));
+    }
+  });
+
+  const shareButton = qs("[data-meeting-share]", host);
+  if (navigator.share) {
+    shareButton.hidden = false;
+    on(shareButton, "click", async () => {
+      try {
+        await navigator.share({ title: meeting.title, text: `Join “${meeting.title}” on Shinzora`, url: link });
+      } catch (error) {
+        if (error?.name !== "AbortError") toastError(error);
+      }
+    });
+  }
+
+  const lockButton = qs("[data-meeting-lock]", host);
+  if (lockButton) {
+    on(lockButton, "click", async () => {
+      const wanted = lockButton.getAttribute("data-meeting-lock") === "true";
+      lockButton.disabled = true;
+      try {
+        await connect("lock", { code, locked: wanted });
+        await paintLobby(host, code);
+      } catch (error) {
+        toastError(error, "The room could not be locked.");
+        lockButton.disabled = false;
+      }
+    });
+  }
+
+  void wireDevices(host);
+
+  on(qs("[data-meeting-join]", host), "click", async (event) => {
+    const button = event.currentTarget;
+    if (button.dataset.busy) return;
+    button.dataset.busy = "1";
+    button.disabled = true;
+    button.textContent = "Joining…";
+    await joinRoom(host, code, { devices: { ...devicePrefs }, subtitle: meeting.title });
+  });
+}
+
+async function paintMeshLobby(host, code) {
   let info;
   try {
     info = await rpc("meeting_lookup", { p_code: code });

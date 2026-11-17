@@ -23,3 +23,26 @@ await build({
 });
 
 console.log(`Built ${path.relative(ROOT, outfile)} (${fs.statSync(outfile).size.toLocaleString()} bytes).`);
+
+/* Daily.co's call client for SHINZORA CONNECT. It is bundled, not loaded from a
+   CDN, so the Content-Security-Policy only needs to allow Daily's own servers
+   for calls. Exposes window.DailyIframe, the same way supabase-js exposes
+   window.supabase. */
+const dailyOut = path.join(ROOT, "public/js/vendor/daily-js.js");
+await build({
+  stdin: {
+    contents: 'import DailyIframe from "@daily-co/daily-js";\nwindow.DailyIframe = DailyIframe;',
+    resolveDir: ROOT,
+    sourcefile: "daily-entry.js",
+    loader: "js"
+  },
+  bundle: true,
+  format: "iife",
+  platform: "browser",
+  target: ["es2020"],
+  minify: true,
+  sourcemap: false,
+  outfile: dailyOut,
+  legalComments: "none"
+});
+console.log(`Built ${path.relative(ROOT, dailyOut)} (${fs.statSync(dailyOut).size.toLocaleString()} bytes).`);

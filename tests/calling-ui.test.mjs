@@ -295,17 +295,20 @@ test("meetings are a route, a sidebar entry, and a real room", () => {
   assert.equal((shell.match(/id: "meeting", label: "Meetings"/g) || []).length, 2, "both navs have it");
 
   const view = read("public/js/modules/dashboard/views/meeting.js");
+  /* SHINZORA CONNECT: creating and listing meetings moved to the `daily` Edge
+     Function (Daily rooms). The older RPCs stay for meetings that use the mesh
+     call path. */
   for (const rpc of [
-    "meeting_create",
     "meeting_lookup",
     "meeting_join",
     "meeting_leave",
     "meeting_end",
-    "meeting_lock",
-    "meeting_mine"
+    "meeting_lock"
   ]) {
     assert.match(view, new RegExp(rpc), `${rpc} is used`);
   }
+  assert.match(view, /connect\("create"/, "creating a meeting goes through the daily function");
+  assert.match(view, /connect\("history"/, "meeting history comes from the daily function");
   assert.match(view, /view=meeting&code=/, "the invite link is a real link");
   assert.match(view, /postgres_changes/, "the room watches for the host ending it");
   assert.match(view, /shinzora:view/, "navigating away leaves the meeting instead of leaving the camera on");
