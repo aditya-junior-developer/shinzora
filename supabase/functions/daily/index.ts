@@ -1,3 +1,4 @@
+export {};
 // ============================================================================
 // Shinzora · SHINZORA CONNECT — Daily.co meetings (Edge Function `daily`)
 // ----------------------------------------------------------------------------
@@ -23,7 +24,176 @@
 // Every request needs a signed-in user's JWT (verify_jwt = true in config.toml).
 // ============================================================================
 
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+/* ------------------------------------------------------------ database client
+   A small PostgREST client that replaces the esm.sh supabase-js import. Remote
+   imports stop the function booting when it is deployed through the connector
+   (every request returns BOOT_ERROR 503), and this function only needs table
+   reads and writes plus one auth lookup, so no SDK is required. The surface
+   matches the calls made below: select, insert, update, upsert, delete, eq, is,
+   in, lt, not, or, order, limit, maybeSingle, single. */
+type DbError = { message: string; code?: string; status?: number };
+type DbReply = { data: any; error: DbError | null; count: number | null };
+
+class Db {
+  constructor(readonly url: string, readonly key: string) {}
+  from(table: string) {
+    return new Query(this, table);
+  }
+}
+
+class Query implements PromiseLike<DbReply> {
+  private method = "GET";
+  private params = new URLSearchParams();
+  private body: unknown = undefined;
+  private wantRows = false;
+  private isUpsert = false;
+  private countMode: "exact" | null = null;
+  private headOnly = false;
+  private one: "none" | "maybe" | "single" = "none";
+
+  constructor(private db: Db, private table: string) {}
+
+  select(cols = "*", opts: { count?: "exact"; head?: boolean } = {}) {
+    this.params.set("select", cols);
+    if (this.method !== "GET") this.wantRows = true;
+    if (opts.count) this.countMode = opts.count;
+    if (opts.head) this.headOnly = true;
+    return this;
+  }
+  insert(rows: unknown) {
+    this.method = "POST";
+    this.body = rows;
+    return this;
+  }
+  update(values: unknown) {
+    this.method = "PATCH";
+    this.body = values;
+    return this;
+  }
+  upsert(rows: unknown, opts: { onConflict?: string } = {}) {
+    this.method = "POST";
+    this.body = rows;
+    this.isUpsert = true;
+    if (opts.onConflict) this.params.set("on_conflict", opts.onConflict);
+    return this;
+  }
+  delete() {
+    this.method = "DELETE";
+    return this;
+  }
+  eq(col: string, value: unknown) {
+    this.params.append(col, `eq.${value}`);
+    return this;
+  }
+  is(col: string, value: null | boolean) {
+    this.params.append(col, `is.${value === null ? "null" : value}`);
+    return this;
+  }
+  in(col: string, values: unknown[]) {
+    this.params.append(col, `in.(${values.join(",")})`);
+    return this;
+  }
+  lt(col: string, value: unknown) {
+    this.params.append(col, `lt.${value}`);
+    return this;
+  }
+  not(col: string, op: string, value: unknown) {
+    this.params.append(col, `not.${op}.${value === null ? "null" : value}`);
+    return this;
+  }
+  or(expression: string) {
+    this.params.append("or", `(${expression})`);
+    return this;
+  }
+  order(col: string, opts: { ascending?: boolean } = {}) {
+    this.params.append("order", `${col}.${opts.ascending === false ? "desc" : "asc"}`);
+    return this;
+  }
+  limit(n: number) {
+    this.params.set("limit", String(n));
+    return this;
+  }
+  maybeSingle() {
+    this.one = "maybe";
+    return this;
+  }
+  single() {
+    this.one = "single";
+    return this;
+  }
+
+  private async run(): Promise<DbReply> {
+    const qs = this.params.toString();
+    const url = `${this.db.url}/rest/v1/${this.table}${qs ? `?${qs}` : ""}`;
+    const headers: Record<string, string> = { apikey: this.db.key, Authorization: `Bearer ${this.db.key}` };
+    const prefer: string[] = [];
+    if (this.isUpsert) prefer.push("resolution=merge-duplicates");
+    if (this.countMode) prefer.push(`count=${this.countMode}`);
+    if (this.method !== "GET") prefer.push(this.wantRows ? "return=representation" : "return=minimal");
+    if (prefer.length) headers.Prefer = prefer.join(",");
+    if (this.body !== undefined) headers["Content-Type"] = "application/json";
+    const method = this.headOnly ? "HEAD" : this.method;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method,
+        headers,
+        body: this.body === undefined ? undefined : JSON.stringify(this.body)
+      });
+    } catch (e) {
+      return { data: null, error: { message: `database unreachable: ${String(e)}` }, count: null };
+    }
+    const range = res.headers.get("content-range") ?? "";
+    const countHeader = range.match(/\/(\d+)$/);
+    const count = countHeader ? Number(countHeader[1]) : null;
+    if (this.headOnly) {
+      return { data: null, error: res.ok ? null : { message: res.statusText, status: res.status }, count };
+    }
+    const text = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = text || null;
+    }
+    if (!res.ok) {
+      return {
+        data: null,
+        error: { message: String(parsed?.message ?? `HTTP ${res.status}`), code: parsed?.code, status: res.status },
+        count: null
+      };
+    }
+    let data = parsed;
+    if (this.one !== "none" && Array.isArray(parsed)) {
+      if (parsed.length === 0 && this.one === "single") {
+        return { data: null, error: { message: "No rows returned", code: "PGRST116" }, count };
+      }
+      data = parsed[0] ?? null;
+    }
+    return { data, error: null, count };
+  }
+
+  then<A = DbReply, B = never>(
+    onok?: ((value: DbReply) => A | PromiseLike<A>) | null,
+    onerr?: ((reason: unknown) => B | PromiseLike<B>) | null
+  ): Promise<A | B> {
+    return this.run().then(onok, onerr);
+  }
+}
+
+/** Verifies a user's access token with Supabase Auth. Returns the user id or null. */
+async function userIdFromToken(token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: ANON_KEY || token, Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    const user = await res.json();
+    return user?.id ? String(user.id) : null;
+  } catch {
+    return null;
+  }
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -69,14 +239,10 @@ function dailyConfig(): { apiKey: string; domain: string } | Response {
   return { apiKey, domain };
 }
 
-let serviceClient: SupabaseClient | null = null;
-function admin(): SupabaseClient {
+let serviceClient: Db | null = null;
+function admin(): Db {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) throw new Error("service role is not configured");
-  if (!serviceClient) {
-    serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-  }
+  if (!serviceClient) serviceClient = new Db(SUPABASE_URL.replace(/\/+$/, ""), SERVICE_ROLE_KEY);
   return serviceClient;
 }
 
@@ -86,13 +252,8 @@ type Caller = { uid: string; name: string; isAdmin: boolean };
 async function callerOf(req: Request): Promise<Caller | null> {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!token || token === ANON_KEY) return null;
-  const client = createClient(SUPABASE_URL, ANON_KEY || token, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-  const { data, error } = await client.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const uid = data.user.id;
+  const uid = await userIdFromToken(token);
+  if (!uid) return null;
   /* Read the role table directly. The service-role client has no auth.uid(),
      so the admin check must name the user explicitly, not rely on a default. */
   const [{ data: profile }, { data: adminRow }] = await Promise.all([
@@ -151,7 +312,9 @@ async function createRoom(cfg: { apiKey: string; domain: string }, name: string,
       eject_at_room_exp: true,
       enable_screenshare: true,
       enable_chat: false,
-      max_participants: 100,
+      /* No max_participants: Daily rejects a value above the account's plan
+         cap (400 "cannot be set to that value with your current plan"), so the
+         plan's own limit applies. */
       start_video_off: kind === "voice",
       start_audio_off: false
     }
