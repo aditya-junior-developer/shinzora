@@ -37,6 +37,9 @@ export function applyPreset(id) {
   const root = document.documentElement;
   if (preset.id === DEFAULT_PRESET) root.removeAttribute("data-preset");
   else root.setAttribute("data-preset", preset.id);
+  /* Light looks switch on the shared light rules in theme-light.css. */
+  if (preset.tone === "light") root.setAttribute("data-tone", "light");
+  else root.removeAttribute("data-tone");
   const meta = document.querySelector('meta[name="theme-color"]');
   const base = getComputedStyle(root).getPropertyValue("--base").trim();
   if (meta && base) meta.setAttribute("content", base);

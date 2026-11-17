@@ -25,7 +25,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..");
 const read = (file) => readFile(path.join(repo, file), "utf8");
 
-const RETIRED = ["midnight", "blossom", "daylight", "nebula", "grove", "porcelain"];
+/* Midnight was the original default and is now Violet. Every other old
+   palette has been restored as a look. */
+const RETIRED = ["midnight"];
 
 /* Default token values from tokens.css :root, to compute the Violet look. */
 function defaultTokens(css) {
@@ -54,8 +56,10 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("the looks are Violet, Cocoa, Ember and Plum, with a Violet default", () => {
-  assert.deepEqual(PRESETS.map((p) => p.id), ["violet", "cocoa", "ember", "plum"]);
+test("the looks are the four presets plus the five restored palettes, with a Violet default", () => {
+  assert.deepEqual(PRESETS.map((p) => p.id), ["violet", "cocoa", "ember", "plum", "nebula", "grove", "blossom", "daylight", "porcelain"]);
+  const light = PRESETS.filter((p) => p.tone === "light").map((p) => p.id);
+  assert.deepEqual(light, ["blossom", "daylight", "porcelain"], "light looks are marked");
   assert.equal(DEFAULT_PRESET, "violet");
   for (const preset of PRESETS) {
     assert.ok(preset.name && preset.blurb, `${preset.id} has a name and a blurb`);
@@ -64,21 +68,26 @@ test("the looks are Violet, Cocoa, Ember and Plum, with a Violet default", () =>
   }
 });
 
-test("none of the six retired palettes can be selected or stored", () => {
+test("retired names resolve to Violet, and restored palettes are selectable", () => {
   for (const id of RETIRED) {
     assert.equal(normalizePreset(id), "violet", `${id} resolves to the default`);
     assert.equal(presetById(id).id, "violet", `${id} is not a preset`);
+  }
+  for (const id of ["nebula", "grove", "blossom", "daylight", "porcelain"]) {
+    assert.equal(normalizePreset(id), id, `${id} is a look again`);
   }
   assert.equal(normalizePreset(undefined), "violet");
   assert.equal(normalizePreset(""), "violet");
   assert.equal(normalizePreset("cocoa"), "cocoa");
 });
 
-test("every overridden token exists in tokens.css (no silent typos)", async () => {
+test("every overridden token exists in tokens.css or the light rules (no silent typos)", async () => {
   const known = defaultTokens(await read("public/css/tokens.css"));
+  const lightRules = await read("public/css/theme-light.css");
   for (const preset of PRESETS) {
     for (const name of Object.keys(preset.tokens)) {
-      assert.ok(name in known, `${preset.id} overrides --${name}, which tokens.css does not define`);
+      const used = lightRules.includes(`var(--${name})`);
+      assert.ok(name in known || used, `${preset.id} overrides --${name}, which nothing defines or uses`);
     }
   }
 });

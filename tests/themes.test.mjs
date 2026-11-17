@@ -36,12 +36,15 @@ test("the theme module offers no palette and applies no palette", () => {
   assert.match(theme, /export function applyWallpaper/, "wallpapers still paint");
 });
 
-test("the pre-paint script no longer reads a stored palette", () => {
+test("the pre-paint script reads the look key, and sets the tone only for light looks", () => {
   for (const page of ["public/app/index.html", "public/admin/index.html"]) {
     const html = read(page);
     assert.doesNotMatch(html, /shinzora:theme/, `${page} does not read the old key`);
-    assert.doesNotMatch(html, /data-tone/, `${page} does not set a tone`);
   }
+  const app = read("public/app/index.html");
+  assert.match(app, /shinzora:look/, "the app reads the look key");
+  assert.match(app, /"blossom", "daylight", "porcelain"/, "the app sets the tone for the light looks");
+  assert.doesNotMatch(read("public/admin/index.html"), /data-tone/, "admin keeps its own styling");
 });
 
 test("the Settings appearance section is the wallpaper card, with no palette picker", () => {

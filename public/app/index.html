@@ -42,6 +42,8 @@
   try {
     var look = localStorage.getItem("shinzora:look");
     if (look) document.documentElement.setAttribute("data-preset", look);
+    /* Light looks (their rules are in theme-light.css). Keep in step with theme-presets.js. */
+    if (look && ["blossom", "daylight", "porcelain"].indexOf(look) !== -1) document.documentElement.setAttribute("data-tone", "light");
   } catch (error) { /* Storage blocked: the default look is shown. */ }
 })();
 </script>
