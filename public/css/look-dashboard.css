@@ -1,0 +1,53 @@
+/* ==========================================================================
+   Dashboard look — the signed-in app (html[data-surface="app"]).
+   Matches the reference dashboards: a rounded geometric typeface, larger glass
+   panels, a lavender active tile, and soft glow on hover. Colours still come
+   from the active preset (themes.css), so every look keeps this layout.
+   Marketing, auth and admin pages are not affected.
+   ========================================================================== */
+
+@font-face {
+  font-family: "OutfitVar";
+  src: url("../assets/fonts/outfit-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+html[data-surface="app"] {
+  --font-sans: "OutfitVar", "InterVar", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --r-lg: 20px;
+  --r-xl: 24px;
+  --lavender-soft: #d8ccff;
+}
+
+html[data-surface="app"] body {
+  font-feature-settings: "ss01" on;
+}
+
+/* Glass panels: the translucent gradient with a soft top-left light, as in the
+   reference cards. Inset light only, so existing card pseudo-elements stay put. */
+html[data-surface="app"] .card {
+  background:
+    linear-gradient(160deg, rgba(var(--accent-rgb), 0.07), transparent 42%),
+    var(--grad-panel);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+}
+html[data-surface="app"] .card:hover {
+  border-color: rgba(var(--violet-rgb), 0.28);
+  box-shadow: var(--shadow-md), 0 18px 48px -24px rgba(var(--accent-rgb), 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Active sidebar item: a lavender tile with a dark icon, as in the reference rail. */
+html[data-surface="app"] .sidebar-link.is-active {
+  background: linear-gradient(92deg, rgba(var(--violet-rgb), 0.9), rgba(var(--accent-rgb), 0.55));
+  color: #140f22;
+  box-shadow: 0 10px 28px -12px rgba(var(--violet-rgb), 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+html[data-surface="app"] .sidebar-link.is-active .ico { color: #140f22; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="app"] .card,
+  html[data-surface="app"] .card:hover { transition: none; transform: none; }
+}

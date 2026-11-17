@@ -113,7 +113,7 @@ export default async function render(root) {
     paint();
     /* A new profile unlocks wallpapers the catalog marked locked, so reload it
        from the server rather than repaint the old answer. No-op off that section. */
-    loadWallpaperPicker();
+    if (WALLPAPER_ENABLED) loadWallpaperPicker();
   };
   document.addEventListener(PREMIUM_EVENT, onPremiumChange);
 
@@ -863,8 +863,16 @@ export default async function render(root) {
   }
 
   /* ----------------------------------------------------------- appearance */
+  /* Appearance is the theme. The wallpaper card is parked (not deleted) until the
+     new wallpaper artwork is supplied; set WALLPAPER_ENABLED to bring it back. */
+  const WALLPAPER_ENABLED = false;
+
   function appearanceSection() {
-    return `${themeCardHtml()}<div class="card wallpaper-card">
+    return `${themeCardHtml()}${WALLPAPER_ENABLED ? wallpaperCardHtml() : ""}`;
+  }
+
+  function wallpaperCardHtml() {
+    return `<div class="card wallpaper-card">
       <div class="card-head">
         <div>
           <div class="card-title">Wallpaper</div>
@@ -1164,7 +1172,7 @@ export default async function render(root) {
 
   function bindAppearance() {
     bindLooks();
-    bindWallpapers();
+    if (WALLPAPER_ENABLED) bindWallpapers();
   }
 
   /* ------------------------------------------------------------ theme looks */
