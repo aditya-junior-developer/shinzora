@@ -19,6 +19,7 @@
        for tidiness, never for safety.
    ========================================================================== */
 
+import { CALLS_ENABLED } from "../../config/env.js";
 import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { timeAgo, timeAgoShort, dateTime, initials, bytes } from "../../lib/format.js";
@@ -210,10 +211,10 @@ export default async function mountGroups(root, options = {}) {
         <div class="pane-head-actions">
           <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-search"
                   aria-label="Search this group" title="Search this group">${icon("search", { size: 14 })}</button>
-          <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-call-voice" hidden
+          ${CALLS_ENABLED ? `<button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-call-voice" hidden
                   aria-label="Start a voice meeting" title="Start a voice meeting">${icon("phone", { size: 14 })}</button>
           <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-call" hidden
-                  aria-label="Start a video meeting" title="Start a video meeting">${icon("video", { size: 14 })}</button>
+                  aria-label="Start a video meeting" title="Start a video meeting">${icon("video", { size: 14 })}</button>` : ""}
           <button class="btn btn-ghost btn-sm hub-icon-btn" type="button" id="grp-more" hidden
                   aria-label="More group actions" title="More">${icon("ellipsis-vertical", { size: 14 })}</button>
           <button class="btn btn-ghost btn-sm hub-info-switch" type="button" id="grp-info" hidden>
@@ -546,8 +547,10 @@ export default async function mountGroups(root, options = {}) {
           ? "Pick a channel to read it. Channels are public rooms for everyone."
           : "Pick a group, or start one. Only members can read what is posted here.";
       infoBtn.hidden = true;
-      qs("#grp-call", wrap).hidden = true;
-      qs("#grp-call-voice", wrap).hidden = true;
+      if (CALLS_ENABLED) {
+        qs("#grp-call", wrap).hidden = true;
+        qs("#grp-call-voice", wrap).hidden = true;
+      }
       qs("#grp-more", wrap).hidden = true;
       pinEl.hidden = true;
       searchPanel.hidden = true;
@@ -573,8 +576,10 @@ export default async function mountGroups(root, options = {}) {
       } · you are ${role.toLowerCase()}${group.description ? ` · ${group.description}` : ""}`;
     }
     infoBtn.hidden = false;
-    qs("#grp-call", wrap).hidden = false;
-    qs("#grp-call-voice", wrap).hidden = false;
+    if (CALLS_ENABLED) {
+      qs("#grp-call", wrap).hidden = false;
+      qs("#grp-call-voice", wrap).hidden = false;
+    }
     qs("#grp-more", wrap).hidden = false;
   }
 
@@ -1422,8 +1427,10 @@ function insertAtCaret(field, text, start, end) {
        open." The call owns its topic; nothing else subscribes to it. */
   }
 
-  on(qs("#grp-call", wrap), "click", () => joinMeeting());
-  on(qs("#grp-call-voice", wrap), "click", () => joinMeeting({ audioOnly: true }));
+  if (CALLS_ENABLED) {
+    on(qs("#grp-call", wrap), "click", () => joinMeeting());
+    on(qs("#grp-call-voice", wrap), "click", () => joinMeeting({ audioOnly: true }));
+  }
 
   on(qs("#grp-search", wrap), "click", () => {
     searchPanel.hidden = !searchPanel.hidden;

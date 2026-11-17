@@ -152,7 +152,7 @@ function listMarkup(rows) {
 
 function tileMarkup(cat, selected) {
   return `<label class="svc-tile${selected ? " is-selected" : ""}" data-tile="${esc(cat.id)}">
-    <input type="radio" name="service" value="${esc(cat.id)}" class="svc-radio"${selected ? " checked" : ""}>
+    <input type="checkbox" name="service" value="${esc(cat.id)}" class="svc-radio"${selected ? " checked" : ""}>
     <span class="svc-tile-icon">${icon(cat.icon, { size: 18 })}</span>
     <span class="svc-tile-text">
       <span class="svc-tile-title">${esc(cat.label)}</span>
@@ -170,13 +170,13 @@ function formMarkup() {
     <div class="card-head">
       <div>
         <div class="card-title" id="request-form-title">Request a service</div>
-        <div class="muted small">Choose one. A specialist will connect with you within 24 hours to discuss your requirements and budget.</div>
+        <div class="muted small">Choose one or more. They are sent together, and a specialist connects with you within 24 hours to discuss each one.</div>
       </div>
     </div>
     <form class="card-body stack gap-5" id="svc-form" novalidate>
       <fieldset class="svc-fieldset">
-        <legend class="field-label svc-legend">Service</legend>
-        <div class="svc-grid" role="radiogroup" aria-label="Service">
+        <legend class="field-label svc-legend">Services</legend>
+        <div class="svc-grid" role="group" aria-label="Services">
           ${REQUEST_CATEGORIES.map((cat) => tileMarkup(cat, false)).join("")}
         </div>
         <div class="field-error" data-error="category" role="alert"></div>
@@ -192,17 +192,9 @@ function formMarkup() {
         </div>
       </div>
 
+      <div class="svc-lines" id="svc-lines" hidden></div>
+
       <div class="svc-two">
-        <div class="field" data-field="budget">
-          <label class="field-label" for="svc-budget">Expected budget (₹)</label>
-          <div class="svc-money">
-            <span class="svc-money-sign" aria-hidden="true">₹</span>
-            <input class="input" id="svc-budget" name="budget" type="text" inputmode="decimal" autocomplete="off"
-              placeholder="5000" aria-describedby="svc-budget-hint">
-          </div>
-          <div class="field-hint" id="svc-budget-hint">In Indian rupees. Up to ₹10,00,00,000.</div>
-          <div class="field-error"></div>
-        </div>
         <div class="field" data-field="name">
           <label class="field-label" for="svc-name">Your name</label>
           <input class="input" id="svc-name" name="name" type="text" autocomplete="name" value="${esc(name)}" maxlength="120">
@@ -269,18 +261,52 @@ export default async function render(root) {
   const count = qs("#svc-count", root);
   const submit = qs("#svc-submit", root);
   const confirm = qs("#svc-confirm", root);
+  const lines = qs("#svc-lines", root);
 
-  /* Picking a tile marks it, reveals the text field only for Others, and moves
-     focus on to the next input so keyboard users do not have to hunt for it. */
-  function choose(id) {
-    tiles.forEach((t) => {
-      const on = t.dataset.tile === id;
-      t.classList.toggle("is-selected", on);
-      t.querySelector("input").checked = on;
+  /* The services picked, in the order they are listed. */
+  const pickedIds = () => tiles.filter((t) => t.querySelector("input").checked).map((t) => t.dataset.tile);
+
+  /* One budget field per picked service: each request row carries its own
+     expected budget, so the amounts are never shared or double counted. Values
+     typed so far are kept when the list is redrawn. */
+  function paintLines() {
+    const kept = {};
+    lines.querySelectorAll("[data-line-budget]").forEach((input) => (kept[input.dataset.lineBudget] = input.value));
+    const ids = pickedIds();
+    lines.hidden = ids.length === 0;
+    lines.innerHTML = ids
+      .map((id) => {
+        const cat = categoryById(id);
+        return `<div class="field" data-field="budget" data-line="${esc(id)}">
+          <label class="field-label" for="svc-budget-${esc(id)}">${esc(cat?.label || id)} · expected budget (₹)</label>
+          <div class="svc-money">
+            <span class="svc-money-sign" aria-hidden="true">₹</span>
+            <input class="input" id="svc-budget-${esc(id)}" data-line-budget="${esc(id)}" type="text" inputmode="numeric" autocomplete="off"
+              placeholder="5000" value="${esc(kept[id] || "")}">
+          </div>
+          <div class="field-hint">In Indian rupees. Up to ₹10,00,00,000.</div>
+          <div class="field-error"></div>
+        </div>`;
+      })
+      .join("");
+    lines.querySelectorAll("[data-line-budget]").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        /* Keep only digits, commas and one decimal point, as the customer types. */
+        e.target.value = e.target.value.replace(/[^\d.,]/g, "");
+        fieldError(e.target, "");
+      });
     });
-    const needs = categoryById(id)?.needsDescription === true;
+  }
+
+  /* Ticking or unticking a service reveals or hides its budget field, and the
+     description field only when Others is among the picked services. */
+  function choose(id) {
+    const on = tiles.find((t) => t.dataset.tile === id)?.querySelector("input")?.checked;
+    tiles.forEach((t) => t.classList.toggle("is-selected", t.querySelector("input").checked));
+    const needs = pickedIds().some((pid) => categoryById(pid)?.needsDescription === true);
     others.hidden = !needs;
-    if (needs) requestAnimationFrame(() => description.focus());
+    if (on && needs && categoryById(id)?.needsDescription) requestAnimationFrame(() => description.focus());
+    paintLines();
     qs('[data-error="category"]', root).textContent = "";
     confirm.hidden = true;
   }
@@ -292,12 +318,6 @@ export default async function render(root) {
     fieldError(description, "");
   });
 
-  qs("#svc-budget", root).addEventListener("input", (e) => {
-    /* Keep only digits, commas and one decimal point, as the customer types. */
-    e.target.value = e.target.value.replace(/[^\d.,]/g, "");
-    fieldError(e.target, "");
-  });
-
   ["#svc-name", "#svc-email", "#svc-phone"].forEach((sel) =>
     qs(sel, root).addEventListener("input", (e) => fieldError(e.target, ""))
   );
@@ -305,13 +325,24 @@ export default async function render(root) {
   function showErrors(errors) {
     const category = qs('[data-error="category"]', root);
     category.textContent = errors.category || "";
-    const map = { budget: "#svc-budget", description: "#svc-description", name: "#svc-name", email: "#svc-email", phone: "#svc-phone" };
+    fieldError(description, errors.description || "");
+    const map = { name: "#svc-name", email: "#svc-email", phone: "#svc-phone" };
     for (const [key, sel] of Object.entries(map)) {
       fieldError(qs(sel, root), errors[key] || "");
     }
+    lines.querySelectorAll("[data-line]").forEach((box) => {
+      fieldError(box.querySelector("input"), errors[`budget:${box.dataset.line}`] || "");
+    });
     const first = Object.keys(errors)[0];
     if (first) {
-      const target = first === "category" ? tiles[0] : qs(map[first], root);
+      const target =
+        first === "category"
+          ? tiles[0]
+          : first.startsWith("budget:")
+            ? lines.querySelector(`[data-line="${CSS.escape(first.slice(7))}"] input`)
+            : first === "description"
+              ? description
+              : qs(map[first], root);
       target?.focus?.();
     }
   }
@@ -320,51 +351,73 @@ export default async function render(root) {
     event.preventDefault();
     confirm.hidden = true;
 
-    const picked = form.querySelector('input[name="service"]:checked')?.value || "";
+    const ids = pickedIds();
     const contact = {
       name: qs("#svc-name", root).value,
       email: qs("#svc-email", root).value,
       phone: qs("#svc-phone", root).value
     };
-    const checked = validateRequest({
-      category: picked,
-      budget: qs("#svc-budget", root).value,
-      description: description.value
-    });
-    const errors = { ...checked.errors, ...validateContact(contact) };
+
+    /* Each picked service is checked on its own, with its own budget, using the
+       same rules as before. The shared description applies to Others only. */
+    const errors = { ...validateContact(contact) };
+    const checkedRows = [];
+    if (!ids.length) errors.category = "Choose at least one service.";
+    for (const id of ids) {
+      const budgetInput = lines.querySelector(`[data-line-budget="${CSS.escape(id)}"]`);
+      const checked = validateRequest({
+        category: id,
+        budget: budgetInput ? budgetInput.value : "",
+        description: description.value
+      });
+      if (!checked.ok) {
+        if (checked.errors.budget) errors[`budget:${id}`] = checked.errors.budget;
+        if (checked.errors.description) errors.description = checked.errors.description;
+      } else {
+        checkedRows.push({ id, value: checked.value });
+      }
+    }
     if (Object.keys(errors).length) {
       showErrors(errors);
       return;
     }
     showErrors({});
 
-    const category = categoryById(picked);
-    const payload = {
-      owner_id: state.user.id,
-      service_type: checked.value.service_type,
-      title: category.label,
-      details: checked.value.custom_description,
-      custom_description: checked.value.custom_description,
-      budget_inr: checked.value.budget_inr,
-      contact_name: contact.name.trim(),
-      contact_email: contact.email.trim(),
-      contact_phone: contact.phone.trim() || null,
-      status: "submitted"
-    };
+    /* One insert for the whole selection: every row is written, or none is. */
+    const payload = checkedRows.map(({ id, value }) => {
+      const category = categoryById(id);
+      return {
+        owner_id: state.user.id,
+        service_type: value.service_type,
+        title: category.label,
+        details: value.custom_description,
+        custom_description: value.custom_description,
+        budget_inr: value.budget_inr,
+        contact_name: contact.name.trim(),
+        contact_email: contact.email.trim(),
+        contact_phone: contact.phone.trim() || null,
+        status: "submitted"
+      };
+    });
 
     submit.disabled = true;
     submit.setAttribute("aria-busy", "true");
     submit.querySelector("span").textContent = "Submitting…";
 
     try {
-      const { data, error } = await sb.from("service_requests").insert(payload).select("*").single();
+      const { data, error } = await sb.from("service_requests").insert(payload).select("*");
       if (error) throw normalizeError(error);
+      const saved = Array.isArray(data) ? data : [];
 
-      /* Only a row the database accepted gets the confirmation. */
-      await logActivity("service_requested", "service_request", data?.id || null, {
-        service_type: payload.service_type,
-        budget_inr: payload.budget_inr
-      }).catch(() => {});
+      /* Only rows the database accepted get the confirmation. */
+      await Promise.all(
+        saved.map((row) =>
+          logActivity("service_requested", "service_request", row?.id || null, {
+            service_type: row.service_type,
+            budget_inr: row.budget_inr
+          }).catch(() => {})
+        )
+      );
 
       confirm.innerHTML = `<div class="svc-callout is-ok"><span class="svc-callout-icon">${icon("circle-check", { size: 18 })}</span><p>${esc(CONFIRMATION_MESSAGE)}</p></div>`;
       confirm.hidden = false;
@@ -377,11 +430,12 @@ export default async function render(root) {
       });
       others.hidden = true;
       count.textContent = "0";
+      paintLines();
       qs("#svc-name", root).value = contact.name;
       qs("#svc-email", root).value = contact.email;
       qs("#svc-phone", root).value = contact.phone;
 
-      /* Refresh the list from the database so the new row shows with its real reference. */
+      /* Refresh the list from the database so the new rows show with their real references. */
       const fresh = await serviceRequests(100).catch(() => null);
       const list = Array.isArray(fresh) ? fresh : Array.isArray(fresh?.data) ? fresh.data : null;
       if (list) {

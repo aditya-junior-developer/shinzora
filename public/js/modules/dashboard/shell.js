@@ -4,6 +4,7 @@
    realtime subscriptions. Everything here is chrome; views own their content.
    ========================================================================== */
 
+import { MEETINGS_ENABLED } from "../../config/env.js";
 import { qs, qsa, delegate, on, debounce, esc } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { state, aiCredits, plan, hasCompletedOnboarding } from "../../lib/store.js";
@@ -61,7 +62,7 @@ export const NAV = [
       { id: "support", label: "Customer Support", icon: "life-buoy" },
       { id: "messages", label: "Messages", icon: "messages-square" },
       { id: "groups", label: "Groups", icon: "users" },
-      { id: "meeting", label: "Meetings", icon: "video" },
+      ...(MEETINGS_ENABLED ? [{ id: "meeting", label: "Meetings", icon: "video" }] : []),
       { id: "analytics", label: "Analytics", icon: "chart-line" },
       { id: "investor-decks", label: "Investor deck", icon: "layers" }
     ]
@@ -97,7 +98,7 @@ export const AGENT_NAV = [
       { id: "community", label: "Community", icon: "messages-square" },
       { id: "messages", label: "Messages", icon: "messages-square" },
       { id: "groups", label: "Groups", icon: "users" },
-      { id: "meeting", label: "Meetings", icon: "video" }
+      ...(MEETINGS_ENABLED ? [{ id: "meeting", label: "Meetings", icon: "video" }] : [])
     ]
   },
   {
@@ -203,12 +204,16 @@ export async function renderRecentChats() {
       .eq("user_id", session.user.id)
       .eq("kind", "assistant")
       .order("updated_at", { ascending: false })
-      .limit(6);
+      .limit(8);
     if (error) throw error;
     if (myToken !== recentChatToken) return;
 
     const activeId = new URLSearchParams(location.search).get("conversation");
-    const rows = data || [];
+    /* The old connection check saved its test prompt as a chat called
+       "health check". It is kept in the database but never listed. */
+    const rows = (data || [])
+      .filter((row) => String(row.title || "").trim().toLowerCase() !== "health check")
+      .slice(0, 6);
     host.innerHTML = rows.length
       ? rows
           .map(

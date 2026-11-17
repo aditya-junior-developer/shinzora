@@ -19,7 +19,7 @@
 
 import { qs, qsa, esc, on, safeSet } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
-import { money, timeAgo } from "../../../lib/format.js";
+import { money, timeAgo, toMinor } from "../../../lib/format.js";
 import { state } from "../../../lib/store.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
 import { campaigns as fetchCampaigns } from "../data.js";
@@ -68,6 +68,9 @@ const STEPS = [
 ];
 
 const view = {
+  /* The wizard is open when this is true. Step 0 is a valid step, so "step"
+     alone cannot say whether the wizard is showing. */
+  wizardOpen: false,
   requests: [],
   accounts: [],
   campaigns: [],
@@ -127,7 +130,7 @@ function paint(root) {
     <div class="grid-4" style="margin-bottom:var(--s-4)">
       ${statCard({ label: "Open requests", value: String(open.length), iconName: "inbox", foot: "Waiting or in progress" })}
       ${statCard({ label: "Completed", value: String(done.length), iconName: "check-check", foot: "Finished work" })}
-      ${statCard({ label: "Budget requested", value: money(Math.round(budget / 100)), iconName: "indian-rupee", foot: "Across submitted requests" })}
+      ${statCard({ label: "Budget requested", value: money(budget), iconName: "indian-rupee", foot: "Across submitted requests" })}
       ${statCard({ label: "Social accounts", value: String(view.accounts.length), iconName: "link", foot: "Connected or waiting for verification" })}
     </div>
 
@@ -140,7 +143,7 @@ function paint(root) {
     ${analyticsMarkup(open, done)}
 
     <h2 class="section-title" style="margin:var(--s-5) 0 var(--s-3)">Campaign requests</h2>
-    ${view.step ? wizard() : list(root)}
+    ${view.wizardOpen ? wizard() : list(root)}
 
     ${
       view.campaigns.length
@@ -220,7 +223,7 @@ function list() {
           <div class="card-body stack gap-2">
             <div class="row gap-4 wrap" style="font-size:var(--fs-xs)">
               <span class="dim">Objective: <span style="color:var(--text-2)">${esc(row.objective || "—")}</span></span>
-              <span class="dim">Budget: <span style="color:var(--text-2)">${money(Math.round(Number(row.budget_paise || 0) / 100))} ${esc(row.budget_mode || "")}</span></span>
+              <span class="dim">Budget: <span style="color:var(--text-2)">${money(Number(row.budget_paise || 0))} ${esc(row.budget_mode || "")}</span></span>
               <span class="dim">Duration: <span style="color:var(--text-2)">${row.duration_days ? row.duration_days + " days" : "—"}</span></span>
               <span class="dim">Submitted: <span style="color:var(--text-2)">${esc(timeAgo(row.created_at))}</span></span>
             </div>
@@ -415,7 +418,7 @@ function stepReview() {
     ["Platform", CAMPAIGN_TYPES[view.type]?.label || "—"],
     ["Campaign type", c.subtype || "—"],
     ["Objective", c.objective || "—"],
-    ["Budget", c.budget ? `${money(Number(c.budget))} ${c.budgetMode === "daily" ? "per day" : "total"}` : "—"],
+    ["Budget", c.budget ? `${money(toMinor(c.budget))} ${c.budgetMode === "daily" ? "per day" : "total"}` : "—"],
     ["Duration", c.duration ? `${c.duration} days` : "—"],
     ["Start date", c.startDate || "As soon as the team starts"],
     ["Location", c.location || d.location || "—"],
@@ -454,6 +457,7 @@ function textarea(label, name, value, placeholder = "") {
 
 function wire(root) {
   on(qs("#new-request"), "click", () => {
+    view.wizardOpen = true;
     view.step = 0;
     view.type = null;
     view.draft = { detail: {}, campaign: {}, accounts: [] };
@@ -506,7 +510,7 @@ function wire(root) {
   if (qs("#budget-mode")) on(qs("#budget-mode"), "change", (event) => (view.draft.campaign.budgetMode = event.target.value));
   if (qs("#asset-input")) on(qs("#asset-input"), "change", (event) => collectAssets(event.target, root));
 
-  if (qs("#wizard-cancel")) on(qs("#wizard-cancel"), "click", () => { view.step = 0; paint(root); });
+  if (qs("#wizard-cancel")) on(qs("#wizard-cancel"), "click", () => { view.wizardOpen = false; view.step = 0; paint(root); });
   if (qs("#wizard-back")) on(qs("#wizard-back"), "click", () => { view.step -= 1; paint(root); });
   if (qs("#wizard-next")) on(qs("#wizard-next"), "click", () => advance(root));
   if (qs("#wizard-submit")) on(qs("#wizard-submit"), "click", () => submitRequest(root));
@@ -672,7 +676,7 @@ async function collectAssets(input, root) {
 async function submitRequest(root) {
   const detail = view.draft.detail;
   const campaign = view.draft.campaign;
-  const budgetPaise = Math.round(Number(campaign.budget || 0) * 100);
+  const budgetPaise = toMinor(campaign.budget);
 
   view.busy = true;
   const button = qs("#wizard-submit");
@@ -753,6 +757,7 @@ async function submitRequest(root) {
     }
 
     view.requests = [data, ...view.requests];
+    view.wizardOpen = false;
     view.step = 0;
     view.busy = false;
     view.draft = { detail: {}, campaign: {}, accounts: [] };

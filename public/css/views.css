@@ -5908,3 +5908,16 @@ dialog.wallpaper-preview::backdrop {
   .look-preview { height: 96px; }
 }
 .look-card + .wallpaper-card { margin-top: var(--s-4); }
+
+/* Extra Services: one budget field per picked service, under the tiles. */
+.svc-lines { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.svc-lines[hidden] { display: none; }
+
+/* Investor deck: the business summary card gets the same inner spacing as the
+   other cards, and its download buttons stack on phones. */
+.deck-summary-body { min-width: 0; }
+.deck-summary .deck-sections legend { padding: 0; margin-bottom: var(--s-2); }
+@media (max-width: 640px) {
+  .deck-summary .card-actions { flex-direction: column; align-items: stretch; }
+  .deck-summary .card-actions .btn { width: 100%; justify-content: center; }
+}

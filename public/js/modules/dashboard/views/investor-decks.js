@@ -198,6 +198,7 @@ function summaryMarkup() {
         <p class="field-hint">A report on the parts of your business you tick below. The AI writes it from those facts only. Free.</p>
       </div>
     </div>
+    <div class="card-body stack gap-4 deck-summary-body">
     <fieldset class="deck-sections" id="summary-sections" data-field="summary-sections">
       <legend class="field-label">Parts of your business the summary may use</legend>
       ${DECK_SECTIONS.map(
@@ -211,6 +212,7 @@ function summaryMarkup() {
       <button class="btn btn-secondary btn-sm" type="button" data-summary="pptx">${icon("layers", { size: 13 })} Download PowerPoint</button>
     </div>
     <p class="field-hint" data-summary-status role="status" aria-live="polite"></p>
+    </div>
   </section>`;
 }
 

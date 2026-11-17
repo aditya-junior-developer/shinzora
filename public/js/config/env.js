@@ -294,3 +294,9 @@ export const TARGET_AUDIENCES = [
   "Local customers",
   "International customers"
 ];
+
+/* Hidden for now. The code is kept: calls need a media relay before they are
+   offered to members, and the Meetings section waits on the same work. Set to
+   true to bring either back. */
+export const CALLS_ENABLED = false;
+export const MEETINGS_ENABLED = false;

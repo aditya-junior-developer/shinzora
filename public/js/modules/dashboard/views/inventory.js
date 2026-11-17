@@ -459,10 +459,11 @@ export default async function render(root) {
           name: "price",
           label: "Price (₹)",
           type: "number",
-          step: "0.01",
+          step: "1",
+          min: "0",
           value: fromMinor(existing?.price ?? 0),
           required: true,
-          hint: "Rupees and paise — type 1.68 for ₹1.68. Stored as 168 paise so nothing rounds away."
+          hint: "Enter the price in rupees, e.g. 1000 for ₹1,000."
         },
         { name: "stock", label: "Stock on hand", type: "number", value: existing?.stock ?? 0, required: true },
         {

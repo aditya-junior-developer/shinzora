@@ -15,6 +15,7 @@
    is not a public identifier.
    ========================================================================== */
 
+import { CALLS_ENABLED } from "../../config/env.js";
 import { qs, esc, on, delegate } from "../../lib/dom.js";
 import { icon } from "../../lib/icons.js";
 import { composerPopsMarkup, composerToolsBar, bindComposerTools, ATTACH_KINDS } from "./composer-tools.js";
@@ -95,9 +96,9 @@ export default async function mountInbox(root, options = {}) {
           <div class="chat-thread-sub">Search a username to start, or pick a conversation.</div>
         </div>
         <div class="dm-head-actions">
-          <button class="btn btn-ghost btn-sm" type="button" id="dm-call" hidden>
+          ${CALLS_ENABLED ? `<button class="btn btn-ghost btn-sm" type="button" id="dm-call" hidden>
             ${icon("phone", { size: 13 })}<span>Call</span>
-          </button>
+          </button>` : ""}
           <div class="dm-head-status" id="dm-head-status"></div>
         </div>
       </div>
@@ -295,7 +296,7 @@ export default async function mountInbox(root, options = {}) {
         thread.kind === "personal" ? presenceDot(other.lastSeenAt, { size: 10 }) : "";
       /* A call makes sense in a one-to-one conversation, not in a team room. */
       activeMeta = { peerName: title, peerId: other.userId || null, personal: thread.kind === "personal" };
-      callButton.hidden = thread.kind !== "personal";
+      if (callButton) callButton.hidden = thread.kind !== "personal";
       watchMessages(id);
       await paintMessages(thread);
       await loadList();
@@ -467,7 +468,7 @@ export default async function mountInbox(root, options = {}) {
   }
 
 
-  on(callButton, "click", () => {
+  if (callButton) on(callButton, "click", () => {
     if (!active || !activeMeta?.peerName) return;
     startCall(active, activeMeta.peerName);
   });

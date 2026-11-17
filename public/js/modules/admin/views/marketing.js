@@ -103,7 +103,7 @@ function paint(root) {
         ${statCard({ label: "Awaiting review", value: String(pending), iconName: "inbox", foot: "Submitted or under review" })}
         ${statCard({ label: "Approved", value: String(approved), iconName: "check-check", foot: "Approved or in progress" })}
         ${statCard({ label: "Completed", value: String(completed), iconName: "flag", foot: "Finished work" })}
-        ${statCard({ label: "Budget requested", value: money(Math.round(budget / 100)), iconName: "indian-rupee", foot: "Advert budget, not service charge" })}
+        ${statCard({ label: "Budget requested", value: money(budget), iconName: "indian-rupee", foot: "Advert budget, not service charge" })}
       </div>
 
       <div class="row gap-2 wrap" style="margin-bottom:var(--s-3)">
@@ -147,7 +147,7 @@ function rowMarkup(row) {
     <div class="card-body stack gap-2">
       <div class="row gap-4 wrap" style="font-size:var(--fs-xs)">
         <span class="dim">Objective: <span style="color:var(--text-2)">${esc(row.objective || "—")}</span></span>
-        <span class="dim">Budget: <span style="color:var(--text-2)">${money(Math.round(Number(row.budget_paise || 0) / 100))} ${esc(
+        <span class="dim">Budget: <span style="color:var(--text-2)">${money(Number(row.budget_paise || 0))} ${esc(
           row.budget_mode || ""
         )}</span></span>
         <span class="dim">Duration: <span style="color:var(--text-2)">${row.duration_days ? `${row.duration_days} days` : "—"}</span></span>
@@ -212,7 +212,7 @@ async function openRequest(id, root) {
     ["Campaign", row.campaign_type === "google_ads" ? "Google Ads" : "Meta Ads"],
     ["Campaign type", details.subtype || "—"],
     ["Objective", row.objective || "—"],
-    ["Budget", `${money(Math.round(Number(row.budget_paise || 0) / 100))} ${row.budget_mode || ""}`],
+    ["Budget", `${money(Number(row.budget_paise || 0))} ${row.budget_mode || ""}`],
     ["Duration", row.duration_days ? `${row.duration_days} days` : "—"],
     ["Start date", row.start_date || "—"],
     ["Location", row.location || "—"],

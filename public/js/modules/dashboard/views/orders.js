@@ -325,10 +325,11 @@ export default async function render(root) {
           name: "unit_price",
           label: "Unit price (₹)",
           type: "number",
-          step: "0.01",
+          step: "1",
+          min: "0",
           value: 0,
           required: true,
-          hint: "Rupees and paise — type 1.68 for ₹1.68."
+          hint: "Enter the amount in rupees, e.g. 1000 for ₹1,000."
         },
         {
           name: "status",

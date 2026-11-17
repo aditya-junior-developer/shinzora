@@ -557,39 +557,10 @@ async function checkFunctions() {
     });
   }
 
-  // Authenticated functions must refuse an unauthenticated call.
-  const session = await getSession().catch(() => null);
-  if (session) {
-    try {
-      const ai = await fn("ai", { method: "POST", body: { action: "chat", message: "health check" } });
-      const quota = ai.json?.code === "quota_exceeded";
-      result({
-        group: "Edge Functions",
-        name: "ai",
-        status: ai.ok || quota ? "pass" : ai.json?.code === "functions_unavailable" ? "warn" : "fail",
-        detail: ai.ok
-          ? "Responded to an authenticated request"
-          : `${ai.json?.code || ai.status} — ${(ai.json?.error || "").slice(0, 140)}`,
-        fix:
-          ai.ok || quota
-            ? ""
-            : ai.json?.code === "functions_unavailable"
-              ? "Set GEMINI_API_KEY for the ai function."
-              : "Deploy the function and check its logs."
-      });
-    } catch (error) {
-      result({ group: "Edge Functions", name: "ai", status: "fail", detail: String(error) });
-    }
-  } else {
-    result({
-      group: "Edge Functions",
-      name: "ai",
-      status: "warn",
-      detail: "Sign in to test an authenticated call (unauthorised calls are expected to be refused).",
-      fix: "Sign in and re-run."
-    });
-  }
+  /* The authenticated AI probe was removed: it sent a real chat, which the AI
+     function saves into Messages as a "health check" conversation. */
 }
+
 
 async function checkAppData() {
   const session = await getSession().catch(() => null);

@@ -1,6 +1,6 @@
 /* ==========================================================================
    Shinzora — Settings
-   Profile, business profile, security, preferences, integrations and data
+   Profile, business profile, security, appearance, preferences, referrals and data
    controls. Every save writes to Postgres and reports exactly what changed.
    ========================================================================== */
 
@@ -48,7 +48,6 @@ const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: "palette" },
   { id: "preferences", label: "Preferences", icon: "sliders-horizontal" },
   { id: "referrals", label: "Referrals", icon: "gift" },
-  { id: "integrations", label: "Integrations", icon: "plug-zap" },
   { id: "data", label: "Data", icon: "database" }
 ];
 
@@ -79,7 +78,7 @@ export default async function render(root) {
   const runtime = await runtimeConfig();
 
   root.innerHTML = `
-    ${pageHead({ title: "Settings", desc: "Account, business profile, security and integrations for this workspace." })}
+    ${pageHead({ title: "Settings", desc: "Account, business profile, security, appearance and data for this workspace." })}
     <div class="settings-layout">
       <div class="card" style="align-self:start">
         <nav class="settings-nav" id="settings-nav">
@@ -126,7 +125,6 @@ export default async function render(root) {
     if (section === "appearance") body.innerHTML = appearanceSection();
     if (section === "preferences") body.innerHTML = preferencesSection();
     if (section === "referrals") body.innerHTML = referralSection();
-    if (section === "integrations") body.innerHTML = integrationsSection(runtime);
     if (section === "data") body.innerHTML = dataSection();
 
     if (section === "profile") bindProfile();
@@ -1446,51 +1444,6 @@ export default async function render(root) {
         ${esc(normalizeError(error).message || "Group notification settings could not be loaded.")}
       </p></div></div>`;
     }
-  }
-
-  /* -------------------------------------------------------- integrations */
-  function integrationsSection(runtime) {
-    const github = runtime?.integrations?.github_configured;
-    const vercel = runtime?.integrations?.vercel_configured;
-    return `<div class="stack gap-4">
-      <div class="card">
-        <div class="card-head">
-          <div><div class="card-title">GitHub</div><div class="card-sub">Push generated projects to a repository you own.</div></div>
-          <span class="badge ${github ? "badge-ok" : "badge-neutral"}">${github ? "Configured" : "Not configured"}</span>
-        </div>
-        <div class="card-body">
-          <p class="muted" style="font-size:var(--fs-xs);line-height:1.65">
-            ${github
-              ? "GitHub OAuth is configured server-side. Connect from any project's Publish panel to select or create a repository."
-              : "Coming soon. Repository publishing is not enabled on this deployment yet."}
-          </p>
-          <a class="btn btn-secondary btn-sm" style="margin-top:10px" href="/app/?view=projects">Go to projects</a>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <div><div class="card-title">Vercel</div><div class="card-sub">Deploy a project and track the real deployment status.</div></div>
-          <span class="badge ${vercel ? "badge-ok" : "badge-neutral"}">${vercel ? "Configured" : "Not configured"}</span>
-        </div>
-        <div class="card-body">
-          <p class="muted" style="font-size:var(--fs-xs);line-height:1.65">
-            ${vercel
-              ? "Vercel integration is configured. Deployments are only reported as successful when Vercel returns a READY state."
-              : "Coming soon. Vercel deployment is not enabled on this deployment yet."}
-          </p>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head"><div class="card-title">Payments</div></div>
-        <div class="card-body">
-          <dl>
-            <div class="kv"><dt>UPI QR</dt><dd>${runtime?.payments?.upi_configured ? `<span class="badge badge-ok">Configured</span>` : `<span class="badge badge-warn">Not configured</span>`}</dd></div>
-            <div class="kv"><dt>Razorpay</dt><dd>${runtime?.payments?.razorpay_configured ? `<span class="badge badge-ok">Configured</span>` : `<span class="badge badge-neutral">Keys absent</span>`}</dd></div>
-            <div class="kv"><dt>Domains</dt><dd>${runtime?.domains?.configured ? esc(runtime.domains.provider || "configured") : "No registrar connected"}</dd></div>
-          </dl>
-        </div>
-      </div>
-    </div>`;
   }
 
   /* ---------------------------------------------------------------- data */
