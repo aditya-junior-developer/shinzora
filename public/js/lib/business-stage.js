@@ -22,9 +22,15 @@ export function stageBadge(id, { size = "md", link = false } = {}) {
     const prompt = `<span class="stage-badge stage-badge--unset stage-badge--${size}">Stage not set</span>`;
     return link ? `<a class="stage-badge-link" href="/app/?view=settings">${prompt}</a>` : prompt;
   }
+  const art = size === "sm" ? 14 : size === "lg" ? 20 : 17;
   return `<span class="stage-badge stage-badge--${stage.tone} stage-badge--${size}" data-stage-badge="${esc(stage.id)}">${
-    icon("rocket", { size: size === "sm" ? 11 : 13 })
+    stageArt(stage, art)
   }${esc(stage.label)}</span>`;
+}
+
+/* The badge artwork for a stage (public/img/stages). Decorative: the label next to it says the same thing. */
+export function stageArt(stage, size = 44) {
+  return `<img class="stage-art" src="/img/stages/${esc(stage.tone)}.png" alt="" width="${size}" height="${size}" decoding="async" />`;
 }
 
 /* Option cards. `name` groups the radio-style buttons; `selected` is the id
@@ -36,7 +42,7 @@ export function stageOptionsHtml({ selected = "", prefix = "stage" } = {}) {
         id="${esc(prefix)}-${esc(stage.id)}" data-stage-option="${esc(stage.id)}"
         aria-checked="${on ? "true" : "false"}" tabindex="${on ? "0" : "-1"}">
         <span class="stage-option-top">
-          <span class="stage-option-mark" aria-hidden="true"></span>
+          <span class="stage-option-mark" aria-hidden="true">${stageArt(stage, 56)}</span>
           <span class="stage-option-check" aria-hidden="true">${icon("check", { size: 12 })}</span>
         </span>
         <span class="stage-option-title">${esc(stage.label)}</span>

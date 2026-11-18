@@ -41,11 +41,12 @@ check("unknown and empty become no stage", stage.normalizeStage("enterprise") ==
 
 console.log("badges");
 check("ideation badge uses the brown tone", stage.stageBadge("ideation").includes("stage-badge--ideation"));
-check("mvp badge uses the gold tone", stage.stageBadge("mvp").includes("stage-badge--mvp"));
-check("scaling badge uses the purple-and-black tone", stage.stageBadge("scaling").includes("stage-badge--scaling"));
-check("established badge uses the platinum tone", stage.stageBadge("established").includes("stage-badge--established"));
+check("mvp badge uses the orange tone", stage.stageBadge("mvp").includes("stage-badge--mvp"));
+check("scaling badge uses the white tone", stage.stageBadge("scaling").includes("stage-badge--scaling"));
+check("established badge uses the dark purple tone", stage.stageBadge("established").includes("stage-badge--established"));
 check("badge shows the approved label", stage.stageBadge("established").includes("Established Business"));
 const unset = stage.stageBadge(null);
+check("each stage shows its badge artwork", ["ideation","mvp","scaling","established"].every((id) => stage.stageBadge(id).includes(`/img/stages/${id}.png`)));
 check("no stage shows a prompt, not a coloured badge", unset.includes("Stage not set") && unset.includes("stage-badge--unset"));
 check("no-stage prompt can link to Settings", stage.stageBadge(null, { link: true }).includes('href="/app/?view=settings"'));
 check("badge escapes its input", !stage.stageBadge("<img>").includes("<img>"));

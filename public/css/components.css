@@ -2446,22 +2446,23 @@ body.ip-open {
   border-color: #b07a48;
 }
 .stage-badge--mvp {
-  color: #2a1a00;
-  background: linear-gradient(135deg, #fde68a, #d4a017 58%, #b7860f);
-  border-color: #f5d06b;
+  color: #2a0f00;
+  background: linear-gradient(135deg, #fdba74, #f97316 58%, #ea580c);
+  border-color: #fb923c;
 }
 .stage-badge--scaling {
-  color: #f5f0ff;
-  background: linear-gradient(135deg, #000 0%, #14082a 48%, var(--purple-500) 100%);
-  border-color: rgba(var(--violet-rgb), 0.7);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
-}
-.stage-badge--established {
   color: #1c2230;
-  background: linear-gradient(120deg, #f8fafc 0%, #cbd2dc 38%, #f1f4f8 62%, #9aa4b4 100%);
-  border-color: #e5e9f0;
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 56%, #cbd5e1 100%);
+  border-color: #f8fafc;
   box-shadow: 0 0 10px rgba(226, 232, 240, 0.25);
 }
+.stage-badge--established {
+  color: #f5f0ff;
+  background: linear-gradient(135deg, #4c1d95 0%, #2e1065 55%, #1e1b4b 100%);
+  border-color: #5b21b6;
+  box-shadow: 0 0 10px rgba(91, 33, 182, 0.35);
+}
+.stage-art { display: block; flex: none; object-fit: contain; pointer-events: none; }
 .stage-badge--unset {
   color: var(--text-3);
   background: transparent;
@@ -2494,27 +2495,19 @@ body.ip-open {
     transform var(--t-base) var(--ease-spring), background var(--t-base) var(--ease);
 }
 .stage-option--ideation { --stage-accent: #b07a48; }
-.stage-option--mvp { --stage-accent: #f5c542; }
-.stage-option--scaling { --stage-accent: var(--violet); }
-.stage-option--established { --stage-accent: #cbd2dc; }
+.stage-option--mvp { --stage-accent: #f97316; }
+.stage-option--scaling { --stage-accent: #e2e8f0; }
+.stage-option--established { --stage-accent: #5b21b6; }
 .stage-option:hover { border-color: var(--line-strong); transform: translateY(-1px); }
 .stage-option:focus-visible { outline: 2px solid var(--violet-soft); outline-offset: 3px; }
 .stage-option-top { display: flex; align-items: center; justify-content: space-between; }
 .stage-option-mark {
-  width: 46px;
-  height: 6px;
-  border-radius: var(--r-pill);
-  background: var(--stage-accent);
-  box-shadow: 0 0 12px -2px var(--stage-accent);
+  display: block;
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--stage-accent) 45%, transparent));
 }
-.stage-option--scaling .stage-option-mark {
-  background: linear-gradient(90deg, #000, var(--purple-500));
-  box-shadow: 0 0 12px -2px var(--purple-500);
-}
-.stage-option--ideation .stage-option-mark {
-  background: linear-gradient(90deg, #8b5a2b, #b07a48);
-  box-shadow: 0 0 12px -2px #8b5a2b;
-}
+.stage-option-mark .stage-art { width: 56px; height: 56px; }
 .stage-option-check {
   display: grid;
   place-items: center;
@@ -2559,7 +2552,7 @@ body.ip-open {
 
 /* Overview: roadmap and stage prompt. */
 .stage-card { margin-bottom: var(--s-4); }
-.stage-card--mvp { border-color: rgba(245, 197, 66, 0.22); }
+.stage-card--mvp { border-color: rgba(249, 115, 22, 0.28); }
 .stage-card--scaling { border-color: rgba(var(--violet-rgb), 0.3); }
 .stage-roadmap {
   display: grid;
