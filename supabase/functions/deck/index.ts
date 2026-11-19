@@ -6,6 +6,7 @@
 //   POST /functions/v1/deck   { action, ... }
 //     generate  { title, sections[], brief? } → an AI draft deck (free)
 //     export    { deckId }                    → application/pdf
+//     pdf_allowance {}                        → { plan, limit, used, remaining }
 //
 // Invariants enforced here, not in the browser:
 //   • only a business owner may build or export a deck (accountTypeOf)
@@ -15,6 +16,9 @@
 //     marks it ready, which requires three slides (database check)
 //   • a manual deck's PDF costs Rs 20. The export takes one verified payment's
 //     entitlement (deck_export_take) and gives it back if rendering fails
+//   • an AI deck's PDF counts against the owner's plan allowance. A slot is
+//     reserved first (ai_pdf_reserve), committed only after the PDF renders
+//     (ai_pdf_commit), and released if rendering fails. Failures use nothing.
 //   • the PDF is rendered here, from the stored slides, never from client text
 // ============================================================================
 
@@ -55,6 +59,8 @@ Deno.serve(async (req) => {
         return await summary(caller, body);
       case "export":
         return await exportDeck(caller, body);
+      case "pdf_allowance":
+        return await pdfAllowance(caller);
       default:
         return fail(400, "unknown_action", "Unknown deck action.");
     }
@@ -63,6 +69,15 @@ Deno.serve(async (req) => {
     return fail(500, "deck_error", "The deck could not be completed. Try again in a moment.");
   }
 });
+
+/* ------------------------------------------------------------- pdf allowance */
+
+async function pdfAllowance(caller: Caller) {
+  const sb = scoped(caller);
+  const { data, error } = await sb.rpc("ai_pdf_allowance");
+  if (error) return fail(400, "allowance_failed", "Your AI PDF allowance could not be read.");
+  return json({ allowance: data });
+}
 
 /* ------------------------------------------------------------------ generate */
 
@@ -161,6 +176,23 @@ async function exportDeck(caller: Caller, body: Record<string, unknown>) {
   if (readError) return fail(400, "read_failed", "That deck could not be read.");
   if (!deck) return fail(404, "not_found", "That deck was not found.");
 
+  // An AI deck's PDF counts against the owner's plan allowance. The slot is
+  // reserved before rendering and committed only after the PDF is built.
+  let aiReservation: string | null = null;
+  if (deck.mode === "ai") {
+    const { data: reserved, error: reserveError } = await sb.rpc("ai_pdf_reserve", { p_deck: deckId });
+    if (reserveError) {
+      if (reserveError.hint === "ai_pdf_limit_reached") {
+        const { data: allowance } = await sb.rpc("ai_pdf_allowance");
+        return fail(402, "ai_pdf_limit_reached", reserveError.message || "You have used your free AI PDF exports. Upgrade to make more.", {
+          allowance: allowance ?? null
+        });
+      }
+      return fail(400, "export_refused", reserveError.message || "The export could not be started.");
+    }
+    aiReservation = (reserved as string | null) ?? null;
+  }
+
   // A manual deck is paid per export. An AI deck is free.
   let entitlement: string | null = null;
   if (deck.mode === "manual") {
@@ -180,8 +212,20 @@ async function exportDeck(caller: Caller, body: Record<string, unknown>) {
     pdf = buildDeckPdf({ title: deck.title, slides: deck.slides });
   } catch (error) {
     if (entitlement) await sb.rpc("deck_export_release", { p_export: entitlement });
+    if (aiReservation) await sb.rpc("ai_pdf_release", { p_export: aiReservation });
     console.error("deck pdf error", (error as Error)?.message);
     return fail(422, "empty_deck", "This deck has no slides to export yet. Add a slide, then try again. Your payment was kept.");
+  }
+
+  // Count the export only now that the PDF exists. If the count cannot be
+  // saved, the PDF is withheld so nothing is delivered for free.
+  if (aiReservation) {
+    const { error: commitError } = await sb.rpc("ai_pdf_commit", { p_export: aiReservation });
+    if (commitError) {
+      await sb.rpc("ai_pdf_release", { p_export: aiReservation });
+      console.error("ai pdf commit", commitError.message);
+      return fail(500, "export_not_counted", "The PDF could not be saved. Nothing was used. Try again in a moment.");
+    }
   }
 
   const name =

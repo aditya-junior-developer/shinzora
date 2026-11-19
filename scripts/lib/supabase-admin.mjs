@@ -116,7 +116,7 @@ export function writeJson(file, value) {
    identity rows from JSON would be reckless. Use the pg_dump path (set
    SUPABASE_DB_URL) when you need the user accounts themselves. */
 export const APPLICATION_TABLES = [
-  "profiles", "businesses", "subscriptions", "subscription_events", "onboarding_progress",
+  "profiles", "businesses", "subscriptions", "plan_ai_pdf_limits", "ai_pdf_exports", "subscription_events", "onboarding_progress",
   "projects", "project_versions", "deployments", "store_products", "inventory_movements",
   "store_orders", "store_order_items", "store_customers", "campaigns",
   "support_tickets", "support_replies", "service_requests", "service_request_notes",
