@@ -1538,3 +1538,103 @@ th,
     line-height: 1.35;
   }
 }
+
+/* ---- Investor portal (phase 2): dashboard, explore, network, connections, profile ---- */
+.inv-page { display: flex; flex-direction: column; gap: 22px; }
+.inv-section { display: flex; flex-direction: column; gap: 12px; }
+.inv-section-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 650; letter-spacing: 0.01em; }
+.inv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.inv-two { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.inv-panel { display: flex; flex-direction: column; gap: 12px; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 14px; }
+.inv-grid-compact { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.inv-card {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 10px; padding: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.inv-card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; opacity: 0.6;
+  background: linear-gradient(90deg, transparent, rgba(var(--violet-rgb), 0.95), transparent);
+}
+.inv-card:hover { transform: translateY(-2px); border-color: rgba(var(--violet-rgb), 0.45); box-shadow: 0 12px 30px -14px rgba(var(--violet-rgb), 0.55); }
+.inv-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.inv-card-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.inv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.inv-desc { margin: 0; font-size: var(--fs-sm); line-height: 1.55; opacity: 0.82; }
+.inv-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.inv-avatar {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: rgba(var(--violet-rgb), 0.25); color: var(--violet-soft); font-weight: 700;
+}
+.inv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.inv-list-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px;
+  color: inherit; text-decoration: none; transition: background 0.15s ease;
+}
+.inv-list-row:hover { background: rgba(var(--violet-rgb), 0.08); }
+.inv-list-row.is-unread { background: rgba(var(--violet-rgb), 0.07); }
+.inv-list-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.inv-banner {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 16px; color: inherit; text-decoration: none;
+  background: linear-gradient(92deg, rgba(var(--accent-rgb), 0.28), rgba(var(--accent-rgb), 0.05));
+  box-shadow: inset 0 0 0 1px rgba(var(--violet-rgb), 0.25);
+}
+.inv-banner > span { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.inv-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; align-items: end; }
+.inv-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.inv-field-wide { grid-column: span 2; }
+.inv-filter-actions { display: flex; align-items: center; }
+.inv-count { margin: 0; }
+.inv-detail { display: flex; flex-direction: column; gap: 14px; }
+.inv-detail-row { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.inv-detail-desc { margin: 0; line-height: 1.65; }
+.inv-note { display: flex; align-items: center; gap: 6px; }
+.inv-form { display: flex; flex-direction: column; gap: 18px; }
+.inv-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; }
+.inv-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; margin-top: 6px; }
+.inv-check {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: var(--fs-sm);
+  background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.inv-visibility { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; margin-top: 6px; }
+.inv-vis {
+  display: flex; gap: 10px; padding: 12px; border-radius: 14px; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+.inv-vis > span { display: flex; flex-direction: column; gap: 3px; }
+.inv-vis.is-on {
+  background: rgba(var(--accent-rgb), 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--violet-rgb), 0.8), 0 0 22px -6px rgba(var(--violet-rgb), 0.6);
+}
+.inv-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+.inv-plan { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
+.inv-plan-head { display: flex; align-items: center; gap: 14px; }
+.inv-plan-icon {
+  width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; color: #fff;
+  background: linear-gradient(135deg, rgba(var(--violet-rgb), 0.7), rgba(var(--accent-rgb), 0.45));
+}
+.inv-plan-name { display: block; font-size: 17px; }
+.inv-plain-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.6; }
+.inv-listing-row {
+  display: grid; grid-template-columns: minmax(0, 1.6fr) auto minmax(0, 1fr) auto; gap: 12px; align-items: end;
+  padding: 12px; border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.inv-listing-row .inv-card-title { gap: 4px; }
+.inv-rise { animation: inv-rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.inv-grid > .inv-rise:nth-child(2) { animation-delay: 0.05s; }
+.inv-grid > .inv-rise:nth-child(3) { animation-delay: 0.1s; }
+.inv-grid > .inv-rise:nth-child(4) { animation-delay: 0.15s; }
+.inv-grid > .inv-rise:nth-child(5) { animation-delay: 0.2s; }
+.inv-grid > .inv-rise:nth-child(6) { animation-delay: 0.25s; }
+@keyframes inv-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 900px) {
+  .inv-two { grid-template-columns: 1fr; }
+  .inv-listing-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .inv-field-wide { grid-column: auto; }
+  .inv-form-actions .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-rise, .inv-card { animation: none; transition: none; }
+}

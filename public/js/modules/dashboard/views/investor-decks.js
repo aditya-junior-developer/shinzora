@@ -12,6 +12,7 @@
    ========================================================================== */
 
 import { stageById } from "../../../lib/business-stage.js";
+import { loadListing, listingMarkup, bindListing } from "./investor-listing.js";
 import { qs, qsa, esc, on, delegate } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
@@ -127,6 +128,7 @@ async function paintList({ fresh = false } = {}) {
     .limit(20);
   const expertRequests = expertRows || [];
   const directory = await loadDirectory();
+  const listing = await loadListing().catch(() => null);
 
   root.innerHTML = `
     ${pageHead({
@@ -137,6 +139,7 @@ async function paintList({ fresh = false } = {}) {
     <div id="deck-builder" ${fresh ? "" : "hidden"}>${builderMarkup()}</div>
     ${expertRequestsMarkup(expertRequests)}
     ${investorPanelMarkup(directory)}
+    ${listingMarkup(listing)}
     ${summaryMarkup()}
     ${
       (decks || []).length
@@ -153,6 +156,7 @@ async function paintList({ fresh = false } = {}) {
   qsa("[data-deck-new]", root).forEach((btn) => on(btn, "click", () => toggleBuilder(true)));
   qsa("[data-summary]", root).forEach((btn) => on(btn, "click", () => downloadSummary(btn, btn.getAttribute("data-summary"))));
   bindBuilder();
+  bindListing(root, () => paintList());
 }
 
 /* ------------------------------------------------- investors and summary */

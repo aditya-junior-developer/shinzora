@@ -42,7 +42,10 @@ export const DECK_MAX_BULLETS = 6;
 export const DECK_MAX_BULLET_CHARS = 220;
 
 /** The views an investor may open. Everything else is refused in the router. */
-export const INVESTOR_VIEWS = ["investor", "notifications", "settings"];
+export const INVESTOR_VIEWS = ["investor", "investor-home", "investor-explore", "investor-network", "investor-connections", "investor-messages", "investor-requests", "investor-profile", "investor-subscription", "notifications", "settings"];
+
+/** Views that exist only for investor accounts. Other accounts are refused them. */
+export const INVESTOR_ONLY_VIEWS = INVESTOR_VIEWS.filter((v) => v.startsWith("investor"));
 
 /** Views only a business owner may open. */
 export const OWNER_ONLY_VIEWS = ["investor-decks"];

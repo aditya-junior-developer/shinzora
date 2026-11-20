@@ -25,7 +25,7 @@ export default async function render(host) {
     if (error) throw error;
     paint(Array.isArray(data) ? data : []);
   } catch (error) {
-    root.innerHTML = `${pageHead({ title: "Shared with you", desc: "Decks founders have shared with you." })}
+    root.innerHTML = `${pageHead({ title: "Shared With You", desc: "Decks founders have shared with you." })}
       ${setupNotice(normalizeError(error), "Shared decks")}`;
   }
 }
@@ -35,7 +35,7 @@ function paint(shares) {
      a repaint after a removal never stacks a second copy on an old list. */
   root.innerHTML = `<div class="investor-view">
     ${pageHead({
-      title: "Shared with you",
+      title: "Shared With You",
       desc: "Decks founders have chosen to share with you. Read-only.",
       badge: chip("Investor", { tone: "violet", iconName: "briefcase" })
     })}

@@ -117,13 +117,28 @@ export const AGENT_NAV = [
 export const INVESTOR_NAV = [
   {
     label: "Investor",
-    items: [{ id: "investor", label: "Shared with you", icon: "briefcase" }]
+    items: [
+      { id: "investor-home", label: "Dashboard", icon: "house" },
+      { id: "investor-explore", label: "Explore Businesses", icon: "search" },
+      { id: "investor-network", label: "Investor Network", icon: "users-round" },
+      { id: "investor-connections", label: "My Connections", icon: "users" },
+      { id: "investor", label: "Shared With You", icon: "briefcase" }
+    ]
+  },
+  {
+    label: "Communication",
+    items: [
+      { id: "investor-messages", label: "Messages", icon: "messages-square" },
+      { id: "investor-requests", label: "Requests", icon: "inbox" },
+      { id: "notifications", label: "Notifications", icon: "bell" }
+    ]
   },
   {
     label: "Account",
     items: [
-      { id: "notifications", label: "Notifications", icon: "bell" },
-      { id: "settings", label: "Settings", icon: "settings" }
+      { id: "investor-profile", label: "Profile", icon: "id-card" },
+      { id: "settings", label: "Settings", icon: "settings" },
+      { id: "investor-subscription", label: "Subscription", icon: "credit-card" }
     ]
   }
 ];
@@ -150,6 +165,12 @@ export function renderSidebar(activeView) {
   const nav = qs("#sidebar-nav");
   if (!nav) return;
   const credits = aiCredits();
+  const investor = state.profile?.account_type === "investor";
+  /* Investors have no AI tools, so the AI usage meter and the chat list are hidden for them. */
+  const usage = qs("#ai-usage-card");
+  if (usage) usage.style.display = investor ? "none" : "";
+  const chats = qs("#sidebar-chats");
+  if (chats) chats.style.display = investor ? "none" : "";
   nav.innerHTML = navFor().map(
     (group) => `<div class="sidebar-group">
         <div class="sidebar-group-label">${esc(group.label)}</div>
@@ -190,6 +211,7 @@ let recentChatToken = 0;
 export async function renderRecentChats() {
   const host = qs("#sidebar-recent");
   if (!host) return;
+  if (state.profile?.account_type === "investor") return;
   const myToken = ++recentChatToken;
 
   try {

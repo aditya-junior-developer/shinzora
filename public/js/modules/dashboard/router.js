@@ -5,7 +5,7 @@
    /app/?view=orders&id=… so any view is linkable and reload-safe.
    ========================================================================== */
 
-import { INVESTOR_VIEWS, OWNER_ONLY_VIEWS } from "../../config/investor-deck.js";
+import { INVESTOR_VIEWS, INVESTOR_ONLY_VIEWS, OWNER_ONLY_VIEWS } from "../../config/investor-deck.js";
 import { MEETINGS_ENABLED } from "../../config/env.js";
 import { skeletonView, setupNotice, pageHead } from "./components.js";
 import { normalizeError } from "../../lib/supabase.js";
@@ -42,7 +42,15 @@ const LOADERS = {
   billing: () => import("./views/billing.js"),
   settings: () => import("./views/settings.js"),
   "investor-decks": () => import("./views/investor-decks.js"),
-  investor: () => import("./views/investor.js")
+  investor: () => import("./views/investor.js"),
+  "investor-home": () => import("./views/investor-home.js"),
+  "investor-explore": () => import("./views/investor-explore.js"),
+  "investor-network": () => import("./views/investor-network.js"),
+  "investor-connections": () => import("./views/investor-connections.js"),
+  "investor-messages": () => import("./views/investor-soon.js"),
+  "investor-requests": () => import("./views/investor-soon.js"),
+  "investor-profile": () => import("./views/investor-profile.js"),
+  "investor-subscription": () => import("./views/investor-subscription.js")
 };
 
 export const DEFAULT_VIEW = "overview";
@@ -50,7 +58,7 @@ export const DEFAULT_VIEW = "overview";
 /* An agent account has no business to overview, so its front door is the
    freelancer dashboard. Explicit ?view= always wins. */
 export function landingView() {
-  if (state.profile?.account_type === "investor") return "investor";
+  if (state.profile?.account_type === "investor") return "investor-home";
   return state.profile?.account_type === "agent" ? "freelancer" : DEFAULT_VIEW;
 }
 
@@ -64,6 +72,7 @@ export function allowedView(view) {
   if (!type) return true;
   if (type === "investor") return INVESTOR_VIEWS.includes(view);
   if (view === "investor") return false;
+  if (INVESTOR_ONLY_VIEWS.includes(view)) return false;
   if (OWNER_ONLY_VIEWS.includes(view)) return type === "owner";
   return true;
 }
