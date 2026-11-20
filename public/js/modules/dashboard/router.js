@@ -47,8 +47,8 @@ const LOADERS = {
   "investor-explore": () => import("./views/investor-explore.js"),
   "investor-network": () => import("./views/investor-network.js"),
   "investor-connections": () => import("./views/investor-connections.js"),
-  "investor-messages": () => import("./views/investor-soon.js"),
-  "investor-requests": () => import("./views/investor-soon.js"),
+  "investor-messages": () => import("./views/investor-messages.js"),
+  "investor-requests": () => import("./views/investor-requests.js"),
   "investor-profile": () => import("./views/investor-profile.js"),
   "investor-subscription": () => import("./views/investor-subscription.js")
 };

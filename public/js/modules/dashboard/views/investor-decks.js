@@ -13,6 +13,7 @@
 
 import { stageById } from "../../../lib/business-stage.js";
 import { loadListing, listingMarkup, bindListing } from "./investor-listing.js";
+import { loadPitches, pitchesMarkup, bindPitches } from "./owner-pitches.js";
 import { qs, qsa, esc, on, delegate } from "../../../lib/dom.js";
 import { icon } from "../../../lib/icons.js";
 import { sb, normalizeError } from "../../../lib/supabase.js";
@@ -129,6 +130,7 @@ async function paintList({ fresh = false } = {}) {
   const expertRequests = expertRows || [];
   const directory = await loadDirectory();
   const listing = await loadListing().catch(() => null);
+  const pitches = await loadPitches();
 
   root.innerHTML = `
     ${pageHead({
@@ -140,6 +142,7 @@ async function paintList({ fresh = false } = {}) {
     ${expertRequestsMarkup(expertRequests)}
     ${investorPanelMarkup(directory)}
     ${listingMarkup(listing)}
+    ${pitchesMarkup(pitches, { businesses: listing || [], investors: directory.investors })}
     ${summaryMarkup()}
     ${
       (decks || []).length
@@ -157,6 +160,7 @@ async function paintList({ fresh = false } = {}) {
   qsa("[data-summary]", root).forEach((btn) => on(btn, "click", () => downloadSummary(btn, btn.getAttribute("data-summary"))));
   bindBuilder();
   bindListing(root, () => paintList());
+  bindPitches(root, { refresh: () => paintList(), businesses: listing || [], investors: directory.investors });
 }
 
 /* ------------------------------------------------- investors and summary */

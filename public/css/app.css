@@ -1638,3 +1638,169 @@ th,
 @media (prefers-reduced-motion: reduce) {
   .inv-rise, .inv-card { animation: none; transition: none; }
 }
+
+/* ==========================================================================
+   Investor portal · phase 3 — messages, requests, owner pitches
+   Tokens only (no literal accent colours). Two columns on desktop; on phones
+   the inbox and the thread take turns, with a Back button.
+   ========================================================================== */
+
+.dm-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  min-height: 62vh;
+}
+.dm-inbox,
+.dm-main {
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dm-inbox-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-violet-soft, rgba(var(--violet-rgb), 0.18));
+  color: var(--text-2);
+}
+.dm-list-items { list-style: none; margin: 0; padding: 6px; display: grid; gap: 4px; overflow: auto; }
+.dm-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.dm-item:hover,
+.dm-item:focus-visible { background: rgba(var(--violet-rgb), 0.08); outline: none; }
+.dm-item.is-active { background: rgba(var(--violet-rgb), 0.16); border-color: var(--line-violet, rgba(var(--violet-rgb), 0.35)); }
+.dm-item.is-unread strong { color: var(--white); }
+.dm-item-main { display: grid; gap: 2px; min-width: 0; }
+.dm-item-meta { display: grid; justify-items: end; gap: 4px; flex-shrink: 0; }
+
+.dm-main-head { display: none; }
+.dm-back { display: none; }
+.dm-thread-box { flex: 1; display: flex; min-height: 0; }
+.dm-thread { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.dm-thread-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-violet-soft, rgba(var(--violet-rgb), 0.18));
+  min-width: 0;
+}
+.dm-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 260px;
+  max-height: 58vh;
+}
+.dm-row { display: flex; justify-content: flex-start; }
+.dm-row.is-me { justify-content: flex-end; }
+.dm-bubble {
+  max-width: min(78%, 520px);
+  padding: 9px 12px 7px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line-violet-soft, rgba(var(--violet-rgb), 0.18));
+  animation: dm-in 0.22s ease both;
+}
+.dm-row.is-me .dm-bubble {
+  border-radius: 14px 14px 4px 14px;
+  background: linear-gradient(135deg, rgba(var(--violet-rgb), 0.38), rgba(var(--violet-rgb), 0.18));
+  border-color: var(--line-violet, rgba(var(--violet-rgb), 0.35));
+}
+.dm-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.dm-time { display: block; margin-top: 4px; font-size: 11px; color: var(--text-3); text-align: right; }
+.dm-empty { margin: auto; text-align: center; }
+.dm-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-violet-soft, rgba(var(--violet-rgb), 0.18));
+}
+.dm-input { flex: 1; min-height: 42px; max-height: 140px; resize: vertical; }
+.dm-live { white-space: nowrap; }
+
+@keyframes dm-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Requests and the owner's pitch tracker */
+.req-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+.req-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-violet-soft, rgba(var(--violet-rgb), 0.2));
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.req-tab:hover { color: var(--text); background: rgba(var(--violet-rgb), 0.08); }
+.req-tab[aria-selected="true"] { background: rgba(var(--violet-rgb), 0.22); color: var(--white); border-color: var(--line-violet, rgba(var(--violet-rgb), 0.4)); }
+.req-tab-count { font-size: 11px; color: var(--text-3); }
+.req-list { display: grid; gap: 14px; }
+.req-card { display: grid; gap: 12px; }
+.req-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-width: 0; }
+.req-title { min-width: 0; display: grid; gap: 2px; }
+.req-name { margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+.req-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
+.req-facts dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+.req-facts dd { margin: 2px 0 0; color: var(--text); }
+.req-summary { margin: 0; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.req-info {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(var(--violet-rgb), 0.1);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.req-files { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.req-actions { flex-wrap: wrap; }
+.owner-pitches { margin-top: 18px; }
+.owner-pitches-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.owner-thread { display: flex; flex-direction: column; min-height: 360px; }
+.owner-thread .dm-stream { max-height: 50vh; }
+
+@media (max-width: 760px) {
+  .dm-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .dm-layout.is-thread-open .dm-inbox { display: none; }
+  .dm-layout:not(.is-thread-open) .dm-main { display: none; }
+  .dm-main-head {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-violet-soft, rgba(var(--violet-rgb), 0.18));
+  }
+  .dm-back { display: inline-flex; }
+  .dm-bubble { max-width: 88%; }
+  .dm-stream { max-height: 60vh; }
+  .req-head { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-bubble, .dm-item, .req-tab { animation: none !important; transition: none !important; }
+}

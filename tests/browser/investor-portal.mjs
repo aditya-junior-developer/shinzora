@@ -328,12 +328,16 @@ console.log("\n[Subscription]");
 }
 
 /* -------------------------------------------------- placeholder honesty */
-console.log("\n[Messages and Requests (phase 3)]");
+console.log("\n[Messages and Requests are live (phase 3)]");
 {
-  const { ctx, page, errors } = await open(browser, { width: 1440, height: 900 }, "/app/?view=investor-requests");
-  ok("Requests says it opens in the next update", (await page.textContent("#view-root")).includes("next update"));
-  ok("no page errors on requests", errors.length === 0);
-  await ctx.close();
+  const r = await open(browser, { width: 1440, height: 900 }, "/app/?view=investor-requests");
+  ok("Requests is the live page, not a placeholder", (await r.page.locator("#req-tabs").count()) === 1 && !(await r.page.textContent("#view-root")).includes("next update"));
+  ok("no page errors on requests", r.errors.length === 0);
+  await r.ctx.close();
+  const m = await open(browser, { width: 1440, height: 900 }, "/app/?view=investor-messages");
+  ok("Messages is the live page, not a placeholder", (await m.page.locator(".dm-layout").count()) === 1 && !(await m.page.textContent("#view-root")).includes("next update"));
+  ok("no page errors on messages", m.errors.length === 0);
+  await m.ctx.close();
 }
 
 await browser.close();

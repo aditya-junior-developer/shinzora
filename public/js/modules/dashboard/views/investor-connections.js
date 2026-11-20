@@ -11,9 +11,11 @@ import { toast, toastError } from "../../../ui/toast.js";
 import { rpc, fmtTime } from "./investor-kit.js";
 
 let host = null;
+let navigateTo = () => {};
 
-export default async function render(root) {
+export default async function render(root, { navigate } = {}) {
   host = root;
+  navigateTo = navigate || (() => {});
   host.innerHTML = `<div class="investor-view inv-page">
     ${pageHead({
       title: "My Connections",
@@ -62,7 +64,8 @@ function paint(rows) {
     ${section("Requests you sent", outgoing, () => `<span class="badge badge-neutral">${icon("clock", { size: 12 })} Waiting for reply</span>`,
       "You have no requests waiting for a reply.")}
     ${declinedSent.length ? section("Declined", declinedSent, (r) => `<button class="btn btn-ghost btn-sm" type="button" data-connect="${esc(r.user_id)}">Send again</button>`) : ""}
-    ${section("Connected", connected, () => `<span class="badge badge-ok">${icon("circle-check", { size: 12 })} Connected</span>`,
+    ${section("Connected", connected, (r) => `<span class="badge badge-ok">${icon("circle-check", { size: 12 })} Connected</span>
+      <button class="btn btn-ghost btn-sm" type="button" data-message-user="${esc(r.user_id)}">${icon("messages-square", { size: 13 })} Message</button>`,
       "You are not connected with anyone yet.")}`;
 }
 
@@ -85,6 +88,18 @@ function section(title, items, actionFor, empty = "") {
 }
 
 async function onClick(event) {
+  const message = event.target.closest?.("[data-message-user]");
+  if (message) {
+    message.disabled = true;
+    try {
+      const conversation = await rpc("open_direct_conversation", { p_user: message.getAttribute("data-message-user") });
+      navigateTo("investor-messages", { conversation: String(conversation) });
+    } catch (error) {
+      message.disabled = false;
+      toastError(error);
+    }
+    return;
+  }
   const respond = event.target.closest?.("[data-respond]");
   if (respond) {
     respond.disabled = true;
